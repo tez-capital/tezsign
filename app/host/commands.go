@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/tez-capital/tezsign/broker"
 	"github.com/tez-capital/tezsign/common"
 	"github.com/tez-capital/tezsign/keychain"
@@ -263,14 +264,14 @@ func cmdList() *cli.Command {
 				return nil
 			}
 
-			// collect aliases (ids) only
-			ids := make([]string, 0, len(st.GetKeys()))
+			// collect aliases (keys) and tz4 only
+			keys := make(map[string]string, len(st.GetKeys()))
 			for _, k := range st.GetKeys() {
-				ids = append(ids, k.GetKeyId())
+				keys[k.GetKeyId()] = k.GetTz4()
 			}
 
 			if !isTTY(os.Stdout) {
-				return json.NewEncoder(os.Stdout).Encode(ids)
+				return json.NewEncoder(os.Stdout).Encode(keys)
 			}
 
 			// Render as chips/bubbles
@@ -278,7 +279,7 @@ func cmdList() *cli.Command {
 			if w <= 0 {
 				w = 80
 			}
-			fmt.Println(renderAliasChips(ids, w))
+			fmt.Println(renderAliasChips(lo.Keys(keys), w))
 
 			return nil
 		},
