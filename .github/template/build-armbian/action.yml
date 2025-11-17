@@ -37,6 +37,10 @@ inputs:
     artifact_id:
         description: 'Output Image Artifact Identifier'
         required: true
+    tezsign-flavour:
+        description: 'TezSign flavour to build'
+        required: false
+        default: 'prod'
 
 runs:
   using: "composite"
@@ -79,6 +83,11 @@ runs:
         rsync -av os/userpatches/. build/userpatches/
         if [[ -d armbian_userpatches ]]; then
         rsync -av armbian_userpatches/. build/userpatches/
+        fi
+
+        # disable customize_image.sh in dev builds
+        if [[ "${{ inputs.tezsign-flavour }}" == "dev" ]]; then
+          rm build/userpatches/customize_image.sh
         fi
 
         # config/boards/radxa-zero3.csc comment out enable_extension "radxa-aic8800"

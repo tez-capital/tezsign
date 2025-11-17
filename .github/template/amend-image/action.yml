@@ -12,6 +12,10 @@ inputs:
     required: false
     description: 'Create tezsign_gadget_binary artifact'
     default: 'false'
+  tezsign-flavour:
+    description: 'TezSign flavour to build'
+    required: false
+    default: 'prod'
 
 runs:
   using: "composite"
@@ -48,22 +52,26 @@ runs:
     run: ls -la ./imgs
 
   - name: Reconfigure to dev image
+    if: ${{ inputs.tezsign-flavour == 'dev' }}
     shell: bash
     run: |
       sudo docker run -e CGO_ENABLED=0 --rm --privileged -v ${{ github.workspace }}/:/work tezsign/builder:latest ./tools/bin/builder ./imgs/${{ inputs.source_artifact }}.img ./imgs/${{ inputs.image_id }}.dev.img.xz dev
 
   - name: Reconfigure to prod image
+    if: ${{ inputs.tezsign-flavour == 'prod' }}
     shell: bash
     run: |
       sudo docker run -e CGO_ENABLED=0 --rm --privileged -v ${{ github.workspace }}/:/work tezsign/builder:latest ./tools/bin/builder ./imgs/${{ inputs.source_artifact }}.img ./imgs/${{ inputs.image_id }}.img.xz prod
 
-  - uses: actions/upload-artifact@v5  
+  - uses: actions/upload-artifact@v5
+    if: ${{ inputs.tezsign-flavour == 'prod' }}
     with:
       name: ${{ inputs.image_id }}.img.xz
       path: ${{ github.workspace }}/imgs/${{ inputs.image_id }}.img.xz
       retention-days: 1
 
   - uses: actions/upload-artifact@v5  
+    if: ${{ inputs.tezsign-flavour == 'dev' }}
     with:
       name: ${{ inputs.image_id }}.dev.img.xz
       path: ${{ github.workspace }}/imgs/${{ inputs.image_id }}.dev.img.xz
