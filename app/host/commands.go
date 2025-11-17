@@ -493,11 +493,6 @@ func cmdLock() *cli.Command {
 
 			keys := resolveKeysFromEnvOrArgs(c.Args().Slice())
 
-			// If no args AND non-TTY -> silent success (exit 0)
-			if len(keys) == 0 && !isTTY(os.Stdout) {
-				return nil
-			}
-
 			// If interactive TTY and no keys -> open picker to choose keys
 			if len(keys) == 0 && isTTY(os.Stdout) {
 				chosen, aborted, err := runKeyPicker(b)
@@ -511,6 +506,19 @@ func cmdLock() *cli.Command {
 					return ErrNoKeysSelected
 				}
 				keys = chosen
+			}
+
+			if len(keys) == 0 {
+				st, err := common.ReqStatus(b)
+				if err != nil {
+					return err
+				}
+				if st == nil || len(st.GetKeys()) == 0 {
+					return nil
+				}
+				keys = lo.Map(st.GetKeys(), func(key *signer.KeyStatus, _ int) string {
+					return key.GetKeyId()
+				})
 			}
 
 			res, err := common.ReqLock(b, keys)
