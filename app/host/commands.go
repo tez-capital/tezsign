@@ -302,9 +302,9 @@ func cmdNewKeys() *cli.Command {
 			}
 			defer keychain.MemoryWipe(pass)
 
-			aliases := c.Args().Slice()
+			keys := c.Args().Slice()
 
-			results, err := common.ReqNewKeys(b, aliases, pass)
+			results, err := common.ReqNewKeys(b, keys, pass)
 			if err != nil {
 				return err
 			}
@@ -393,7 +393,7 @@ func cmdStatus() *cli.Command {
 	}
 }
 
-func cmdUnlock() *cli.Command {
+func cmdUnlockKeys() *cli.Command {
 	return &cli.Command{
 		Name:      "unlock",
 		Usage:     "Unlock one or more keys",
@@ -425,7 +425,7 @@ func cmdUnlock() *cli.Command {
 					// Silent success if no keys to unlock and empty passphrase
 					return nil
 				}
-				return err
+				return fmt.Errorf("unlock keys: %w", err)
 			}
 			defer keychain.MemoryWipe(pass)
 
@@ -439,7 +439,7 @@ func cmdUnlock() *cli.Command {
 				})
 			}
 
-			res, err := common.ReqUnlock(b, keys, pass)
+			res, err := common.ReqUnlockKeys(b, keys, pass)
 			if err != nil {
 				return err
 			}
@@ -482,7 +482,7 @@ func cmdUnlock() *cli.Command {
 	}
 }
 
-func cmdLock() *cli.Command {
+func cmdLockKeys() *cli.Command {
 	return &cli.Command{
 		Name:      "lock",
 		Usage:     "Lock one or more keys",
@@ -491,7 +491,7 @@ func cmdLock() *cli.Command {
 			h := mustHost(ctx)
 			b := h.Session.Broker
 
-			keys := resolveKeysFromEnvOrArgs(c.Args().Slice())
+			keys := c.Args().Slice()
 
 			// If interactive TTY and no keys -> open picker to choose keys
 			if len(keys) == 0 && isTTY(os.Stdout) {
@@ -521,7 +521,86 @@ func cmdLock() *cli.Command {
 				})
 			}
 
-			res, err := common.ReqLock(b, keys)
+			res, err := common.ReqLockKeys(b, keys)
+			if err != nil {
+				return err
+			}
+
+			if !isTTY(os.Stdout) {
+				out := make([]keyStateJSON, 0, len(res))
+				for _, r := range res {
+					o := keyStateJSON{ID: r.GetKeyId(), OK: r.GetOk()}
+					if !r.GetOk() {
+						o.Err = r.GetError()
+					}
+					out = append(out, o)
+				}
+				return json.NewEncoder(os.Stdout).Encode(out)
+			}
+
+			okLabels := make([]string, 0, len(res))
+			errLabels := make([]string, 0)
+			for _, r := range res {
+				if r.GetOk() {
+					okLabels = append(okLabels, r.GetKeyId()+" ✓")
+				} else {
+					errLabels = append(errLabels, r.GetKeyId()+" ✗")
+				}
+			}
+
+			w, _, _ := term.GetSize(int(os.Stdout.Fd()))
+			if len(okLabels) > 0 {
+				fmt.Println(renderChips(okLabels, chipOkStyle, w))
+			}
+			if len(errLabels) > 0 {
+				if len(okLabels) > 0 {
+					fmt.Println()
+				}
+				fmt.Println(renderChips(errLabels, chipErrStyle, w))
+			}
+
+			return nil
+		},
+	}
+}
+
+func cmdDeleteKeys() *cli.Command {
+	return &cli.Command{
+		Name:      "delete",
+		Usage:     "Delete one or more keys from the gadget (requires master passphrase)",
+		ArgsUsage: "alias1 alias2 ...",
+		Action: func(ctx context.Context, c *cli.Command) error {
+			h := mustHost(ctx)
+			b := h.Session.Broker
+
+			keys := c.Args().Slice()
+
+			// If interactive TTY and no keys -> open picker to choose keys
+			if len(keys) == 0 && isTTY(os.Stdout) {
+				chosen, aborted, err := runKeyPicker(b)
+				if err != nil {
+					return err
+				}
+				if aborted {
+					return ErrAborted
+				}
+				if len(chosen) == 0 {
+					return ErrNoKeysSelected
+				}
+				keys = chosen
+			}
+
+			pass, err := obtainPassword("Master passphrase", false)
+			if err != nil {
+				if errors.Is(err, ErrEmptyPassphrase) && len(keys) == 0 {
+					// Silent success if no keys to delete and empty passphrase
+					return nil
+				}
+				return fmt.Errorf("delete keys: %w", err)
+			}
+			defer keychain.MemoryWipe(pass)
+
+			res, err := common.ReqDeleteKeys(b, keys, pass)
 			if err != nil {
 				return err
 			}

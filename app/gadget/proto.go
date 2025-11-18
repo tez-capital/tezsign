@@ -43,5 +43,10 @@ func wipeReq(r *signer.Request) {
 			keychain.MemoryWipe(p.NewKeys.Passphrase)
 			p.NewKeys.Passphrase = nil
 		}
+	case *signer.Request_DeleteKeys:
+		if p.DeleteKeys != nil && p.DeleteKeys.Passphrase != nil {
+			keychain.MemoryWipe(p.DeleteKeys.Passphrase)
+			p.DeleteKeys.Passphrase = nil
+		}
 	}
 }

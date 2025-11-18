@@ -120,6 +120,15 @@ message SetLevelRequest {
   uint64   level   = 3;
 }
 
+// ---- delete keys ----
+message DeleteKeysRequest {
+  repeated string key_ids    = 1;
+  bytes           passphrase = 2;
+}
+message DeleteKeysResponse {
+  repeated PerKeyResult results = 1;
+}
+
 
 message Ok {
   bool ok = 1;
@@ -141,20 +150,22 @@ message Request {
     InitMasterRequest init_master = 7;
     InitInfoRequest   init_info   = 8;
     SetLevelRequest   set_level   = 9;
+    DeleteKeysRequest delete_keys = 10;
   }
 }
 
 message Response {
   oneof payload {
-    UnlockResponse   unlock    = 1;
-    LockResponse     lock      = 2;
-    StatusResponse   status    = 3;
-    SignResponse     sign      = 4;
-    NewKeysResponse  new_key   = 5;
-    LogsResponse     logs      = 6;
-    InitInfoResponse init_info = 7;
+    UnlockResponse     unlock      = 1;
+    LockResponse       lock        = 2;
+    StatusResponse     status      = 3;
+    SignResponse       sign        = 4;
+    NewKeysResponse    new_key     = 5;
+    LogsResponse       logs        = 6;
+    InitInfoResponse   init_info   = 7;
+    DeleteKeysResponse delete_keys = 8;
 
-    Ok               ok        = 15; // for init_master & set_level
-    Error            error     = 16;
+    Ok                 ok          = 15; // for init_master & set_level
+    Error              error       = 16;
   }
 }

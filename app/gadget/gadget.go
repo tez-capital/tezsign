@@ -21,11 +21,11 @@ import (
 const (
 	waitEndpointsTime = 30 * time.Second
 
-	unlockAttemptWindow = 30 * time.Second
-	unlockAttemptLimit  = 5
+	securedAttemptWindow = 30 * time.Second
+	securedAttemptLimit  = 5
 )
 
-var unlockLimiter = newAttemptLimiter(unlockAttemptLimit, unlockAttemptWindow)
+var securedRPCLimiter = newAttemptLimiter(securedAttemptLimit, securedAttemptWindow)
 
 func main() {
 	logCfg := logging.NewConfigFromEnv()
@@ -165,15 +165,15 @@ func run(l *slog.Logger) error {
 				return marshalErr(10, "unlock: no key_ids provided"), nil
 			}
 			if len(pass) == 0 {
-				return marshalErr(11, "unlock: empty password is not allowed"), nil
+				return marshalErr(11, "unlock: passphrase required"), nil
 			}
-			if ok, wait := unlockLimiter.Allow(); !ok {
+			if ok, wait := securedRPCLimiter.Allow(); !ok {
 				l.Warn("unlock throttled", slog.Duration("retry_in", wait))
 				msg := fmt.Sprintf(
 					"unlock throttled: retry in ~%s (max %d attempts per %s)",
 					wait.Round(time.Second),
-					unlockAttemptLimit,
-					unlockAttemptWindow,
+					securedAttemptLimit,
+					securedAttemptWindow,
 				)
 				return marshalErr(rpcUnlockThrottled, msg), nil
 			}
@@ -191,6 +191,8 @@ func run(l *slog.Logger) error {
 				}
 				results = append(results, res)
 			}
+
+			l.Debug("UNLOCK batch", "count", len(ids))
 
 			return proto.Marshal(&signer.Response{
 				Payload: &signer.Response_Unlock{
@@ -219,6 +221,7 @@ func run(l *slog.Logger) error {
 			}
 
 			l.Debug("LOCK batch", "count", len(ids))
+
 			return proto.Marshal(&signer.Response{
 				Payload: &signer.Response_Lock{
 					Lock: &signer.LockResponse{Results: results},
@@ -298,6 +301,51 @@ func run(l *slog.Logger) error {
 			return proto.Marshal(&signer.Response{
 				Payload: &signer.Response_NewKey{
 					NewKey: &signer.NewKeysResponse{
+						Results: results,
+					},
+				},
+			})
+
+		case *signer.Request_DeleteKeys:
+			pass := p.DeleteKeys.GetPassphrase()
+			defer keychain.MemoryWipe(pass)
+			ids := p.DeleteKeys.GetKeyIds()
+			if len(ids) == 0 {
+				return marshalErr(90, "delete_keys: no key_ids provided"), nil
+			}
+			if len(pass) == 0 {
+				return marshalErr(91, "delete_keys: passphrase required"), nil
+			}
+			if ok, wait := securedRPCLimiter.Allow(); !ok {
+				l.Warn("delete throttled", slog.Duration("retry_in", wait))
+				msg := fmt.Sprintf(
+					"delete throttled: retry in ~%s (max %d attempts per %s)",
+					wait.Round(time.Second),
+					securedAttemptLimit,
+					securedAttemptWindow,
+				)
+				return marshalErr(rpcDeleteThrottled, msg), nil
+			}
+
+			results := make([]*signer.PerKeyResult, 0, len(ids))
+			for _, alias := range ids {
+				res := &signer.PerKeyResult{KeyId: alias}
+				if err := kr.DeleteKey(alias); err != nil {
+					res.Ok = false
+					res.Error = err.Error()
+					l.Error("DELETE_KEY", "key", alias, "err", err)
+				} else {
+					res.Ok = true
+					l.Debug("DELETE_KEY", "key", alias)
+				}
+				results = append(results, res)
+			}
+
+			l.Debug("DELETE_KEY batch", "count", len(ids))
+
+			return proto.Marshal(&signer.Response{
+				Payload: &signer.Response_DeleteKeys{
+					DeleteKeys: &signer.DeleteKeysResponse{
 						Results: results,
 					},
 				},

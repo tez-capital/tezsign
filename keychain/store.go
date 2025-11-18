@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 	"time"
 	unsafe "unsafe"
 
@@ -37,16 +38,18 @@ var (
 )
 
 type FileStore struct {
-	base string
+	base     string
+	masterMu sync.Mutex
 }
 
 // ----- on-disk formats -----
 
 type masterFile struct {
-	Version int          `json:"version"`
-	Salt    []byte       `json:"salt"` // Argon2id salt
-	Params  argon2Params `json:"params"`
-	Created time.Time    `json:"created"`
+	Version                int          `json:"version"`
+	Salt                   []byte       `json:"salt"` // Argon2id salt
+	Params                 argon2Params `json:"params"`
+	Created                time.Time    `json:"created"`
+	NextDeterministicIndex uint64       `json:"next_det_index,omitempty"`
 }
 
 type argon2Params struct {
@@ -165,12 +168,41 @@ func (fs *FileStore) InitMaster() error {
 		return ErrMasterJSONAlreadyInitialized
 	}
 	mf := masterFile{
-		Version: storeFormatVersion,
-		Salt:    randBytes(16),
-		Params:  argon2Params{Time: 3, Memory: 64 * 1024, Threads: 4, KeyLen: 32},
-		Created: time.Now().UTC(),
+		Version:                storeFormatVersion,
+		Salt:                   randBytes(16),
+		Params:                 argon2Params{Time: 3, Memory: 64 * 1024, Threads: 4, KeyLen: 32},
+		Created:                time.Now().UTC(),
+		NextDeterministicIndex: 1,
 	}
 	return writeJSONAtomic(masterPath, &mf, 0o600)
+}
+
+func (fs *FileStore) nextDeterministicIndex() (uint32, error) {
+	fs.masterMu.Lock()
+	defer fs.masterMu.Unlock()
+
+	masterPath := filepath.Join(fs.base, masterFileName)
+	var mf masterFile
+	if err := readJSON(masterPath, &mf); err != nil {
+		return 0, err
+	}
+
+	if mf.NextDeterministicIndex == 0 {
+		ids, err := fs.list()
+		if err != nil {
+			return 0, err
+		}
+		mf.NextDeterministicIndex = uint64(len(ids)) + 1
+	}
+
+	idx := mf.NextDeterministicIndex
+	mf.NextDeterministicIndex++
+
+	if err := writeJSONAtomic(masterPath, &mf, 0o600); err != nil {
+		return 0, err
+	}
+
+	return uint32(idx), nil
 }
 
 // InitInfo returns (master.json present, deterministic flag)

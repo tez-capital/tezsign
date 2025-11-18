@@ -104,7 +104,7 @@ func main() {
 	// }
 
 	// 3) unlock key1
-	rs, err := common.ReqUnlock(b, []string{key}, masterPass)
+	rs, err := common.ReqUnlockKeys(b, []string{key}, masterPass)
 	if err != nil {
 		l.Error("unlock", slog.Any("err", err))
 		return
@@ -144,7 +144,7 @@ func main() {
 	// }
 
 	// 10) lock key
-	rs, err = common.ReqLock(b, []string{key})
+	rs, err = common.ReqLockKeys(b, []string{key})
 	if err != nil {
 		l.Error("lock", slog.Any("err", err))
 	}
