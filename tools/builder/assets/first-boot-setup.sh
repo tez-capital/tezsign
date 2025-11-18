@@ -63,6 +63,7 @@ echo "[+] Users configured."
 
 ### 4) Device identity / hostname / serial
 hostnamectl set-hostname tezsign
+echo "127.0.1.1 $(cat /etc/hostname)" >> /etc/hosts # ensure hostname resolves locally
 
 # Generate/persist device serial (goes to /app/tezsign_id)
 /usr/local/bin/generate-serial-number.sh >/dev/null

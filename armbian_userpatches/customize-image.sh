@@ -2,6 +2,8 @@
 
 set -e
 
+echo "127.0.1.1 $(cat /etc/hostname)" >> /etc/hosts
+
 # This command checks if the package status is NOT 'no such package' (i.e., it exists)
 # and then purges only the packages that are found.
 sudo apt update
