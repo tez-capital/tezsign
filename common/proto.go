@@ -10,7 +10,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func ReqUnlock(b *broker.Broker, keys []string, pass []byte) ([]*signer.PerKeyResult, error) {
+func ReqUnlockKeys(b *broker.Broker, keys []string, pass []byte) ([]*signer.PerKeyResult, error) {
 	p := append([]byte(nil), pass...)
 	defer keychain.MemoryWipe(p)
 
@@ -29,7 +29,7 @@ func ReqUnlock(b *broker.Broker, keys []string, pass []byte) ([]*signer.PerKeyRe
 	return resp.GetUnlock().GetResults(), nil
 }
 
-func ReqLock(b *broker.Broker, keys []string) ([]*signer.PerKeyResult, error) {
+func ReqLockKeys(b *broker.Broker, keys []string) ([]*signer.PerKeyResult, error) {
 	resp, err := doReq(b, &signer.Request{
 		Payload: &signer.Request_Lock{
 			Lock: &signer.LockRequest{
@@ -91,6 +91,24 @@ func ReqNewKeys(b *broker.Broker, keyIDs []string, pass []byte) ([]*signer.NewKe
 		return nil, err
 	}
 	return resp.GetNewKey().GetResults(), nil
+}
+
+func ReqDeleteKeys(b *broker.Broker, keyIDs []string, pass []byte) ([]*signer.PerKeyResult, error) {
+	p := append([]byte(nil), pass...)
+	defer keychain.MemoryWipe(p)
+
+	resp, err := doReq(b, &signer.Request{
+		Payload: &signer.Request_DeleteKeys{
+			DeleteKeys: &signer.DeleteKeysRequest{
+				KeyIds:     keyIDs,
+				Passphrase: p,
+			},
+		},
+	}, 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return resp.GetDeleteKeys().GetResults(), nil
 }
 
 func ReqLogs(b *broker.Broker, limit int) ([]string, error) {

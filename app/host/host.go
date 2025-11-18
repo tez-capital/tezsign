@@ -37,8 +37,9 @@ func main() {
 			withBefore(cmdList(), withSession(common.ChanMgmt)),
 			withBefore(cmdNewKeys(), withSession(common.ChanMgmt)),
 			withBefore(cmdStatus(), withSession(common.ChanMgmt)),
-			withBefore(cmdUnlock(), withSession(common.ChanMgmt)),
-			withBefore(cmdLock(), withSession(common.ChanMgmt)),
+			withBefore(cmdUnlockKeys(), withSession(common.ChanMgmt)),
+			withBefore(cmdLockKeys(), withSession(common.ChanMgmt)),
+			withBefore(cmdDeleteKeys(), withSession(common.ChanMgmt)),
 
 			cmdAdvanced(),
 		},

@@ -1090,6 +1090,103 @@ func (x *SetLevelRequest) GetLevel() uint64 {
 	return 0
 }
 
+// ---- delete keys ----
+type DeleteKeysRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	KeyIds        []string               `protobuf:"bytes,1,rep,name=key_ids,json=keyIds,proto3" json:"key_ids,omitempty"`
+	Passphrase    []byte                 `protobuf:"bytes,2,opt,name=passphrase,proto3" json:"passphrase,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteKeysRequest) Reset() {
+	*x = DeleteKeysRequest{}
+	mi := &file_signer_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteKeysRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteKeysRequest) ProtoMessage() {}
+
+func (x *DeleteKeysRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_signer_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteKeysRequest.ProtoReflect.Descriptor instead.
+func (*DeleteKeysRequest) Descriptor() ([]byte, []int) {
+	return file_signer_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *DeleteKeysRequest) GetKeyIds() []string {
+	if x != nil {
+		return x.KeyIds
+	}
+	return nil
+}
+
+func (x *DeleteKeysRequest) GetPassphrase() []byte {
+	if x != nil {
+		return x.Passphrase
+	}
+	return nil
+}
+
+type DeleteKeysResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Results       []*PerKeyResult        `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteKeysResponse) Reset() {
+	*x = DeleteKeysResponse{}
+	mi := &file_signer_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteKeysResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteKeysResponse) ProtoMessage() {}
+
+func (x *DeleteKeysResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_signer_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteKeysResponse.ProtoReflect.Descriptor instead.
+func (*DeleteKeysResponse) Descriptor() ([]byte, []int) {
+	return file_signer_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *DeleteKeysResponse) GetResults() []*PerKeyResult {
+	if x != nil {
+		return x.Results
+	}
+	return nil
+}
+
 type Ok struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
@@ -1099,7 +1196,7 @@ type Ok struct {
 
 func (x *Ok) Reset() {
 	*x = Ok{}
-	mi := &file_signer_proto_msgTypes[19]
+	mi := &file_signer_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1111,7 +1208,7 @@ func (x *Ok) String() string {
 func (*Ok) ProtoMessage() {}
 
 func (x *Ok) ProtoReflect() protoreflect.Message {
-	mi := &file_signer_proto_msgTypes[19]
+	mi := &file_signer_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1124,7 +1221,7 @@ func (x *Ok) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Ok.ProtoReflect.Descriptor instead.
 func (*Ok) Descriptor() ([]byte, []int) {
-	return file_signer_proto_rawDescGZIP(), []int{19}
+	return file_signer_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *Ok) GetOk() bool {
@@ -1144,7 +1241,7 @@ type Error struct {
 
 func (x *Error) Reset() {
 	*x = Error{}
-	mi := &file_signer_proto_msgTypes[20]
+	mi := &file_signer_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1156,7 +1253,7 @@ func (x *Error) String() string {
 func (*Error) ProtoMessage() {}
 
 func (x *Error) ProtoReflect() protoreflect.Message {
-	mi := &file_signer_proto_msgTypes[20]
+	mi := &file_signer_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1169,7 +1266,7 @@ func (x *Error) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Error.ProtoReflect.Descriptor instead.
 func (*Error) Descriptor() ([]byte, []int) {
-	return file_signer_proto_rawDescGZIP(), []int{20}
+	return file_signer_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *Error) GetCode() uint32 {
@@ -1199,6 +1296,7 @@ type Request struct {
 	//	*Request_InitMaster
 	//	*Request_InitInfo
 	//	*Request_SetLevel
+	//	*Request_DeleteKeys
 	Payload       isRequest_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1206,7 +1304,7 @@ type Request struct {
 
 func (x *Request) Reset() {
 	*x = Request{}
-	mi := &file_signer_proto_msgTypes[21]
+	mi := &file_signer_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1218,7 +1316,7 @@ func (x *Request) String() string {
 func (*Request) ProtoMessage() {}
 
 func (x *Request) ProtoReflect() protoreflect.Message {
-	mi := &file_signer_proto_msgTypes[21]
+	mi := &file_signer_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1231,7 +1329,7 @@ func (x *Request) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Request.ProtoReflect.Descriptor instead.
 func (*Request) Descriptor() ([]byte, []int) {
-	return file_signer_proto_rawDescGZIP(), []int{21}
+	return file_signer_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *Request) GetPayload() isRequest_Payload {
@@ -1322,6 +1420,15 @@ func (x *Request) GetSetLevel() *SetLevelRequest {
 	return nil
 }
 
+func (x *Request) GetDeleteKeys() *DeleteKeysRequest {
+	if x != nil {
+		if x, ok := x.Payload.(*Request_DeleteKeys); ok {
+			return x.DeleteKeys
+		}
+	}
+	return nil
+}
+
 type isRequest_Payload interface {
 	isRequest_Payload()
 }
@@ -1362,6 +1469,10 @@ type Request_SetLevel struct {
 	SetLevel *SetLevelRequest `protobuf:"bytes,9,opt,name=set_level,json=setLevel,proto3,oneof"`
 }
 
+type Request_DeleteKeys struct {
+	DeleteKeys *DeleteKeysRequest `protobuf:"bytes,10,opt,name=delete_keys,json=deleteKeys,proto3,oneof"`
+}
+
 func (*Request_Unlock) isRequest_Payload() {}
 
 func (*Request_Lock) isRequest_Payload() {}
@@ -1380,6 +1491,8 @@ func (*Request_InitInfo) isRequest_Payload() {}
 
 func (*Request_SetLevel) isRequest_Payload() {}
 
+func (*Request_DeleteKeys) isRequest_Payload() {}
+
 type Response struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Payload:
@@ -1391,6 +1504,7 @@ type Response struct {
 	//	*Response_NewKey
 	//	*Response_Logs
 	//	*Response_InitInfo
+	//	*Response_DeleteKeys
 	//	*Response_Ok
 	//	*Response_Error
 	Payload       isResponse_Payload `protobuf_oneof:"payload"`
@@ -1400,7 +1514,7 @@ type Response struct {
 
 func (x *Response) Reset() {
 	*x = Response{}
-	mi := &file_signer_proto_msgTypes[22]
+	mi := &file_signer_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1412,7 +1526,7 @@ func (x *Response) String() string {
 func (*Response) ProtoMessage() {}
 
 func (x *Response) ProtoReflect() protoreflect.Message {
-	mi := &file_signer_proto_msgTypes[22]
+	mi := &file_signer_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1425,7 +1539,7 @@ func (x *Response) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Response.ProtoReflect.Descriptor instead.
 func (*Response) Descriptor() ([]byte, []int) {
-	return file_signer_proto_rawDescGZIP(), []int{22}
+	return file_signer_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *Response) GetPayload() isResponse_Payload {
@@ -1498,6 +1612,15 @@ func (x *Response) GetInitInfo() *InitInfoResponse {
 	return nil
 }
 
+func (x *Response) GetDeleteKeys() *DeleteKeysResponse {
+	if x != nil {
+		if x, ok := x.Payload.(*Response_DeleteKeys); ok {
+			return x.DeleteKeys
+		}
+	}
+	return nil
+}
+
 func (x *Response) GetOk() *Ok {
 	if x != nil {
 		if x, ok := x.Payload.(*Response_Ok); ok {
@@ -1548,6 +1671,10 @@ type Response_InitInfo struct {
 	InitInfo *InitInfoResponse `protobuf:"bytes,7,opt,name=init_info,json=initInfo,proto3,oneof"`
 }
 
+type Response_DeleteKeys struct {
+	DeleteKeys *DeleteKeysResponse `protobuf:"bytes,8,opt,name=delete_keys,json=deleteKeys,proto3,oneof"`
+}
+
 type Response_Ok struct {
 	Ok *Ok `protobuf:"bytes,15,opt,name=ok,proto3,oneof"` // for init_master & set_level
 }
@@ -1569,6 +1696,8 @@ func (*Response_NewKey) isResponse_Payload() {}
 func (*Response_Logs) isResponse_Payload() {}
 
 func (*Response_InitInfo) isResponse_Payload() {}
+
+func (*Response_DeleteKeys) isResponse_Payload() {}
 
 func (*Response_Ok) isResponse_Payload() {}
 
@@ -1645,12 +1774,19 @@ const file_signer_proto_rawDesc = "" +
 	"\x15deterministic_enabled\x18\x02 \x01(\bR\x14deterministicEnabled\">\n" +
 	"\x0fSetLevelRequest\x12\x15\n" +
 	"\x06key_id\x18\x01 \x01(\tR\x05keyId\x12\x14\n" +
-	"\x05level\x18\x03 \x01(\x04R\x05level\"\x14\n" +
+	"\x05level\x18\x03 \x01(\x04R\x05level\"L\n" +
+	"\x11DeleteKeysRequest\x12\x17\n" +
+	"\akey_ids\x18\x01 \x03(\tR\x06keyIds\x12\x1e\n" +
+	"\n" +
+	"passphrase\x18\x02 \x01(\fR\n" +
+	"passphrase\"D\n" +
+	"\x12DeleteKeysResponse\x12.\n" +
+	"\aresults\x18\x01 \x03(\v2\x14.signer.PerKeyResultR\aresults\"\x14\n" +
 	"\x02Ok\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\"5\n" +
 	"\x05Error\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\rR\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\xda\x03\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x98\x04\n" +
 	"\aRequest\x12/\n" +
 	"\x06unlock\x18\x01 \x01(\v2\x15.signer.UnlockRequestH\x00R\x06unlock\x12)\n" +
 	"\x04lock\x18\x02 \x01(\v2\x13.signer.LockRequestH\x00R\x04lock\x12/\n" +
@@ -1661,8 +1797,11 @@ const file_signer_proto_rawDesc = "" +
 	"\vinit_master\x18\a \x01(\v2\x19.signer.InitMasterRequestH\x00R\n" +
 	"initMaster\x126\n" +
 	"\tinit_info\x18\b \x01(\v2\x17.signer.InitInfoRequestH\x00R\binitInfo\x126\n" +
-	"\tset_level\x18\t \x01(\v2\x17.signer.SetLevelRequestH\x00R\bsetLevelB\t\n" +
-	"\apayload\"\xaf\x03\n" +
+	"\tset_level\x18\t \x01(\v2\x17.signer.SetLevelRequestH\x00R\bsetLevel\x12<\n" +
+	"\vdelete_keys\x18\n" +
+	" \x01(\v2\x19.signer.DeleteKeysRequestH\x00R\n" +
+	"deleteKeysB\t\n" +
+	"\apayload\"\xee\x03\n" +
 	"\bResponse\x120\n" +
 	"\x06unlock\x18\x01 \x01(\v2\x16.signer.UnlockResponseH\x00R\x06unlock\x12*\n" +
 	"\x04lock\x18\x02 \x01(\v2\x14.signer.LockResponseH\x00R\x04lock\x120\n" +
@@ -1670,7 +1809,9 @@ const file_signer_proto_rawDesc = "" +
 	"\x04sign\x18\x04 \x01(\v2\x14.signer.SignResponseH\x00R\x04sign\x122\n" +
 	"\anew_key\x18\x05 \x01(\v2\x17.signer.NewKeysResponseH\x00R\x06newKey\x12*\n" +
 	"\x04logs\x18\x06 \x01(\v2\x14.signer.LogsResponseH\x00R\x04logs\x127\n" +
-	"\tinit_info\x18\a \x01(\v2\x18.signer.InitInfoResponseH\x00R\binitInfo\x12\x1c\n" +
+	"\tinit_info\x18\a \x01(\v2\x18.signer.InitInfoResponseH\x00R\binitInfo\x12=\n" +
+	"\vdelete_keys\x18\b \x01(\v2\x1a.signer.DeleteKeysResponseH\x00R\n" +
+	"deleteKeys\x12\x1c\n" +
 	"\x02ok\x18\x0f \x01(\v2\n" +
 	".signer.OkH\x00R\x02ok\x12%\n" +
 	"\x05error\x18\x10 \x01(\v2\r.signer.ErrorH\x00R\x05errorB\t\n" +
@@ -1694,7 +1835,7 @@ func file_signer_proto_rawDescGZIP() []byte {
 }
 
 var file_signer_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_signer_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_signer_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_signer_proto_goTypes = []any{
 	(LockState)(0),             // 0: signer.LockState
 	(*PerKeyResult)(nil),       // 1: signer.PerKeyResult
@@ -1716,10 +1857,12 @@ var file_signer_proto_goTypes = []any{
 	(*InitInfoRequest)(nil),    // 17: signer.InitInfoRequest
 	(*InitInfoResponse)(nil),   // 18: signer.InitInfoResponse
 	(*SetLevelRequest)(nil),    // 19: signer.SetLevelRequest
-	(*Ok)(nil),                 // 20: signer.Ok
-	(*Error)(nil),              // 21: signer.Error
-	(*Request)(nil),            // 22: signer.Request
-	(*Response)(nil),           // 23: signer.Response
+	(*DeleteKeysRequest)(nil),  // 20: signer.DeleteKeysRequest
+	(*DeleteKeysResponse)(nil), // 21: signer.DeleteKeysResponse
+	(*Ok)(nil),                 // 22: signer.Ok
+	(*Error)(nil),              // 23: signer.Error
+	(*Request)(nil),            // 24: signer.Request
+	(*Response)(nil),           // 25: signer.Response
 }
 var file_signer_proto_depIdxs = []int32{
 	1,  // 0: signer.UnlockResponse.results:type_name -> signer.PerKeyResult
@@ -1727,29 +1870,32 @@ var file_signer_proto_depIdxs = []int32{
 	0,  // 2: signer.KeyStatus.lock_state:type_name -> signer.LockState
 	6,  // 3: signer.StatusResponse.keys:type_name -> signer.KeyStatus
 	11, // 4: signer.NewKeysResponse.results:type_name -> signer.NewKeyPerKeyResult
-	2,  // 5: signer.Request.unlock:type_name -> signer.UnlockRequest
-	4,  // 6: signer.Request.lock:type_name -> signer.LockRequest
-	7,  // 7: signer.Request.status:type_name -> signer.StatusRequest
-	9,  // 8: signer.Request.sign:type_name -> signer.SignRequest
-	12, // 9: signer.Request.new_keys:type_name -> signer.NewKeysRequest
-	14, // 10: signer.Request.logs:type_name -> signer.LogsRequest
-	16, // 11: signer.Request.init_master:type_name -> signer.InitMasterRequest
-	17, // 12: signer.Request.init_info:type_name -> signer.InitInfoRequest
-	19, // 13: signer.Request.set_level:type_name -> signer.SetLevelRequest
-	3,  // 14: signer.Response.unlock:type_name -> signer.UnlockResponse
-	5,  // 15: signer.Response.lock:type_name -> signer.LockResponse
-	8,  // 16: signer.Response.status:type_name -> signer.StatusResponse
-	10, // 17: signer.Response.sign:type_name -> signer.SignResponse
-	13, // 18: signer.Response.new_key:type_name -> signer.NewKeysResponse
-	15, // 19: signer.Response.logs:type_name -> signer.LogsResponse
-	18, // 20: signer.Response.init_info:type_name -> signer.InitInfoResponse
-	20, // 21: signer.Response.ok:type_name -> signer.Ok
-	21, // 22: signer.Response.error:type_name -> signer.Error
-	23, // [23:23] is the sub-list for method output_type
-	23, // [23:23] is the sub-list for method input_type
-	23, // [23:23] is the sub-list for extension type_name
-	23, // [23:23] is the sub-list for extension extendee
-	0,  // [0:23] is the sub-list for field type_name
+	1,  // 5: signer.DeleteKeysResponse.results:type_name -> signer.PerKeyResult
+	2,  // 6: signer.Request.unlock:type_name -> signer.UnlockRequest
+	4,  // 7: signer.Request.lock:type_name -> signer.LockRequest
+	7,  // 8: signer.Request.status:type_name -> signer.StatusRequest
+	9,  // 9: signer.Request.sign:type_name -> signer.SignRequest
+	12, // 10: signer.Request.new_keys:type_name -> signer.NewKeysRequest
+	14, // 11: signer.Request.logs:type_name -> signer.LogsRequest
+	16, // 12: signer.Request.init_master:type_name -> signer.InitMasterRequest
+	17, // 13: signer.Request.init_info:type_name -> signer.InitInfoRequest
+	19, // 14: signer.Request.set_level:type_name -> signer.SetLevelRequest
+	20, // 15: signer.Request.delete_keys:type_name -> signer.DeleteKeysRequest
+	3,  // 16: signer.Response.unlock:type_name -> signer.UnlockResponse
+	5,  // 17: signer.Response.lock:type_name -> signer.LockResponse
+	8,  // 18: signer.Response.status:type_name -> signer.StatusResponse
+	10, // 19: signer.Response.sign:type_name -> signer.SignResponse
+	13, // 20: signer.Response.new_key:type_name -> signer.NewKeysResponse
+	15, // 21: signer.Response.logs:type_name -> signer.LogsResponse
+	18, // 22: signer.Response.init_info:type_name -> signer.InitInfoResponse
+	21, // 23: signer.Response.delete_keys:type_name -> signer.DeleteKeysResponse
+	22, // 24: signer.Response.ok:type_name -> signer.Ok
+	23, // 25: signer.Response.error:type_name -> signer.Error
+	26, // [26:26] is the sub-list for method output_type
+	26, // [26:26] is the sub-list for method input_type
+	26, // [26:26] is the sub-list for extension type_name
+	26, // [26:26] is the sub-list for extension extendee
+	0,  // [0:26] is the sub-list for field type_name
 }
 
 func init() { file_signer_proto_init() }
@@ -1757,7 +1903,7 @@ func file_signer_proto_init() {
 	if File_signer_proto != nil {
 		return
 	}
-	file_signer_proto_msgTypes[21].OneofWrappers = []any{
+	file_signer_proto_msgTypes[23].OneofWrappers = []any{
 		(*Request_Unlock)(nil),
 		(*Request_Lock)(nil),
 		(*Request_Status)(nil),
@@ -1767,8 +1913,9 @@ func file_signer_proto_init() {
 		(*Request_InitMaster)(nil),
 		(*Request_InitInfo)(nil),
 		(*Request_SetLevel)(nil),
+		(*Request_DeleteKeys)(nil),
 	}
-	file_signer_proto_msgTypes[22].OneofWrappers = []any{
+	file_signer_proto_msgTypes[24].OneofWrappers = []any{
 		(*Response_Unlock)(nil),
 		(*Response_Lock)(nil),
 		(*Response_Status)(nil),
@@ -1776,6 +1923,7 @@ func file_signer_proto_init() {
 		(*Response_NewKey)(nil),
 		(*Response_Logs)(nil),
 		(*Response_InitInfo)(nil),
+		(*Response_DeleteKeys)(nil),
 		(*Response_Ok)(nil),
 		(*Response_Error)(nil),
 	}
@@ -1785,7 +1933,7 @@ func file_signer_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_signer_proto_rawDesc), len(file_signer_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   23,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

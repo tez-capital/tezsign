@@ -126,35 +126,39 @@ func (kr *KeyRing) CreateKey(wanted string, masterPassword []byte) (id, blPubkey
 			return "", "", "", err
 		}
 	}
-	// helper for explicit id -> index
-	pickExplicitIndex := func() (uint32, error) {
-		ids, e := kr.store.list()
-		if e != nil {
-			return 0, e
-		}
 
-		return uint32(len(ids) + 1), nil
-	}
+	var deterministicIndex uint32
+	var detIndexReserved bool
 
 	for {
 		candidate := id
-		var index uint32
 		if candidate == "" {
 			n := kr.nextID.Add(1)
 			candidate = fmt.Sprintf("key%d", n)
-			index = uint32(n)
-		} else {
-			if index, err = pickExplicitIndex(); err != nil {
-				return "", "", "", err
+		}
+
+		if kr.store.hasKey(candidate) {
+			if id != "" {
+				return "", "", "", ErrKeyExists
 			}
+			continue
 		}
 
 		var (
 			secretKey   *signer.SecretKey
 			pubkeyBytes []byte
 			popBLsig    string
+			index       uint32
 		)
 		if useDeterministic {
+			if !detIndexReserved {
+				deterministicIndex, err = kr.store.nextDeterministicIndex()
+				if err != nil {
+					return "", "", "", err
+				}
+				detIndexReserved = true
+			}
+			index = deterministicIndex
 			// Build HD params (domain-separated with store salt)
 			secretKey, pubkeyBytes, blPubkey, err = signer.GenerateHDKey(mf.Salt, seed, index)
 			if err != nil {
@@ -290,6 +294,40 @@ func (kr *KeyRing) Lock(id string) error {
 
 	kr.log.Info("key locked", "key", id)
 
+	return nil
+}
+
+func (kr *KeyRing) DeleteKey(wanted string) error {
+	id := normalizeID(wanted)
+	if id == "" {
+		return fmt.Errorf("invalid key_id")
+	}
+	if !kr.store.hasKey(id) {
+		return ErrKeyNotFound
+	}
+
+	if v, ok := kr.keys.LoadAndDelete(id); ok {
+		if key, _ := v.(*gKey); key != nil {
+			key.mu.Lock()
+			if key.dek != nil {
+				MemoryWipe(key.dek)
+				key.dek = nil
+			}
+			key.encSecret = nil
+			key.dataNonce = nil
+			key.mu.Unlock()
+		}
+	}
+
+	return kr.store.removeKey(id)
+}
+
+func (kr *KeyRing) VerifyMasterPassword(masterPassword []byte) error {
+	_, seed, err := kr.store.readSeed(masterPassword)
+	if err != nil {
+		return err
+	}
+	MemoryWipe(seed)
 	return nil
 }
 
