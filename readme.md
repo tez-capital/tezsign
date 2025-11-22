@@ -20,6 +20,8 @@
 * **Gadget:** The external, air-gapped device connected to the host over USB, acting as a peripheral. This is where your keys live and signing operations happen.
 * **Host App:** Your companion application (the `tezsign` command-line tool) which you use to control the gadget from your host machine.
 
+> **Note:** If you want to run `tezsign` as a standalone service (not in conjunction with `tezbake`) on Linux or macOS, please refer to the [AMI Guide](https://github.com/tez-capital/tezsign/blob/main/readme.ami.md) for detailed instructions.
+
 ---
 
 ## ⚙️ Setup

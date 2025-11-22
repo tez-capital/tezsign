@@ -46,7 +46,7 @@ func main() {
 	l.Info("connected", slog.String("serial", mgmtSession.Serial))
 
 	// ---- MOCK FLOW ----
-	masterPass := []byte("pass")
+	masterPass := []byte("test")
 
 	// 0) (Optional) init master once — if already initialized, treat as OK.
 	if ok, err := common.ReqInitMaster(mgmtBroker, false, masterPass); err != nil {
@@ -135,7 +135,7 @@ func main() {
 
 // benchmarkRoundtrip runs N sign requests and prints min, max, avg, median latencies.
 func benchmarkRoundtrip(b *broker.Broker, l *slog.Logger, tz4 string) {
-	const N = 100
+	const N = 1000
 	durations := make([]time.Duration, 0, N)
 
 	// sign same message with increasing levels so gadget accepts them
