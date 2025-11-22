@@ -2,6 +2,10 @@
 
 `ami` is a utility for portable application management, providing a unified interface and portability for managed apps.
 
+#### Device Setup
+
+For detailed instructions on device setup, please refer to the main README under the [Setup](https://github.com/tez-capital/tezsign/blob/main/readme.md#%EF%B8%8F-setup) section.
+
 #### Setup
 
 > **NOTE:** You do not need to specify the `path` when running `ami` commands if your current working directory (cwd) matches the path you want to run the command against. In this tutorial, we explicitly use the path for clarity.

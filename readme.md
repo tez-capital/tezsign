@@ -27,7 +27,8 @@
 ## ⚙️ Setup
 
 1.  Download the **gadget image** for your specific device and the **host app**.
-    - https://github.com/tez-capital/tezsign/releases
+    - [tezsign Releases](https://github.com/tez-capital/tezsign/releases)  
+    - **IMPORTANT:** For production use, avoid images with `dev` in their name.
 2.  Use Balena Etcher (or a tool you are familiar with) to flash the gadget image to your SD card.
 3.  Plug the SD card into your board (e.g., Radxa Zero 3, RPi Zero 2W).
 4.  Connect the board to your host machine.
