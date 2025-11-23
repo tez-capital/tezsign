@@ -30,33 +30,51 @@ runs:
     with:
       version: '0.15.2'
 
-  - name: Create build dir
-    shell: bash
-    run: mkdir -p build
+  # - name: ⚙️ Setup MSYS2 and Install Autotools & Make
+  #   uses: msys2/setup-msys2@v2
+  #   with:
+  #     msystem: clang64
+  #     install: clang-x86_64
 
-  - name: autogen libusb (windows)
-    shell: bash
+  # - name: Create build dir
+  #   shell: powershell
+  #   run: mkdir -p build
+
+  - name: install libusb with vcpkg
+    shell: powershell
     env:
-      CC: zig cc -target ${{ inputs.toolchain }}
-      CXX: zig c++ -target ${{ inputs.toolchain }}
-    working-directory: ${{ github.workspace }}/libs/libusb
-    run: ./autogen.sh --disable-udev --host=${{ inputs.libusb-host }}
+      VCPKG_ROOT: ${{ github.workspace }}/libs/vcpkg
+      VCPKG_DEFAULT_TRIPLET: ${{ inputs.toolchain }}
+    run: |
+      git clone https://github.com/Microsoft/vcpkg.git
+      cd vcpkg
+      ./bootstrap-vcpkg.bat
+      ./vcpkg integrate install
+      vcpkg install libusb
 
-  - name: configure libusb (windows)
-    shell: bash
-    env:
-      CC: zig cc -target ${{ inputs.toolchain }}
-      CXX: zig c++ -target ${{ inputs.toolchain }}
-      INSTALL_DIR: ${{ github.workspace }}/libs/.install
-    working-directory: ${{ github.workspace }}/libs/libusb
-    run: ./configure --prefix=$INSTALL_DIR --enable-udev=no --enable-shared=no --disable-dependency-tracking --host=${{ inputs.libusb-host }}
+  # - name: autogen libusb (linux)
+  #   shell: bash
+  #   env:
+  #     CC: zig cc -target ${{ inputs.toolchain }}
+  #     CXX: zig c++ -target ${{ inputs.toolchain }}
+  #   working-directory: ${{ github.workspace }}/libs/libusb
+  #   run: ./autogen.sh --disable-udev --host=${{ inputs.libusb-host }}
 
-  - name: make libusb
-    shell: bash
-    working-directory: ${{ github.workspace }}/libs/libusb
-    run: make install
+  # - name: configure libusb (linux)
+  #   shell: bash
+  #   env:
+  #     CC: zig cc -target ${{ inputs.toolchain }}
+  #     CXX: zig c++ -target ${{ inputs.toolchain }}
+  #     INSTALL_DIR: ${{ github.workspace }}/libs/.install
+  #   working-directory: ${{ github.workspace }}/libs/libusb
+  #   run: ./configure --prefix=$INSTALL_DIR --enable-udev=no --enable-shared=no --disable-dependency-tracking --host=${{ inputs.libusb-host }}
+
+  # - name: make libusb
+  #   shell: bash
+  #   working-directory: ${{ github.workspace }}/libs/libusb
+  #   run: make install
     
-  - name: Build host (windows)
+  - name: Build host (linux)
     shell: bash
     env:
       CC: zig cc -target ${{ inputs.toolchain }}
@@ -66,7 +84,7 @@ runs:
       CGO_ENABLED: 1
       PKG_CONFIG_PATH: "${{ github.workspace }}/libs/.install/lib/pkgconfig"
     run: |
-       go build -ldflags='-s -w -extldflags "-I${{ github.workspace }}/libs/.install/include/libusb-1.0 -L${{ github.workspace }}/libs/.install/lib/ -lusb-1.0 -static"' -trimpath -o ./build/tezsign-host-${{ inputs.goos }}-${{ inputs.goarch }} ./app/host
+       go build -ldflags='-s -w -extldflags "-lusb-1.0 -static"' -trimpath -o ./build/tezsign-host-${{ inputs.goos }}-${{ inputs.goarch }} ./app/host
 
   - uses: actions/upload-artifact@v4
     with:

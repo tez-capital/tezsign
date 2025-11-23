@@ -205,7 +205,7 @@ jobs:
               libusb-host: aarch64-darwin-none
 
     build-host-windows-amd64:
-        runs-on: ubuntu-latest
+        runs-on: windows-latest
         steps:
           - uses: actions/checkout@v5
             with:
@@ -218,10 +218,10 @@ jobs:
               artifact-id: tezsign-host-windows-amd64
               goos: windows
               goarch: amd64
-              libusb-host: x86_64-w64-mingw32
+              libusb-host: x86_64-w64-msys
 
     build-host-windows-arm64:
-        runs-on: ubuntu-latest
+        runs-on: windows-latest
         steps:
           - uses: actions/checkout@v5
             with:
@@ -234,7 +234,7 @@ jobs:
               artifact-id: tezsign-host-windows-arm64
               goos: windows
               goarch: arm64
-              libusb-host: aarch64-w64-mingw32
+              libusb-host: aarch64-w64-msys
 
     publish:
         runs-on: ubuntu-latest
