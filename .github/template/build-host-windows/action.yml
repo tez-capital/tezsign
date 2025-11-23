@@ -44,7 +44,7 @@ runs:
     shell: powershell
     env:
       VCPKG_ROOT: ${{ github.workspace }}/libs/vcpkg
-      VCPKG_DEFAULT_TRIPLET: ${{ inputs.toolchain }}
+      VCPKG_DEFAULT_TRIPLET: x64-windows-static-release
     run: |
       git clone https://github.com/Microsoft/vcpkg.git
       cd vcpkg
