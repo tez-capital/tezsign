@@ -244,6 +244,10 @@ func (m selectionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.err = errors.New("invalid selection")
 					return m, tea.Quit
 				}
+				if !m.devices[cursor].Valid {
+					m.err = errors.New("selected device is not a valid TezSign SD card")
+					return m, tea.Quit
+				}
 				m.selectedDevice = &m.devices[cursor]
 				m.stage = stageKind
 			}
@@ -407,9 +411,9 @@ func probeTezsignDevice(path string) (bool, string) {
 	ok, err := checkTezsignMarker(disk, appPartition)
 	switch {
 	case err != nil:
-		return true, "marker check skipped"
+		return false, "marker check failed"
 	case !ok:
-		return true, "marker /tezsign missing (will be updated)"
+		return false, "device does not match TezSign layout"
 	default:
 		return true, "OK"
 	}
@@ -428,7 +432,7 @@ func checkTezsignMarker(disk *disk.Disk, appPartition part.Partition) (bool, err
 		}
 		hasApp := false
 		hasData := false
-		for _, p := range t.Partitions {
+		for idx, p := range t.Partitions {
 			name := strings.TrimSpace(p.Name)
 			if name == constants.AppPartitionLabel {
 				hasApp = true
@@ -436,11 +440,45 @@ func checkTezsignMarker(disk *disk.Disk, appPartition part.Partition) (bool, err
 			if name == constants.DataPartitionLabel {
 				hasData = true
 			}
+			if hasApp && hasData {
+				continue
+			}
+			// Fallback to filesystem label if name is missing.
+			fs, err := disk.GetFilesystem(idx + 1)
+			if err == nil {
+				label := strings.TrimSpace(fs.Label())
+				if label == constants.AppPartitionLabel {
+					hasApp = true
+				}
+				if label == constants.DataPartitionLabel {
+					hasData = true
+				}
+			}
 		}
 		return hasApp && hasData, nil
 	case *mbr.Table:
-		// For MBR (Armbian Pi images), expect four partitions (boot/root/app/data).
-		return len(t.Partitions) >= 4, nil
+		// For MBR (Armbian Pi images), expect four partitions (boot/root/app/data) with non-zero size
+		// and rely on filesystem labels for app/data.
+		nonZero := 0
+		hasApp := false
+		hasData := false
+		for idx, p := range t.Partitions {
+			if p == nil || p.Size == 0 {
+				continue
+			}
+			nonZero++
+			fs, err := disk.GetFilesystem(idx + 1)
+			if err == nil {
+				label := strings.TrimSpace(fs.Label())
+				if label == constants.AppPartitionLabel {
+					hasApp = true
+				}
+				if label == constants.DataPartitionLabel {
+					hasData = true
+				}
+			}
+		}
+		return nonZero == 4 && hasApp && hasData, nil
 	default:
 		return false, nil
 	}
