@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -197,7 +198,7 @@ func (m decompressModel) View() string {
 	}
 
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("Decompressing %s → %s\n\n", m.source, m.target))
+	builder.WriteString(fmt.Sprintf("%s → %s\n\n", m.source, m.target))
 	if pct >= 0 {
 		builder.WriteString(renderProgressBar(pct, 40))
 		builder.WriteString(fmt.Sprintf("  %s / %s\n", byteCountToHumanReadable(read), byteCountToHumanReadable(m.total)))
@@ -211,6 +212,8 @@ func (m decompressModel) View() string {
 		} else {
 			builder.WriteString("\nDone.\n")
 		}
+	} else {
+		builder.WriteString("\nPress q to cancel.")
 	}
 	return builder.String()
 }
@@ -516,7 +519,7 @@ func maybeDecompressSource(path string, logger *slog.Logger) (string, func(), er
 		tmpFile.Close()
 	}
 
-	p := tea.NewProgram(newDecompressModel(filepath.Base(path), tmpFile.Name(), totalBytes, cr, cancel))
+	p := tea.NewProgram(newDecompressModel(fmt.Sprintf("Decompress %s", filepath.Base(path)), tmpFile.Name(), totalBytes, cr, cancel))
 
 	go func() {
 		_, copyErr := io.Copy(tmpFile, r)
@@ -540,6 +543,91 @@ func maybeDecompressSource(path string, logger *slog.Logger) (string, func(), er
 	if res.err != nil {
 		os.Remove(tmpFile.Name())
 		return "", nil, fmt.Errorf("failed to decompress source image: %w", res.err)
+	}
+
+	cleanup := func() {
+		os.Remove(tmpFile.Name())
+	}
+
+	return tmpFile.Name(), cleanup, nil
+}
+
+func detectDeviceFlavor(devicePath string) (string, error) {
+	f, err := os.Open(devicePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open device %s: %w", devicePath, err)
+	}
+	defer f.Close()
+
+	d, err := diskfs.OpenBackend(file.New(f, false), diskfs.WithOpenMode(diskfs.ReadOnly), diskfs.WithSectorSize(diskfs.SectorSizeDefault))
+	if err != nil {
+		return "", fmt.Errorf("failed to open disk backend for %s: %w", devicePath, err)
+	}
+	defer d.Close()
+
+	table, err := d.GetPartitionTable()
+	if err != nil {
+		return "", fmt.Errorf("failed to read partition table for %s: %w", devicePath, err)
+	}
+
+	switch table.(type) {
+	case *gpt.Table:
+		return "radxa_zero3.img.xz", nil
+	case *mbr.Table:
+		return "raspberry_pi.img.xz", nil
+	default:
+		return "", errors.New("unknown partition table type")
+	}
+}
+
+func downloadWithProgress(url string, logger *slog.Logger) (string, func(), error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to download image: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return "", nil, fmt.Errorf("failed to download image: %s", resp.Status)
+	}
+
+	tmpFile, err := os.CreateTemp("", "tezsign_download_*.img.xz")
+	if err != nil {
+		resp.Body.Close()
+		return "", nil, fmt.Errorf("failed to create temp file for download: %w", err)
+	}
+
+	total := resp.ContentLength
+	cr := &countingReader{r: resp.Body}
+	cancel := func() {
+		resp.Body.Close()
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+	}
+
+	p := tea.NewProgram(newDecompressModel(fmt.Sprintf("Download %s", filepath.Base(url)), tmpFile.Name(), total, cr, cancel))
+
+	go func() {
+		_, copyErr := io.Copy(tmpFile, cr)
+		tmpFile.Close()
+		resp.Body.Close()
+		p.Send(finishMsg{err: copyErr})
+	}()
+
+	model, progErr := p.Run()
+	if progErr != nil {
+		cancel()
+		return "", nil, fmt.Errorf("failed to render download progress: %w", progErr)
+	}
+
+	res, ok := model.(decompressModel)
+	if !ok {
+		cancel()
+		return "", nil, errors.New("unexpected model type after download")
+	}
+
+	if res.err != nil {
+		cancel()
+		return "", nil, fmt.Errorf("failed to download image: %w", res.err)
 	}
 
 	cleanup := func() {
@@ -669,19 +757,15 @@ func performUpdate(source, destination string, kind UpdateKind, logger *slog.Log
 func main() {
 	logger := slog.Default()
 
-	if len(os.Args) < 2 {
-		logger.Error("Usage: tezsign_updater <source_img> [destination_device] [update_kind]")
-		os.Exit(1)
-	}
-
-	source := os.Args[1]
-	if _, err := os.Stat(source); err != nil {
-		logger.Error("Invalid source image", "error", err)
-		os.Exit(1)
+	var source string
+	var sourceProvided bool
+	if len(os.Args) >= 2 {
+		source = os.Args[1]
+		sourceProvided = true
 	}
 
 	// Keep the previous non-interactive flow when destination is provided explicitly.
-	if len(os.Args) >= 3 {
+	if sourceProvided && len(os.Args) >= 3 {
 		destination := os.Args[2]
 		kind := UpdateKindFull
 		if len(os.Args) >= 4 {
@@ -712,6 +796,27 @@ func main() {
 	selectedDevice, kind, err := runSelection(devices)
 	if err != nil {
 		logger.Error("Selection failed", "error", err)
+		os.Exit(1)
+	}
+
+	if !sourceProvided {
+		imageName, err := detectDeviceFlavor(selectedDevice.Path)
+		if err != nil {
+			logger.Error("Failed to detect device flavor", "error", err)
+			os.Exit(1)
+		}
+		url := fmt.Sprintf("%s%s", constants.LatestReleaseURL, imageName)
+		downloaded, cleanup, err := downloadWithProgress(url, logger)
+		if err != nil {
+			logger.Error("Failed to download image", "error", err)
+			os.Exit(1)
+		}
+		defer cleanup()
+		source = downloaded
+	}
+
+	if _, err := os.Stat(source); err != nil {
+		logger.Error("Invalid source image", "error", err)
 		os.Exit(1)
 	}
 
