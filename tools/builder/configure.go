@@ -234,8 +234,11 @@ func patchAppPartition(imgPath string, appPartition part.Partition, flavour imag
 		srcPath := src
 		dstPath := path.Join(appfs, dst)
 
-		if err := os.MkdirAll(path.Dir(dstPath), 0755); err != nil {
-			return fmt.Errorf("failed to create directory for %s: %w", dstPath, err)
+		dstDir := path.Dir(dstPath)
+		if _, err = os.Stat(dstDir); err != nil {
+			if err = os.MkdirAll(dstDir, 0755); err != nil {
+				return fmt.Errorf("failed to create directory for %s: %w", dstPath, err)
+			}
 		}
 		if err := copyFile(srcPath, dstPath); err != nil {
 			return fmt.Errorf("failed to copy %s to %s: %w", srcPath, dstPath, err)
@@ -271,8 +274,10 @@ func patchDataPartition(imgPath string, dataPartition part.Partition, flavour im
 
 	// create data dir and set ownership to tezsign user
 	dataMountPoint := path.Join(datafs, "tezsign")
-	if err := os.MkdirAll(dataMountPoint, 0755); err != nil {
-		return fmt.Errorf("failed to create data mount point %s: %w", dataMountPoint, err)
+	if _, err = os.Stat(dataMountPoint); err != nil {
+		if err := os.MkdirAll(dataMountPoint, 0755); err != nil {
+			return fmt.Errorf("failed to create data mount point %s: %w", dataMountPoint, err)
+		}
 	}
 	if err := os.Chown(dataMountPoint, 1000, 1000); err != nil {
 		return fmt.Errorf("failed to chown data mount point %s: %w", dataMountPoint, err)
