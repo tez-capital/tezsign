@@ -14,8 +14,8 @@ require (
 	github.com/diskfs/go-diskfs v1.7.1-0.20251128084654-5f6c4283478f
 	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/google/gousb v1.1.3
-	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/ulikunitz/xz v0.5.15
+	golang.org/x/sys v0.38.0
 	google.golang.org/protobuf v1.36.10
 )
 
@@ -49,17 +49,13 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.68.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
 )
 
 require (
-	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/charmbracelet/bubbles v0.21.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/samber/lo v1.52.0
 	github.com/urfave/cli/v3 v3.5.0
 	golang.org/x/term v0.36.0
-	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

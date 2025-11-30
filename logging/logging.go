@@ -10,8 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/natefinch/lumberjack"
 )
 
 // ----------------- Config -----------------
@@ -67,10 +65,10 @@ func NewConfigFromEnv() Config {
 	cfg.File = strings.TrimSpace(os.Getenv("LOG_FILE"))
 	cfg.AlsoStderr = envBool(os.Getenv("LOG_STDERR"), true)
 	cfg.NoColor = envBool(os.Getenv("LOG_NO_COLOR"), false)
-	cfg.MaxSizeMB = envInt(os.Getenv("LOG_MAX_SIZE_MB"), 50)
-	cfg.MaxBackups = envInt(os.Getenv("LOG_MAX_BACKUPS"), 3)
+	cfg.MaxSizeMB = envInt(os.Getenv("LOG_MAX_SIZE_MB"), 5)
+	cfg.MaxBackups = envInt(os.Getenv("LOG_MAX_BACKUPS"), 0)
 	cfg.MaxAgeDays = envInt(os.Getenv("LOG_MAX_AGE_DAYS"), 14)
-	cfg.Compress = envBool(os.Getenv("LOG_COMPRESS"), true)
+	cfg.Compress = envBool(os.Getenv("LOG_COMPRESS"), false)
 
 	cfg.SetAsDefault = true
 	return cfg
@@ -179,22 +177,15 @@ func EnsureDir(path string) error {
 func New(cfg Config) (*slog.Logger, io.Writer) {
 	handlers := make([]slog.Handler, 0, 2)
 
-	// file handler (rotating)
-	var lj *lumberjack.Logger
+	var logWriter io.Writer
 	if cfg.File != "" {
-		lj = &lumberjack.Logger{
-			Filename:   cfg.File,
-			MaxSize:    cfg.MaxSizeMB, // megabytes
-			MaxBackups: cfg.MaxBackups,
-			MaxAge:     cfg.MaxAgeDays, // days
-			Compress:   cfg.Compress,
-		}
+		logWriter, _ = NewSimpleLogResetWriter(cfg.File, cfg.MaxSizeMB*1024*1024)
 		setCurrentFile(cfg.File)
 		switch cfg.Format {
 		case "json":
-			handlers = append(handlers, slog.NewJSONHandler(lj, &slog.HandlerOptions{Level: cfg.Level}))
+			handlers = append(handlers, slog.NewJSONHandler(logWriter, &slog.HandlerOptions{Level: cfg.Level}))
 		default: // text
-			handlers = append(handlers, slog.NewTextHandler(lj, &slog.HandlerOptions{Level: cfg.Level}))
+			handlers = append(handlers, slog.NewTextHandler(logWriter, &slog.HandlerOptions{Level: cfg.Level}))
 		}
 	}
 
@@ -222,7 +213,7 @@ func New(cfg Config) (*slog.Logger, io.Writer) {
 	if cfg.SetAsDefault {
 		slog.SetDefault(l)
 	}
-	return l, lj
+	return l, logWriter
 }
 
 func NewFromEnv() (*slog.Logger, io.Writer) {

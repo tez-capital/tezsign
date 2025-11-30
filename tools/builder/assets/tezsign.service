@@ -11,8 +11,8 @@ ExecStart=/app/tezsign
 RemainAfterExit=yes
 Restart=on-failure
 RestartSec=2
-StandardOutput=journal+console
-StandardError=journal+console
+StandardOutput=null
+StandardError=null
 
 [Install]
 WantedBy=multi-user.target
