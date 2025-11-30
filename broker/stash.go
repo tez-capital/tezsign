@@ -20,6 +20,10 @@ func newStash(size int, logger *slog.Logger) *stash {
 	}
 }
 
+func (s *stash) Len() int {
+	return s.buf.Len()
+}
+
 func (s *stash) Write(data []byte) (int, error) {
 	dataLen := len(data)
 
@@ -51,7 +55,10 @@ func (s *stash) ReadPayload() ([16]byte, payloadType, []byte, error) {
 	h, err := DecodeHeader(data)
 	if err != nil {
 		s.logger.Debug("bad header decode; resync")
-		s.buf.Next(1)
+		if err != ErrIncompleteHeader {
+			// skip magic byte only if header is definitely bad
+			s.buf.Next(1)
+		}
 		return id, payloadTypeUnknown, nil, errors.Join(ErrInvalidPayload, err)
 	}
 

@@ -210,6 +210,7 @@ func formatPartitionTable(path string, flavour imageFlavour, logger *slog.Logger
 	if err := exec.Command("mkfs.ext4", "-E", fmt.Sprintf("offset=%d", appPartitionOffset), "-F", path, fmt.Sprintf("%dK", appPartitionSize/1024), "-L", constants.AppPartitionLabel).Run(); err != nil {
 		return errors.Join(common.ErrFailedToFormatPartition, err)
 	}
+
 	slog.Info("Formatting data partition", slog.Int64("data_offset", dataPartitionOffset), slog.Int64("data_size", dataPartitionSize))
 	if err := exec.Command("mkfs.ext4", "-E", fmt.Sprintf("offset=%d", dataPartitionOffset), "-F", path, fmt.Sprintf("%dK", dataPartitionSize/1024), "-L", constants.DataPartitionLabel).Run(); err != nil {
 		return errors.Join(common.ErrFailedToFormatPartition, err)

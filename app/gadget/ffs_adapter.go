@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"os"
+
+	"golang.org/x/sys/unix"
 )
 
 type result struct {
@@ -12,11 +14,11 @@ type result struct {
 }
 
 type Reader struct {
-	f *os.File
+	fd int
 }
 
 type Writer struct {
-	f *os.File
+	fd int
 }
 
 // we know that this is potentially leaking goroutines
@@ -24,17 +26,17 @@ type Writer struct {
 // this is the simplest way to achieve it for now
 
 func NewReader(f *os.File) (*Reader, error) {
-	return &Reader{f: f}, nil
+	return &Reader{fd: int(f.Fd())}, nil
 }
 func NewWriter(f *os.File) (*Writer, error) {
-	return &Writer{f: f}, nil
+	return &Writer{fd: int(f.Fd())}, nil
 }
 
 func (r *Reader) ReadContext(ctx context.Context, p []byte) (int, error) {
 	readChan := make(chan result, 1)
 
 	go func() {
-		n, err := r.f.Read(p)
+		n, err := unix.Read(r.fd, p)
 		readChan <- result{n: n, err: err}
 	}()
 
@@ -56,7 +58,7 @@ func (w *Writer) WriteContext(ctx context.Context, p []byte) (int, error) {
 		written := 0
 		total := len(p)
 		for written < total {
-			n, err := w.f.Write(p[written:])
+			n, err := unix.Write(w.fd, p[written:])
 			if err != nil {
 				writeChan <- result{n: written, err: err}
 				return

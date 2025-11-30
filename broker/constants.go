@@ -32,7 +32,9 @@ const (
 type payloadType byte
 
 const (
-	payloadTypeUnknown  payloadType = 0x00
-	payloadTypeRequest  payloadType = 0x01
-	payloadTypeResponse payloadType = 0x02
+	payloadTypeUnknown       payloadType = 0x00
+	payloadTypeRequest       payloadType = 0x01
+	payloadTypeResponse      payloadType = 0x02
+	payloadTypeAcceptRequest payloadType = 0x03
+	payloadTypeRetry         payloadType = 0x04
 )

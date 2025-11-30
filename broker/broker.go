@@ -7,7 +7,6 @@ import (
 	"io"
 	"log/slog"
 	"syscall"
-	"time"
 
 	"github.com/tez-capital/tezsign/logging"
 )
@@ -60,12 +59,17 @@ type Broker struct {
 	waiters waiterMap
 	handler Handler
 
+	writeChan           chan []byte
+	processingRequests  requestMap[struct{}]
+	unconfirmedRequests requestMap[[]byte]
+
 	capacity int
 	logger   *slog.Logger
 
-	ctx          context.Context
-	cancel       context.CancelFunc
-	readLoopDone <-chan struct{}
+	ctx            context.Context
+	cancel         context.CancelFunc
+	readLoopDone   <-chan struct{}
+	writerLoopDone <-chan struct{}
 }
 
 func New(r ReadContexter, w WriteContexter, opts ...Option) *Broker {
@@ -91,12 +95,18 @@ func New(r ReadContexter, w WriteContexter, opts ...Option) *Broker {
 		capacity: o.bufSize,
 		logger:   o.logger,
 		handler:  o.handler,
-		stash:    newStash(o.bufSize, o.logger),
-		ctx:      ctx,
-		cancel:   cancel,
+
+		writeChan:           make(chan []byte, 32),
+		processingRequests:  NewRequestMap[struct{}](),
+		unconfirmedRequests: NewRequestMap[[]byte](),
+
+		stash:  newStash(o.bufSize, o.logger),
+		ctx:    ctx,
+		cancel: cancel,
 	}
 
 	b.readLoopDone = b.readLoop()
+	b.writerLoopDone = b.writerLoop()
 	return b
 }
 
@@ -112,6 +122,8 @@ func (b *Broker) Request(ctx context.Context, payload []byte) ([]byte, [16]byte,
 	}
 
 	id, ch := b.waiters.NewWaiter()
+	b.unconfirmedRequests.Store(id, payload)
+
 	b.logger.Debug("tx req", slog.String("id", fmt.Sprintf("%x", id)), slog.Int("size", payloadLen))
 
 	if err := b.writeFrame(ctx, payloadTypeRequest, id, payload); err != nil {
@@ -124,12 +136,38 @@ func (b *Broker) Request(ctx context.Context, payload []byte) ([]byte, [16]byte,
 	case resp := <-ch:
 		return resp, id, nil
 	case <-ctx.Done():
+		b.unconfirmedRequests.Delete(id)
 		b.waiters.Delete(id)
 		return nil, id, ctx.Err()
 	case <-b.ctx.Done():
+		b.unconfirmedRequests.Delete(id)
 		b.waiters.Delete(id)
 		return nil, id, io.EOF
 	}
+}
+
+func (b *Broker) writerLoop() <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			var data []byte
+			select {
+			case data = <-b.writeChan:
+			case <-b.ctx.Done():
+				return
+			}
+			if _, err := b.w.WriteContext(b.ctx, data); err != nil {
+				if isRetryable(err) {
+					b.logger.Debug("write retryable error", slog.Any("err", err))
+					continue
+				}
+				b.logger.Debug("write loop exit", slog.Any("err", err))
+				return
+			}
+		}
+	}()
+	return done
 }
 
 func (b *Broker) readLoop() <-chan struct{} {
@@ -147,8 +185,9 @@ func (b *Broker) readLoop() <-chan struct{} {
 
 			if err != nil {
 				if isRetryable(err) {
+					// send retry packet to
+					b.writeFrame(b.ctx, payloadTypeRetry, [16]byte{}, nil)
 					b.logger.Debug("read retryable error", slog.Any("err", err))
-					time.Sleep(2 * time.Millisecond)
 					continue
 				}
 				b.logger.Debug("read loop exit", slog.Any("err", err))
@@ -161,7 +200,7 @@ func (b *Broker) readLoop() <-chan struct{} {
 
 func (b *Broker) processStash() {
 	for {
-		id, payloadType, payload, err := b.stash.ReadPayload()
+		id, pt, payload, err := b.stash.ReadPayload()
 		switch {
 		case errors.Is(err, ErrNoPayloadFound):
 			fallthrough
@@ -174,29 +213,45 @@ func (b *Broker) processStash() {
 			continue // resync
 		}
 
-		switch payloadType {
-		case payloadTypeResponse:
-			b.logger.Debug("rx resp", slog.String("id", fmt.Sprintf("%x", id)), slog.Int("size", len(payload)))
+		go func(id [16]byte, payloadType payloadType, payload []byte) {
+			switch payloadType {
+			case payloadTypeResponse:
+				b.logger.Debug("rx resp", slog.String("id", fmt.Sprintf("%x", id)), slog.Int("size", len(payload)))
+				if ch, ok := b.waiters.LoadAndDelete(id); ok && ch != nil {
+					ch <- payload
+				}
+			case payloadTypeRequest:
+				b.logger.Debug("rx req", slog.String("id", fmt.Sprintf("%x", id)), slog.Int("size", len(payload)))
+				if processing := b.processingRequests.HasRequest(id); processing {
+					b.logger.Debug("duplicate request being processed; ignoring", slog.String("id", fmt.Sprintf("%x", id)))
+					return
+				}
+				b.processingRequests.Store(id, struct{}{})
 
-			if ch, ok := b.waiters.LoadAndDelete(id); ok && ch != nil {
-				ch <- payload
-			}
-		case payloadTypeRequest:
-			b.logger.Debug("rx req", slog.String("id", fmt.Sprintf("%x", id)), slog.Int("size", len(payload)))
+				// accept the request immediately
+				b.writeFrame(b.ctx, payloadTypeAcceptRequest, id, nil)
 
-			if b.handler == nil {
-				continue
-			}
-
-			go func(id [16]byte, pl []byte) {
-				resp, _ := b.handler(b.ctx, pl)
+				if b.handler == nil {
+					return
+				}
+				defer b.processingRequests.Delete(id)
+				resp, _ := b.handler(b.ctx, payload)
 
 				b.logger.Debug("tx resp", slog.String("id", fmt.Sprintf("%x", id)), slog.Int("size", len(resp)))
 				_ = b.writeFrame(b.ctx, payloadTypeResponse, id, resp) // Put is deferred inside writeFrame if pooled
-			}(id, payload)
-		default:
-			b.logger.Warn("unknown type; resync", slog.String("type", fmt.Sprintf("%02x", payloadType)), slog.String("id", fmt.Sprintf("%x", id)))
-		}
+			case payloadTypeAcceptRequest:
+				b.logger.Debug("rx accept", slog.String("id", fmt.Sprintf("%x", id)))
+				b.unconfirmedRequests.Delete(id)
+			case payloadTypeRetry:
+				b.logger.Debug("rx retry", slog.String("id", fmt.Sprintf("%x", id)))
+				allUnconfirmed := b.unconfirmedRequests.All()
+				for reqID, reqPayload := range allUnconfirmed {
+					b.writeFrame(b.ctx, payloadTypeRequest, reqID, reqPayload)
+				}
+			default:
+				b.logger.Warn("unknown type; resync", slog.String("type", fmt.Sprintf("%02x", payloadType)), slog.String("id", fmt.Sprintf("%x", id)))
+			}
+		}(id, pt, payload)
 	}
 }
 
@@ -215,13 +270,15 @@ func (b *Broker) writeFrame(ctx context.Context, msgType payloadType, id [16]byt
 	if err != nil {
 		return err
 	}
-	_, err = b.w.WriteContext(ctx, frame)
-	return err
+
+	b.writeChan <- frame
+	return nil
 }
 
 func (b *Broker) Stop() {
 	b.cancel()
 	<-b.readLoopDone
+	<-b.writerLoopDone
 }
 
 func isRetryable(err error) bool {

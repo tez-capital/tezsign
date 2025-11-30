@@ -11,7 +11,7 @@ require (
 require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/charmbracelet/x/term v0.2.2
-	github.com/diskfs/go-diskfs v1.7.0
+	github.com/diskfs/go-diskfs v1.7.1-0.20251128084654-5f6c4283478f
 	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/google/gousb v1.1.3
 	github.com/natefinch/lumberjack v2.0.0+incompatible

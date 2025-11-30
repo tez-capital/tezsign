@@ -29,7 +29,7 @@ func headerParity(bytes22 []byte) (byte, error) {
 // DecodeHeader validates magic & parity and returns the parsed header.
 func DecodeHeader(src []byte) (Header, error) {
 	if len(src) < HeaderLen {
-		return Header{}, ErrInvalidHeaderLength
+		return Header{}, ErrIncompleteHeader
 	}
 	if src[0] != MagicByte {
 		return Header{}, ErrInvalidHeaderBadMagic

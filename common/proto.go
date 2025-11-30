@@ -86,7 +86,7 @@ func ReqNewKeys(b *broker.Broker, keyIDs []string, pass []byte) ([]*signer.NewKe
 				Passphrase: p,
 			},
 		},
-	}, 5*time.Second)
+	}, 10*time.Second)
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Generate a stable ASCII USB serial (12–32 chars, [A-Za-z0-9], uppercased),
-# then ALWAYS persist it to /app/tezsign_id.
+# then ALWAYS persist it to /app/tezsign_id
 
 set -eu
 
@@ -68,11 +68,11 @@ main() {
   if [[ -f "$APP_ID_FILE" ]]; then
     return # already exists
   fi
-  
+
   raw="$(compute_serial_raw || true)"
   [[ -z "${raw:-}" ]] && raw="$(head -c 16 /dev/urandom | xxd -p -c 32)"
   serial="$(sanitize_serial "$raw")"
-  mount -o remount,rw /app # ensure /app is writable
+  mount -o remount,rw /app
   persist_serial "$serial"
   printf '%s\n' "$serial"
 }

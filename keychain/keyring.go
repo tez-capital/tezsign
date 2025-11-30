@@ -456,6 +456,21 @@ func (kr *KeyRing) SignAndUpdate(tz4 string, raw []byte) (sig []byte, err error)
 		return nil, ErrStaleWatermark
 	}
 
+	writeChan := make(chan error, 1)
+	go func() {
+		// Update in-memory
+
+		key.watermark[knd] = HighWatermark{level: level, round: round}
+		// Persist level.bin using DEK
+		if err := kr.store.writeKeyState(keyID, key.dek, key.tz4, key.GetKeyState()); err != nil {
+			writeChan <- fmt.Errorf("persist state: %w", err)
+			return
+		}
+
+		key.stateCorrupted = false
+		writeChan <- nil
+	}()
+
 	// decrypt secret (32B LE) using in-memory DEK; authenticate with AAD
 	gcmDEK, err := newAESGCM(key.dek)
 	if err != nil {
@@ -479,21 +494,6 @@ func (kr *KeyRing) SignAndUpdate(tz4 string, raw []byte) (sig []byte, err error)
 		MemoryWipe(le)
 		return nil, fmt.Errorf("invalid scalar")
 	}
-
-	writeChan := make(chan error, 1)
-	go func() {
-		// Update in-memory
-
-		key.watermark[knd] = HighWatermark{level: level, round: round}
-		// Persist level.bin using DEK
-		if err := kr.store.writeKeyState(keyID, key.dek, key.tz4, key.GetKeyState()); err != nil {
-			writeChan <- fmt.Errorf("persist state: %w", err)
-			return
-		}
-
-		key.stateCorrupted = false
-		writeChan <- nil
-	}()
 
 	sig, _ = signer.SignCompressed(&sk, signBytes)
 	MemoryWipe(le)

@@ -54,12 +54,16 @@ runs:
   - name: Reconfigure to dev image
     if: ${{ inputs.tezsign_flavour == 'dev' }}
     shell: bash
+    env:
+      IMAGE_ID: ${{ inputs.image_id }}.dev
     run: |
       sudo docker run -e CGO_ENABLED=0 --rm --privileged -v ${{ github.workspace }}/:/work tezsign/builder:latest ./tools/bin/builder ./imgs/${{ inputs.source_artifact }}.img ./imgs/${{ inputs.image_id }}.dev.img.xz dev
 
   - name: Reconfigure to prod image
     if: ${{ inputs.tezsign_flavour == 'prod' }}
     shell: bash
+    env:
+      IMAGE_ID: ${{ inputs.image_id }}
     run: |
       sudo docker run -e CGO_ENABLED=0 --rm --privileged -v ${{ github.workspace }}/:/work tezsign/builder:latest ./tools/bin/builder ./imgs/${{ inputs.source_artifact }}.img ./imgs/${{ inputs.image_id }}.img.xz prod
 

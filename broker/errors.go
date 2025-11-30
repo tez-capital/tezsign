@@ -4,7 +4,7 @@ import "errors"
 
 var (
 	ErrInvalidHeaderParity   = errors.New("invalid header parity")
-	ErrInvalidHeaderLength   = errors.New("invalid header length")
+	ErrIncompleteHeader      = errors.New("incomplete header")
 	ErrInvalidHeaderBadMagic = errors.New("invalid header magic")
 
 	ErrNoPayloadFound     = errors.New("no payload found")
