@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Generate a stable ASCII USB serial (12–32 chars, [A-Za-z0-9], uppercased),
-# then ALWAYS persist it to /data/tezsign_id so it survives app partition updates.
+# then ALWAYS persist it to /app/tezsign_id
 
 set -eu
 
-readonly APP_ID_FILE="/data/tezsign_id"
+readonly APP_ID_FILE="/app/tezsign_id"
 
 sanitize_serial() {
   local s="$1"
@@ -72,7 +72,7 @@ main() {
   raw="$(compute_serial_raw || true)"
   [[ -z "${raw:-}" ]] && raw="$(head -c 16 /dev/urandom | xxd -p -c 32)"
   serial="$(sanitize_serial "$raw")"
-  mount -o remount,rw /data
+  mount -o remount,rw /app
   persist_serial "$serial"
   printf '%s\n' "$serial"
 }

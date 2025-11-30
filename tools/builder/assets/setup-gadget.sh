@@ -5,8 +5,15 @@
 
 readonly VID="0x9997"
 readonly PID="0x0001"
-readonly APP_ID_FILE="/data/tezsign_id"
-SERIAL="$(cat ${APP_ID_FILE} 2>/dev/null)"
+readonly APP_ID_FILE="/app/tezsign_id"
+readonly LEGACY_APP_ID_FILE="/data/tezsign_id"
+if [[ -f "${APP_ID_FILE}" ]]; then
+  SERIAL="$(cat "${APP_ID_FILE}" 2>/dev/null)"
+elif [[ -f "${LEGACY_APP_ID_FILE}" ]]; then
+  SERIAL="$(cat "${LEGACY_APP_ID_FILE}" 2>/dev/null)"
+else
+  SERIAL=""
+fi
 readonly MANUFACTURER="TzC"
 readonly PRODUCT="tezsign-gadget"
 

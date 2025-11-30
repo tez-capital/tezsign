@@ -65,7 +65,7 @@ echo "[+] Users configured."
 hostnamectl set-hostname tezsign
 echo "127.0.1.1 $(cat /etc/hostname)" >> /etc/hosts # ensure hostname resolves locally
 
-# Generate/persist device serial (goes to /data/tezsign_id)
+# Generate/persist device serial (goes to /app/tezsign_id)
 /usr/local/bin/generate-serial-number.sh >/dev/null
 
 ### 5) Prepare read-only mounts for next boot
