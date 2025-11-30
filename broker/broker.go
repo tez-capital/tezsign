@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"runtime"
 	"syscall"
 
 	"github.com/tez-capital/tezsign/logging"
@@ -205,6 +206,7 @@ func (b *Broker) processStash() {
 		case errors.Is(err, ErrNoPayloadFound):
 			fallthrough
 		case errors.Is(err, ErrIncompletePayload):
+			runtime.GC() // encourage freeing stash buffers
 			return
 		case errors.Is(err, ErrInvalidPayloadSize):
 			continue // resync
