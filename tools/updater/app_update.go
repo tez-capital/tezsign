@@ -60,6 +60,7 @@ func performAppBinaryUpdate(binaryPath, destination string, logger *slog.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to open app filesystem: %w", err)
 	}
+	defer fs.Close()
 
 	table, err := dstImg.GetPartitionTable()
 	if err != nil {
