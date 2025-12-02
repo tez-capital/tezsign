@@ -224,6 +224,9 @@ func performUpdate(source, destination string, kind UpdateKind, logger *slog.Log
 		if err = copyPartitionData(sourceImg, sourceAppPartition, dstImg, destinationAppPartition, "app partition", logger); err != nil {
 			return fmt.Errorf("failed to update app partition: %w", err)
 		}
+		if err := flushDevice(destination, logger); err != nil {
+			return fmt.Errorf("failed to flush destination before tezsign_id restore: %w", err)
+		}
 		if existingTezsignID != "" {
 			if err := restoreTezsignID(existingTezsignID, destination, dstImg, destinationAppPartition, logger); err != nil {
 				return fmt.Errorf("failed to restore tezsign_id: %w", err)
@@ -497,4 +500,17 @@ func fsyncPath(path string) error {
 	}
 	defer f.Close()
 	return f.Sync()
+}
+
+func flushDevice(device string, logger *slog.Logger) error {
+	if out, err := exec.Command("sync").CombinedOutput(); err != nil {
+		logger.Debug("sync failed during device flush", "error", err, "output", string(out))
+		return fmt.Errorf("sync failed during device flush: %w", err)
+	}
+
+	if out, err := exec.Command("blockdev", "--flushbufs", device).CombinedOutput(); err != nil {
+		logger.Debug("blockdev flush failed during device flush", "error", err, "output", string(out))
+		return fmt.Errorf("blockdev flush failed during device flush: %w", err)
+	}
+	return nil
 }

@@ -71,7 +71,7 @@ func mountAppPartition(writable bool) (string, func(), error) {
 		return "", nil, fmt.Errorf("failed to create temp mount dir: %w", err)
 	}
 
-	opts := "ro,noload"
+	opts := "ro"
 	if writable {
 		opts = "rw,sync"
 	}
@@ -103,7 +103,7 @@ func mountSpecificPartition(devicePath string, partIndex int, writable bool) (st
 		return "", nil, fmt.Errorf("failed to create temp mount dir: %w", err)
 	}
 
-	opts := "ro,noload"
+	opts := "ro"
 	if writable {
 		opts = "rw,sync"
 	}
