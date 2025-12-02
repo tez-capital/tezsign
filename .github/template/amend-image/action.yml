@@ -57,7 +57,7 @@ runs:
     env:
       IMAGE_ID: ${{ inputs.image_id }}.dev
     run: |
-      sudo docker run -e CGO_ENABLED=0 --rm --privileged -v ${{ github.workspace }}/:/work tezsign/builder:latest ./tools/bin/builder ./imgs/${{ inputs.source_artifact }}.img ./imgs/${{ inputs.image_id }}.dev.img.xz dev
+      sudo docker run -e $IMAGE_ID -e CGO_ENABLED=0 --rm --privileged -v ${{ github.workspace }}/:/work tezsign/builder:latest ./tools/bin/builder ./imgs/${{ inputs.source_artifact }}.img ./imgs/${{ inputs.image_id }}.dev.img.xz dev
 
   - name: Reconfigure to prod image
     if: ${{ inputs.tezsign_flavour == 'prod' }}
@@ -65,7 +65,7 @@ runs:
     env:
       IMAGE_ID: ${{ inputs.image_id }}
     run: |
-      sudo docker run -e CGO_ENABLED=0 --rm --privileged -v ${{ github.workspace }}/:/work tezsign/builder:latest ./tools/bin/builder ./imgs/${{ inputs.source_artifact }}.img ./imgs/${{ inputs.image_id }}.img.xz prod
+      sudo docker run -e $IMAGE_ID -e CGO_ENABLED=0 --rm --privileged -v ${{ github.workspace }}/:/work tezsign/builder:latest ./tools/bin/builder ./imgs/${{ inputs.source_artifact }}.img ./imgs/${{ inputs.image_id }}.img.xz prod
 
   - uses: actions/upload-artifact@v5
     if: ${{ inputs.tezsign_flavour == 'prod' }}
