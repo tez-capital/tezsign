@@ -8,3 +8,4 @@ imgs
 # go cache
 .gocache
 .gomodcache
+.cache

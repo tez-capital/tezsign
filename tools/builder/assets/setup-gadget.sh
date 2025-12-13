@@ -50,7 +50,10 @@ mount -t functionfs tezsign /dev/ffs/tezsign
 chmod 770 /dev/ffs/tezsign
 chown :dev_manager /dev/ffs/tezsign
 chown registrar:registrar /dev/ffs/tezsign/ep0
-chown tezsign:tezsign -R /data/tezsign # restore data permissions
+# Shared data/logs directory for gadget + registrar
+mkdir -p /data/tezsign
+chown -R tezsign:dev_manager /data/tezsign
+chmod 2770 /data/tezsign # setgid to keep group dev_manager on new files
 
 # Tune performance
 echo schedutil | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor

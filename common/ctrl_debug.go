@@ -1,11 +1,11 @@
 package common
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 
 	"github.com/google/gousb"
+	"github.com/tez-capital/tezsign/logging"
 )
 
 type ctrlSetup struct {
@@ -26,7 +26,7 @@ func logCtrl(l *slog.Logger, tag string, s ctrlSetup, n int, data []byte, err er
 		return
 	}
 	hex := fmt.Sprintf("% x", data[:n])
-	l.Log(context.Background(), -100, tag,
+	logging.All(l, tag,
 		"bm", fmt.Sprintf("0x%02x", s.BmReqType),
 		"bReq", fmt.Sprintf("0x%02x", s.BReq),
 		"wValue", s.WValue, "wIndex", s.WIndex, "wLength", s.WLength,

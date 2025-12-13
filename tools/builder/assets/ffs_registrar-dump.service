@@ -1,0 +1,11 @@
+[Unit]
+Description=Dump ffs_registrar journal to /data/tezsign on failure
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'base=/data/tezsign/LogsJournal; day=LogsJournal.$(date +%%F); dir=\"$base/$day\"; mkdir -p \"$dir\" && journalctl -u ffs_registrar.service -b > \"$dir/registrar.journal.$(date +%%H-%%M-%%S)\"'
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

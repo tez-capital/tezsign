@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"errors"
 	"os"
 	"sync"
 )
@@ -29,7 +30,16 @@ func NewSimpleLogResetWriter(filePath string, maxSize int) (*SimpleLogResetWrite
 
 func (w *SimpleLogResetWriter) openFile() error {
 	var err error
-	w.File, err = os.OpenFile(w.FilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	w.File, err = os.OpenFile(w.FilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o660)
+	if err != nil && errors.Is(err, os.ErrPermission) {
+		if rmErr := os.Remove(w.FilePath); rmErr == nil {
+			w.File, err = os.OpenFile(w.FilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o660)
+		}
+	}
+	if err == nil && w.File != nil {
+		_ = w.File.Chmod(0o660)
+		_ = os.Chmod(w.FilePath, 0o660)
+	}
 	return err
 }
 
