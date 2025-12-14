@@ -16,7 +16,7 @@ fi
 RULE_PATH="/etc/udev/rules.d/99-tezsign.rules"
 
 cat <<'RULES' > "${RULE_PATH}" || die "Failed to write ${RULE_PATH}."
-SUBSYSTEM=="usb", ATTR{idVendor}=="9997", ATTR{idProduct}=="0001", ATTR{product}=="tezsign-gadget", GROUP="plugdev", MODE="0660"
+ACTION=="add|change", SUBSYSTEM=="usb", ATTR{idVendor}=="9997", ATTR{idProduct}=="0001", ATTR{product}=="tezsign-gadget", ATTR{power/control}="on", GROUP="plugdev", MODE="0660"
 RULES
 
 if ! udevadm control --reload-rules; then
