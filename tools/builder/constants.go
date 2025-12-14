@@ -53,6 +53,7 @@ var (
 		"tools/builder/assets/attach-gadget.service":          "/etc/systemd/system/attach-gadget.service",
 		"tools/builder/assets/ffs_registrar":                  "/usr/local/bin/ffs_registrar",
 		"tools/builder/assets/ffs_registrar.service":          "/etc/systemd/system/ffs_registrar.service",
+		"tools/builder/assets/ffs_registrar-dump.service":     "/etc/systemd/system/ffs_registrar-dump.service",
 		"tools/builder/assets/tezsign.service":                "/etc/systemd/system/tezsign.service",
 		"tools/builder/assets/generate-serial-number.sh":      "/usr/local/bin/generate-serial-number.sh",
 		"tools/builder/assets/setup-gadget-dev-dummy.service": "/etc/systemd/system/setup-gadget-dev.service", // dummy to satisfy dependencies

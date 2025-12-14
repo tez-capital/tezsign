@@ -2,12 +2,15 @@
 Description=Registers FFS gadget descriptors (writes to ep0)
 After=setup-gadget.service
 Requires=setup-gadget.service
+StartLimitIntervalSec=0
+OnFailure=ffs_registrar-dump.service
 
 [Service]
 Type=simple
 User=registrar
 Group=registrar
-Environment="BROKER_LOG=debug"
+Environment="DATA_STORE=/data/tezsign"
+Environment="LOG_LEVEL=debug"
 ExecStart=/usr/local/bin/ffs_registrar
 RemainAfterExit=yes
 Restart=always

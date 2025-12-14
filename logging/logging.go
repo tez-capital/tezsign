@@ -3,6 +3,8 @@ package logging
 import (
 	"bufio"
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -10,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // ----------------- Config -----------------
@@ -22,6 +25,13 @@ type Config struct {
 	MaxSizeMB    int        // default 50
 	SetAsDefault bool       // set slog.SetDefault
 }
+
+const (
+	// LevelAll is a custom level logging all errors.
+	LevelAll slog.Level = -100
+	// LevelFatal is a custom level above Error used for fatal events.
+	LevelFatal slog.Level = 20
+)
 
 func DefaultConfig() Config {
 	return Config{
@@ -39,13 +49,15 @@ func NewConfigFromEnv() Config {
 	// Level
 	switch strings.ToLower(os.Getenv("LOG_LEVEL")) {
 	case "all":
-		cfg.Level = slog.Level(-100)
+		cfg.Level = LevelAll
 	case "debug":
 		cfg.Level = slog.LevelDebug
 	case "warn", "warning":
 		cfg.Level = slog.LevelWarn
 	case "error":
 		cfg.Level = slog.LevelError
+	case "fatal":
+		cfg.Level = LevelFatal
 	}
 
 	// Format
@@ -169,14 +181,24 @@ func New(cfg Config) (*slog.Logger, io.Writer) {
 
 	var logWriter io.Writer
 	if cfg.File != "" {
-		logWriter, _ = NewSimpleLogResetWriter(cfg.File, cfg.MaxSizeMB*1024*1024)
-		setCurrentFile(cfg.File)
-		switch cfg.Format {
-		case "json":
-			handlers = append(handlers, slog.NewJSONHandler(logWriter, &slog.HandlerOptions{Level: cfg.Level}))
-		default: // text
-			handlers = append(handlers, slog.NewTextHandler(logWriter, &slog.HandlerOptions{Level: cfg.Level}))
+		lw, err := NewSimpleLogResetWriter(cfg.File, cfg.MaxSizeMB*1024*1024)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "logging: file %q disabled: %v\n", cfg.File, err)
+		} else {
+			logWriter = lw
+			setCurrentFile(cfg.File)
+			switch cfg.Format {
+			case "json":
+				handlers = append(handlers, slog.NewJSONHandler(logWriter, &slog.HandlerOptions{Level: cfg.Level}))
+			default: // text
+				handlers = append(handlers, slog.NewTextHandler(logWriter, &slog.HandlerOptions{Level: cfg.Level}))
+			}
 		}
+	}
+
+	// Fatal-only handler that appends daily fatal logs next to the main log.
+	if cfg.File != "" {
+		handlers = append(handlers, newFatalFileHandler(cfg.File, cfg.Format))
 	}
 
 	// stderr handler
@@ -211,6 +233,104 @@ func NewFromEnv() (*slog.Logger, io.Writer) {
 }
 
 // ----------------- Tail utility -----------------
+
+// All logs a message at LevelAll using a background context.
+func All(l *slog.Logger, msg string, args ...any) {
+	if l == nil {
+		return
+	}
+	l.Log(context.Background(), LevelAll, msg, args...)
+}
+
+// Fatal logs a message at LevelFatal using a background context.
+func Fatal(l *slog.Logger, msg string, args ...any) {
+	if l == nil {
+		return
+	}
+	l.Log(context.Background(), LevelFatal, msg, args...)
+}
+
+// fatalFileHandler appends fatal records to daily files next to the main log.
+type fatalFileHandler struct {
+	basePath string
+	format   string
+	attrs    []slog.Attr
+	groups   []string
+}
+
+func newFatalFileHandler(basePath, format string) slog.Handler {
+	return fatalFileHandler{basePath: basePath, format: format}
+}
+
+func (h fatalFileHandler) Enabled(_ context.Context, level slog.Level) bool {
+	return level >= LevelFatal
+}
+
+func (h fatalFileHandler) Handle(ctx context.Context, r slog.Record) error {
+	if !h.Enabled(ctx, r.Level) {
+		return nil
+	}
+
+	path := fatalFilePath(h.basePath, time.Now())
+	if err := EnsureDir(path); err != nil {
+		return err
+	}
+
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o660)
+	if err != nil && errors.Is(err, os.ErrPermission) {
+		if rmErr := os.Remove(path); rmErr == nil {
+			f, err = os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o660)
+		}
+	}
+	if err != nil {
+		return err
+	}
+	if f != nil {
+		_ = f.Chmod(0o660)
+		_ = os.Chmod(path, 0o660)
+	}
+	defer f.Close()
+
+	var handler slog.Handler
+	switch h.format {
+	case "json":
+		handler = slog.NewJSONHandler(f, &slog.HandlerOptions{Level: LevelFatal})
+	default:
+		handler = slog.NewTextHandler(f, &slog.HandlerOptions{Level: LevelFatal})
+	}
+
+	for _, g := range h.groups {
+		handler = handler.WithGroup(g)
+	}
+	if len(h.attrs) > 0 {
+		handler = handler.WithAttrs(h.attrs)
+	}
+	return handler.Handle(ctx, r)
+}
+
+func (h fatalFileHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	h.attrs = append(h.attrs, attrs...)
+	return h
+}
+
+func (h fatalFileHandler) WithGroup(name string) slog.Handler {
+	h.groups = append(h.groups, name)
+	return h
+}
+
+func fatalFilePath(base string, now time.Time) string {
+	dir := filepath.Dir(base)
+	if dir == "" || dir == "." {
+		dir = "."
+	}
+	name := filepath.Base(base)
+	ext := filepath.Ext(name)
+	name = strings.TrimSuffix(name, ext)
+	if name == "" {
+		name = "fatal"
+	}
+	return filepath.Join(dir, fmt.Sprintf("%s.error.%s", name, now.Format("2006-01-02")))
+}
 
 // TailLastLines reads up to n last newline-delimited lines from a file.
 // Works with rotated file as long as you pass the current path.
