@@ -7,11 +7,40 @@ import (
 	"log/slog"
 	"os"
 	"sync/atomic"
+	"time"
 
 	"github.com/tez-capital/tezsign/app/gadget/common"
 )
 
-func drainEP0Events(ep0 *os.File, ready *atomic.Uint32, l *slog.Logger) {
+func triggerSoftConnect(l *slog.Logger) error {
+	const udcClassPath = "/sys/class/udc"
+	const softConnectFile = "soft_connect"
+
+	l.Info("--- Checking %s for %s ---", udcClassPath, softConnectFile)
+
+	softConnectPath := "/tmp/soft_connect"
+	if _, err := os.Stat(softConnectPath); err != nil {
+		l.Error("soft_connect symlink missing", "err", err.Error())
+		return err
+	}
+	l.Info("triggering soft connect", "udc", softConnectPath)
+	err := os.WriteFile(softConnectPath, []byte("disconnect\n"), 0644) // writing '0' disconnects, '1' connects
+	if err != nil {
+		l.Error("writing soft_connect file", "err", err.Error())
+		return err
+	}
+	time.Sleep(500 * time.Millisecond)
+
+	err = os.WriteFile(softConnectPath, []byte("connect\n"), 0644) // writing '0' disconnects, '1' connects
+	if err != nil {
+		l.Error("writing soft_connect file", "err", err.Error())
+		return err
+	}
+	l.Info("soft connect triggered successfully")
+	return nil
+}
+
+func drainEP0Events(ep0 *os.File, enabled chan<- bool, ready *atomic.Uint32, l *slog.Logger) {
 	buf := make([]byte, evSize)
 
 	for {
@@ -21,7 +50,8 @@ func drainEP0Events(ep0 *os.File, ready *atomic.Uint32, l *slog.Logger) {
 				return
 			}
 			l.Error("ep0 read events", "err", err)
-			return
+			triggerSoftConnect(l) // try to recover by soft reconnect
+			continue
 		}
 
 		if n < evSize {
@@ -32,7 +62,33 @@ func drainEP0Events(ep0 *os.File, ready *atomic.Uint32, l *slog.Logger) {
 		// [65 90 0 0 0 0 8 0 | 4 | 0 0 0]
 		//                      ^ evType
 		evType := int(buf[8])
-		if evType != evTypeSetup {
+		switch evType {
+		case evTypeBind:
+			l.Info("tezsign gadget bound")
+			continue
+		case evTypeUnbind:
+			l.Info("tezsign gadget unbound")
+			continue
+		case evTypeEnable:
+			l.Info("tezsign gadget enabled")
+			enabled <- true
+			continue
+		case evTypeDisable:
+			l.Info("tezsign gadget disabled")
+			enabled <- false
+			triggerSoftConnect(l)
+			continue
+		case evTypeSuspend:
+			enabled <- false
+			l.Info("tezsign gadget suspended")
+			continue
+		case evTypeResume:
+			enabled <- true
+			l.Info("tezsign gadget resumed")
+			continue
+		case evTypeSetup:
+			// Handle below
+		default:
 			continue
 		}
 
@@ -91,8 +147,10 @@ func main() {
 	// Start watching gadget liveness
 	var ready atomic.Uint32
 	go watchLiveness(common.ReadySock, &ready, l)
+	enabled := make(chan bool, 1)
+	go runEnabledWatcher(enabled, common.EnabledSock, l)
 
 	l.Info("FFS registrar online; handling EP0 control & events")
 
-	drainEP0Events(ep0, &ready, l)
+	drainEP0Events(ep0, enabled, &ready, l)
 }

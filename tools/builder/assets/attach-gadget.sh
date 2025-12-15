@@ -19,6 +19,10 @@ fi
 echo "${UDC}" > "${GADGET_DIR}/UDC"
 echo "Attached gadget to UDC: ${UDC}"
 
+# create link to soft_connect
+ln -sf "/sys/class/udc/${UDC}/soft_connect" "/tmp/soft_connect"
+chown registrar:registrar /tmp/soft_connect # allow ffs_registrar to access it
+
 # Wait for endpoints and fix ownership
 for ep in /dev/ffs/tezsign/ep1 /dev/ffs/tezsign/ep2 /dev/ffs/tezsign/ep3 /dev/ffs/tezsign/ep4; do
   while [[ ! -e "$ep" ]]; do sleep 1; done

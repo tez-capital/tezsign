@@ -7,7 +7,13 @@ const (
 
 	// usb_ctrlrequest constants
 	evSize            = 12
+	evTypeBind        = 0
+	evTypeUnbind      = 1
+	evTypeEnable      = 2
+	evTypeDisable     = 3
 	evTypeSetup       = 4
+	evTypeSuspend     = 5
+	evTypeResume      = 6
 	vendorReqReady    = 0x5A
 	bmReqTypeVendorIn = 0x81
 	protoVersion      = 0x0001

@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -88,68 +90,8 @@ func handleMgmtOnly(base func(context.Context, []byte) ([]byte, error)) broker.H
 	}
 }
 
-func run(l *slog.Logger) error {
-	l.Info("Waiting for endpoints...")
-	in0, out0, in1, out1, err := waitForFunctionFSEndpoints(common.FfsInstanceRoot, waitEndpointsTime)
-	if err != nil {
-		return err
-	}
-
-	// IF0 (sign) endpoints
-	in0Fd, err := os.OpenFile(in0, os.O_WRONLY, 0) // device -> host
-	if err != nil {
-		return fmt.Errorf("open IF0 IN: %w", err)
-	}
-	defer in0Fd.Close()
-	out0Fd, err := os.OpenFile(out0, os.O_RDONLY, 0) // host -> device
-	if err != nil {
-		return fmt.Errorf("open IF0 OUT: %w", err)
-	}
-	defer out0Fd.Close()
-
-	// IF1 (sign) endpoints
-	in1Fd, err := os.OpenFile(in1, os.O_WRONLY, 0) // device -> host
-	if err != nil {
-		return fmt.Errorf("open IF1 IN: %w", err)
-	}
-	defer in1Fd.Close()
-	out1Fd, err := os.OpenFile(out1, os.O_RDONLY, 0) // host -> device
-	if err != nil {
-		return fmt.Errorf("open IF1 OUT: %w", err)
-	}
-	defer out1Fd.Close()
-
-	r0, _ := NewReader(out0Fd)
-	w0, _ := NewWriter(in0Fd)
-	r1, _ := NewReader(out1Fd)
-	w1, _ := NewWriter(in1Fd)
-
-	l.Info("Endpoints ready; starting broker",
-		slog.String("IF0.in", in0), slog.String("IF0.out", out0),
-		slog.String("IF1.in", in1), slog.String("IF1.out", out1),
-	)
-
-	// Keystore directory: DATA_STORE/keystore when DATA_STORE is set; else next to binary
-	var baseDir string
-	if ds := strings.TrimSpace(os.Getenv("DATA_STORE")); ds != "" {
-		baseDir = filepath.Join(ds, "keystore")
-	} else {
-		baseDir = logging.DefaultFileInExecDir("keystore") // e.g. /path/to/bin/keystore
-	}
-	// Ensure keystore dir exists (0700 since it holds secrets)
-	if err := os.MkdirAll(baseDir, 0o700); err != nil {
-		return fmt.Errorf("keystore mkdir %q: %w", baseDir, err)
-	}
-
-	fs, err := keychain.NewFileStore(baseDir)
-	if err != nil {
-		return fmt.Errorf("store: %w", err)
-	}
-
-	kr := keychain.NewKeyRing(l, fs)
-
-	// --- broker handler: parse → validate → sign/deny → respond ---
-	handleAll := func(ctx context.Context, payload []byte) ([]byte, error) {
+func handleRequestsFactory(fs *keychain.FileStore, kr *keychain.KeyRing, l *slog.Logger) broker.Handler {
+	return func(ctx context.Context, payload []byte) ([]byte, error) {
 		var req signer.Request
 		if err := proto.Unmarshal(payload, &req); err != nil {
 			return marshalErr(1, fmt.Sprintf("bad protobuf: %v", err)), nil
@@ -423,36 +365,149 @@ func run(l *slog.Logger) error {
 			return marshalErr(1000, "unknown request"), nil
 		}
 	}
+}
+
+func runBrokers(ctx context.Context, fs *keychain.FileStore, kr *keychain.KeyRing, l *slog.Logger) error {
+	l.Info("Waiting for endpoints...")
+	in0, out0, in1, out1, err := waitForFunctionFSEndpoints(common.FfsInstanceRoot, waitEndpointsTime)
+	if err != nil {
+		return err
+	}
+
+	l.Info("Endpoints ready; starting broker",
+		slog.String("IF0.in", in0), slog.String("IF0.out", out0),
+		slog.String("IF1.in", in1), slog.String("IF1.out", out1),
+	)
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
 
 	bLogger := broker.WithLogger(l.With("component", "broker"))
+	// IF0 (sign) endpoints
+	in0Fd, err := os.OpenFile(in0, os.O_WRONLY, 0) // device -> host
+	if err != nil {
+		return fmt.Errorf("open IF0 IN: %w", err)
+	}
+	defer in0Fd.Close()
+	out0Fd, err := os.OpenFile(out0, os.O_RDONLY, 0) // host -> device
+	if err != nil {
+		return fmt.Errorf("open IF0 OUT: %w", err)
+	}
+	defer out0Fd.Close()
 
-	// IF0: sign channel
-	signBroker := broker.New(r0, w0, bLogger, broker.WithHandler(handleSignAndStatus(handleAll)))
-	// IF1: management channel
-	mgmtBroker := broker.New(r1, w1, bLogger, broker.WithHandler(handleMgmtOnly(handleAll)))
+	// IF1 (mgmt) endpoints
+	in1Fd, err := os.OpenFile(in1, os.O_WRONLY, 0) // device -> host
+	if err != nil {
+		return fmt.Errorf("open IF1 IN: %w", err)
+	}
+	defer in1Fd.Close()
+	out1Fd, err := os.OpenFile(out1, os.O_RDONLY, 0) // host -> device
+	if err != nil {
+		return fmt.Errorf("open IF1 OUT: %w", err)
+	}
+	defer out1Fd.Close()
+
+	r0, _ := NewReader(out0Fd)
+	w0, _ := NewWriter(in0Fd)
+	r1, _ := NewReader(out1Fd)
+	w1, _ := NewWriter(in1Fd)
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
 
 	cleanupSock := serveReadySocket(l)
+	defer cleanupSock()
+	// IF0: sign channel
+	signBroker := broker.New(r0, w0, bLogger, broker.WithHandler(handleSignAndStatus(handleRequestsFactory(fs, kr, l))))
+	defer signBroker.Stop()
+	// IF1: management channel
+	mgmtBroker := broker.New(r1, w1, bLogger, broker.WithHandler(handleMgmtOnly(handleRequestsFactory(fs, kr, l))))
+	defer mgmtBroker.Stop()
 
 	l.Info("Signer gadget online; awaiting requests.")
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func run(l *slog.Logger) error {
+	// Keystore directory: DATA_STORE/keystore when DATA_STORE is set; else next to binary
+	var baseDir string
+	if ds := strings.TrimSpace(os.Getenv("DATA_STORE")); ds != "" {
+		baseDir = filepath.Join(ds, "keystore")
+	} else {
+		baseDir = logging.DefaultFileInExecDir("keystore") // e.g. /path/to/bin/keystore
+	}
+	// Ensure keystore dir exists (0700 since it holds secrets)
+	if err := os.MkdirAll(baseDir, 0o700); err != nil {
+		return fmt.Errorf("keystore mkdir %q: %w", baseDir, err)
+	}
+
+	fs, err := keychain.NewFileStore(baseDir)
+	if err != nil {
+		return fmt.Errorf("store: %w", err)
+	}
+
+	kr := keychain.NewKeyRing(l, fs)
 
 	// Graceful shutdown on SIGTERM/SIGINT
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
 
-	sig := <-sigCh
-	l.Info("Received shutdown signal, cleaning up...", slog.String("signal", sig.String()))
+	// Revival loop: wait for enabled socket, run brokers, restart on disable
+	for {
+		// Check for shutdown signal before waiting for enabled socket
+		select {
+		case sig := <-sigCh:
+			l.Info("Received shutdown signal", slog.String("signal", sig.String()))
+			return nil
+		default:
+		}
 
-	// Clean up in reverse order of creation
-	cleanupSock()
-	mgmtBroker.Stop()
-	signBroker.Stop()
+		enabled, err := net.Dial("unix", common.EnabledSock)
+		if err != nil {
+			l.Debug("gadget not enabled (socket down), retrying", "err", err)
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		l.Info("gadget enabled; starting brokers")
 
-	// Close readers/writers
-	r0.Close()
-	w0.Close()
-	r1.Close()
-	w1.Close()
+		ctx, cancel := context.WithCancel(context.Background())
 
-	l.Info("Gadget shutdown complete")
-	return nil
+		// Monitor for disable (socket close) or shutdown signal
+		go func() {
+			select {
+			case <-func() chan struct{} {
+				ch := make(chan struct{})
+				go func() {
+					_, _ = io.Copy(io.Discard, enabled)
+					close(ch)
+				}()
+				return ch
+			}():
+				l.Warn("gadget disabled; stopping brokers")
+			case sig := <-sigCh:
+				l.Info("Received shutdown signal during operation", slog.String("signal", sig.String()))
+			}
+			cancel()
+			_ = enabled.Close()
+		}()
+
+		err = runBrokers(ctx, fs, kr, l)
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				l.Info("Brokers stopped")
+			} else {
+				l.Error("broker error", "err", err)
+			}
+			continue
+		}
+	}
 }

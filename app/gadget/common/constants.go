@@ -3,5 +3,6 @@ package common
 var (
 	FfsInstanceRoot = "/dev/ffs/tezsign"
 
-	ReadySock = "/tmp/tezsign.ready"
+	EnabledSock = "/tmp/tezsign.enabled"
+	ReadySock   = "/tmp/tezsign.ready"
 )
