@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/tez-capital/tezsign/logging"
 )
@@ -24,9 +24,10 @@ type WriteContexter interface {
 type Handler func(ctx context.Context, payload []byte) ([]byte, error)
 
 type options struct {
-	bufSize int
-	handler Handler
-	logger  *slog.Logger
+	bufSize     int
+	handler     Handler
+	logger      *slog.Logger
+	workerCount int
 }
 
 type Option func(*options)
@@ -51,6 +52,23 @@ func WithLogger(l *slog.Logger) Option {
 	}
 }
 
+// WithWorkerCount sets the number of worker goroutines for handling requests.
+// Default is 8.
+func WithWorkerCount(n int) Option {
+	return func(o *options) {
+		if n > 0 {
+			o.workerCount = n
+		}
+	}
+}
+
+// work represents a unit of work for the worker pool
+type work struct {
+	id          [16]byte
+	payloadType payloadType
+	payload     []byte
+}
+
 type Broker struct {
 	r ReadContexter
 	w WriteContexter
@@ -61,21 +79,35 @@ type Broker struct {
 	handler Handler
 
 	writeChan           chan []byte
+	workChan            chan work // bounded channel for worker pool
 	processingRequests  requestMap[struct{}]
 	unconfirmedRequests requestMap[[]byte]
 
-	capacity int
-	logger   *slog.Logger
+	capacity    int
+	workerCount int
+	logger      *slog.Logger
 
 	ctx            context.Context
 	cancel         context.CancelFunc
 	readLoopDone   <-chan struct{}
 	writerLoopDone <-chan struct{}
+	workersDone    <-chan struct{}
 }
+
+const (
+	defaultWorkerCount = 8
+	workQueueSize      = 64
+
+	// Backoff constants for retry loops
+	initialBackoff = 10 * time.Millisecond
+	maxBackoff     = 1 * time.Second
+	backoffFactor  = 2
+)
 
 func New(r ReadContexter, w WriteContexter, opts ...Option) *Broker {
 	o := &options{
-		bufSize: DEFAULT_BROKER_CAPACITY,
+		bufSize:     DEFAULT_BROKER_CAPACITY,
+		workerCount: defaultWorkerCount,
 	}
 	for _, fn := range opts {
 		fn(o)
@@ -91,13 +123,15 @@ func New(r ReadContexter, w WriteContexter, opts ...Option) *Broker {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	b := &Broker{
-		r:        r,
-		w:        w,
-		capacity: o.bufSize,
-		logger:   o.logger,
-		handler:  o.handler,
+		r:           r,
+		w:           w,
+		capacity:    o.bufSize,
+		workerCount: o.workerCount,
+		logger:      o.logger,
+		handler:     o.handler,
 
 		writeChan:           make(chan []byte, 32),
+		workChan:            make(chan work, workQueueSize),
 		processingRequests:  NewRequestMap[struct{}](),
 		unconfirmedRequests: NewRequestMap[[]byte](),
 
@@ -106,9 +140,92 @@ func New(r ReadContexter, w WriteContexter, opts ...Option) *Broker {
 		cancel: cancel,
 	}
 
+	b.workersDone = b.startWorkers()
 	b.readLoopDone = b.readLoop()
 	b.writerLoopDone = b.writerLoop()
 	return b
+}
+
+// startWorkers launches a fixed pool of worker goroutines
+func (b *Broker) startWorkers() <-chan struct{} {
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		workerDone := make(chan struct{}, b.workerCount)
+
+		for i := 0; i < b.workerCount; i++ {
+			go func() {
+				defer func() { workerDone <- struct{}{} }()
+				for {
+					select {
+					case w, ok := <-b.workChan:
+						if !ok {
+							return
+						}
+						b.handleWork(w)
+					case <-b.ctx.Done():
+						return
+					}
+				}
+			}()
+		}
+
+		// Wait for all workers to finish
+		for i := 0; i < b.workerCount; i++ {
+			<-workerDone
+		}
+	}()
+
+	return done
+}
+
+// handleWork processes a single work item
+func (b *Broker) handleWork(w work) {
+	switch w.payloadType {
+	case payloadTypeResponse:
+		b.logger.Debug("rx resp", slog.String("id", fmt.Sprintf("%x", w.id)), slog.Int("size", len(w.payload)))
+		if ch, ok := b.waiters.LoadAndDelete(w.id); ok && ch != nil {
+			select {
+			case ch <- w.payload:
+			default:
+				// Channel full or closed, drop response
+				b.logger.Warn("response channel full, dropping", slog.String("id", fmt.Sprintf("%x", w.id)))
+			}
+		}
+	case payloadTypeRequest:
+		b.logger.Debug("rx req", slog.String("id", fmt.Sprintf("%x", w.id)), slog.Int("size", len(w.payload)))
+		if processing := b.processingRequests.HasRequest(w.id); processing {
+			b.logger.Debug("duplicate request being processed; ignoring", slog.String("id", fmt.Sprintf("%x", w.id)))
+			return
+		}
+		b.processingRequests.Store(w.id, struct{}{})
+
+		// accept the request immediately
+		b.writeFrame(b.ctx, payloadTypeAcceptRequest, w.id, nil)
+
+		if b.handler == nil {
+			b.processingRequests.Delete(w.id)
+			return
+		}
+		resp, _ := b.handler(b.ctx, w.payload)
+		b.processingRequests.Delete(w.id)
+
+		b.logger.Debug("tx resp", slog.String("id", fmt.Sprintf("%x", w.id)), slog.Int("size", len(resp)))
+		_ = b.writeFrame(b.ctx, payloadTypeResponse, w.id, resp)
+	case payloadTypeAcceptRequest:
+		b.logger.Debug("rx accept", slog.String("id", fmt.Sprintf("%x", w.id)))
+		b.unconfirmedRequests.Delete(w.id)
+	case payloadTypeRetry:
+		b.logger.Debug("rx retry", slog.String("id", fmt.Sprintf("%x", w.id)))
+		allUnconfirmed := b.unconfirmedRequests.All()
+		for reqID, reqPayload := range allUnconfirmed {
+			b.writeFrame(b.ctx, payloadTypeRequest, reqID, reqPayload)
+		}
+	default:
+		b.logger.Warn("unknown type; resync", slog.String("type", fmt.Sprintf("%02x", w.payloadType)), slog.String("id", fmt.Sprintf("%x", w.id)))
+	}
 }
 
 func (b *Broker) Request(ctx context.Context, payload []byte) ([]byte, [16]byte, error) {
@@ -151,6 +268,8 @@ func (b *Broker) writerLoop() <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
+		backoff := initialBackoff
+
 		for {
 			var data []byte
 			select {
@@ -158,15 +277,36 @@ func (b *Broker) writerLoop() <-chan struct{} {
 			case <-b.ctx.Done():
 				return
 			}
+
 			for {
+				select {
+				case <-b.ctx.Done():
+					return
+				default:
+				}
+
 				if _, err := b.w.WriteContext(b.ctx, data); err != nil {
 					if isRetryable(err) {
-						b.logger.Debug("write retryable error", slog.Any("err", err))
+						b.logger.Debug("write retryable error, backing off", slog.Any("err", err), slog.Duration("backoff", backoff))
+
+						// Exponential backoff with context check
+						select {
+						case <-time.After(backoff):
+						case <-b.ctx.Done():
+							return
+						}
+
+						backoff *= backoffFactor
+						if backoff > maxBackoff {
+							backoff = maxBackoff
+						}
 						continue
 					}
 					b.logger.Error("write loop exit", slog.Any("err", err))
 					return
 				}
+				// Success - reset backoff
+				backoff = initialBackoff
 				break
 			}
 		}
@@ -179,19 +319,41 @@ func (b *Broker) readLoop() <-chan struct{} {
 	go func() {
 		defer close(done)
 		var buf [DEFAULT_READ_BUFFER]byte
+		backoff := initialBackoff
+
 		for {
+			select {
+			case <-b.ctx.Done():
+				return
+			default:
+			}
+
 			n, err := b.r.ReadContext(b.ctx, buf[:])
 			if n > 0 {
 				b.stash.Write(buf[:n])
 				clear(buf[:n]) // clear buffer after we used it
 				b.processStash()
+				// Reset backoff on successful read
+				backoff = initialBackoff
 			}
 
 			if err != nil {
 				if isRetryable(err) {
-					// send retry packet to
+					// send retry packet
 					b.writeFrame(b.ctx, payloadTypeRetry, [16]byte{}, nil)
-					b.logger.Debug("read retryable error", slog.Any("err", err))
+					b.logger.Debug("read retryable error, backing off", slog.Any("err", err), slog.Duration("backoff", backoff))
+
+					// Exponential backoff with context check
+					select {
+					case <-time.After(backoff):
+					case <-b.ctx.Done():
+						return
+					}
+
+					backoff *= backoffFactor
+					if backoff > maxBackoff {
+						backoff = maxBackoff
+					}
 					continue
 				}
 				b.logger.Debug("read loop exit", slog.Any("err", err))
@@ -207,9 +369,9 @@ func (b *Broker) processStash() {
 		id, pt, payload, err := b.stash.ReadPayload()
 		switch {
 		case errors.Is(err, ErrNoPayloadFound):
-			fallthrough
+			return
 		case errors.Is(err, ErrIncompletePayload):
-			runtime.GC() // encourage freeing stash buffers
+			// Removed runtime.GC() - let Go manage GC naturally
 			return
 		case errors.Is(err, ErrInvalidPayloadSize):
 			continue // resync
@@ -218,45 +380,19 @@ func (b *Broker) processStash() {
 			continue // resync
 		}
 
-		go func(id [16]byte, payloadType payloadType, payload []byte) {
-			switch payloadType {
-			case payloadTypeResponse:
-				b.logger.Debug("rx resp", slog.String("id", fmt.Sprintf("%x", id)), slog.Int("size", len(payload)))
-				if ch, ok := b.waiters.LoadAndDelete(id); ok && ch != nil {
-					ch <- payload
-				}
-			case payloadTypeRequest:
-				b.logger.Debug("rx req", slog.String("id", fmt.Sprintf("%x", id)), slog.Int("size", len(payload)))
-				if processing := b.processingRequests.HasRequest(id); processing {
-					b.logger.Debug("duplicate request being processed; ignoring", slog.String("id", fmt.Sprintf("%x", id)))
-					return
-				}
-				b.processingRequests.Store(id, struct{}{})
-
-				// accept the request immediately
-				b.writeFrame(b.ctx, payloadTypeAcceptRequest, id, nil)
-
-				if b.handler == nil {
-					return
-				}
-				defer b.processingRequests.Delete(id)
-				resp, _ := b.handler(b.ctx, payload)
-
-				b.logger.Debug("tx resp", slog.String("id", fmt.Sprintf("%x", id)), slog.Int("size", len(resp)))
-				_ = b.writeFrame(b.ctx, payloadTypeResponse, id, resp) // Put is deferred inside writeFrame if pooled
-			case payloadTypeAcceptRequest:
-				b.logger.Debug("rx accept", slog.String("id", fmt.Sprintf("%x", id)))
-				b.unconfirmedRequests.Delete(id)
-			case payloadTypeRetry:
-				b.logger.Debug("rx retry", slog.String("id", fmt.Sprintf("%x", id)))
-				allUnconfirmed := b.unconfirmedRequests.All()
-				for reqID, reqPayload := range allUnconfirmed {
-					b.writeFrame(b.ctx, payloadTypeRequest, reqID, reqPayload)
-				}
-			default:
-				b.logger.Warn("unknown type; resync", slog.String("type", fmt.Sprintf("%02x", payloadType)), slog.String("id", fmt.Sprintf("%x", id)))
-			}
-		}(id, pt, payload)
+		// Send work to the worker pool (bounded queue)
+		w := work{id: id, payloadType: pt, payload: payload}
+		select {
+		case b.workChan <- w:
+			// Successfully queued
+		case <-b.ctx.Done():
+			return
+		default:
+			// Work queue full - log warning but don't block
+			b.logger.Warn("work queue full, dropping message",
+				slog.String("type", fmt.Sprintf("%02x", pt)),
+				slog.String("id", fmt.Sprintf("%x", id)))
+		}
 	}
 }
 
@@ -277,14 +413,23 @@ func (b *Broker) writeFrame(ctx context.Context, msgType payloadType, id [16]byt
 		return err
 	}
 
-	b.writeChan <- frame
-	return nil
+	// Non-blocking send with context awareness
+	select {
+	case b.writeChan <- frame:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-b.ctx.Done():
+		return io.EOF
+	}
 }
 
 func (b *Broker) Stop() {
 	b.cancel()
 	<-b.readLoopDone
 	<-b.writerLoopDone
+	close(b.workChan)
+	<-b.workersDone
 }
 
 func isRetryable(err error) bool {

@@ -9,9 +9,15 @@ User=registrar
 Group=registrar
 Environment="BROKER_LOG=debug"
 ExecStart=/usr/local/bin/ffs_registrar
-RemainAfterExit=yes
+
+# Restart policy: always restart to ensure resilience
 Restart=always
 RestartSec=1
+
+# Disable restart rate limiting to ensure continuous operation
+StartLimitIntervalSec=0
+
+# Logging to journal for debugging
 StandardOutput=journal+console
 StandardError=journal+console
 

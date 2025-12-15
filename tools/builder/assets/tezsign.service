@@ -1,6 +1,7 @@
 [Unit]
 Description=Runs tezsign
 After=attach-gadget.service
+Requires=attach-gadget.service
 
 [Service]
 Type=simple
@@ -8,11 +9,23 @@ User=tezsign
 Group=tezsign
 Environment="DATA_STORE=/data/tezsign"
 ExecStart=/app/tezsign
-RemainAfterExit=yes
-Restart=on-failure
+
+# Restart policy: always restart to ensure resilience
+Restart=always
 RestartSec=2
-StandardOutput=null
-StandardError=null
+
+# Disable restart rate limiting to ensure continuous operation
+# This ensures the service keeps restarting even after multiple failures
+StartLimitIntervalSec=0
+
+# Resource limits - conservative values for embedded devices (RPi Zero 2W, RPi4, Radxa Zero 3)
+# These are upper limits, not reservations
+LimitNOFILE=4096
+LimitNPROC=256
+
+# Logging to journal for debugging (can be filtered by unit)
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

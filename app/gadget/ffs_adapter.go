@@ -4,77 +4,188 @@ import (
 	"context"
 	"errors"
 	"os"
+	"sync"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
 
-type result struct {
-	n   int
-	err error
-}
+const (
+	// pollInterval is how often we check context cancellation during I/O
+	pollInterval = 100 * time.Millisecond
+)
 
+// Reader wraps a file descriptor for context-aware reading using poll.
+// Unlike the previous implementation, goroutines properly terminate when
+// context is canceled.
 type Reader struct {
-	fd int
+	fd     int
+	mu     sync.Mutex
+	closed bool
 }
 
+// Writer wraps a file descriptor for context-aware writing using poll.
 type Writer struct {
-	fd int
+	fd     int
+	mu     sync.Mutex
+	closed bool
 }
-
-// we know that this is potentially leaking goroutines
-// but as there are no available context-aware read/write for os.File
-// this is the simplest way to achieve it for now
 
 func NewReader(f *os.File) (*Reader, error) {
-	return &Reader{fd: int(f.Fd())}, nil
+	fd := int(f.Fd())
+	// Set non-blocking mode so we can use poll
+	if err := unix.SetNonblock(fd, true); err != nil {
+		return nil, err
+	}
+	return &Reader{fd: fd}, nil
 }
+
 func NewWriter(f *os.File) (*Writer, error) {
-	return &Writer{fd: int(f.Fd())}, nil
+	fd := int(f.Fd())
+	// Set non-blocking mode so we can use poll
+	if err := unix.SetNonblock(fd, true); err != nil {
+		return nil, err
+	}
+	return &Writer{fd: fd}, nil
 }
 
+// ReadContext reads from the file descriptor with context cancellation support.
+// Uses poll() to wait for data, periodically checking if context is done.
+// This prevents goroutine leaks that occurred with the previous blocking implementation.
 func (r *Reader) ReadContext(ctx context.Context, p []byte) (int, error) {
-	readChan := make(chan result, 1)
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	go func() {
-		n, err := unix.Read(r.fd, p)
-		readChan <- result{n: n, err: err}
-	}()
+	if r.closed {
+		return 0, os.ErrClosed
+	}
 
-	select {
-	case <-ctx.Done():
-		return 0, ctx.Err()
-	case res := <-readChan:
-		if errors.Is(res.err, os.ErrDeadlineExceeded) {
+	pollFds := []unix.PollFd{
+		{Fd: int32(r.fd), Events: unix.POLLIN},
+	}
+	timeoutMs := int(pollInterval.Milliseconds())
+
+	for {
+		// Check context before polling
+		select {
+		case <-ctx.Done():
 			return 0, ctx.Err()
+		default:
 		}
-		return res.n, res.err
+
+		// Poll with timeout so we can check context periodically
+		n, err := unix.Poll(pollFds, timeoutMs)
+		if err != nil {
+			if errors.Is(err, unix.EINTR) {
+				continue // Interrupted, retry
+			}
+			return 0, err
+		}
+
+		if n == 0 {
+			// Timeout - check context and retry
+			continue
+		}
+
+		// Check for errors on the fd
+		if pollFds[0].Revents&(unix.POLLERR|unix.POLLHUP|unix.POLLNVAL) != 0 {
+			return 0, unix.EIO
+		}
+
+		// Data available, do non-blocking read
+		if pollFds[0].Revents&unix.POLLIN != 0 {
+			nr, err := unix.Read(r.fd, p)
+			if err != nil {
+				if errors.Is(err, unix.EAGAIN) || errors.Is(err, unix.EWOULDBLOCK) {
+					continue // No data yet, retry poll
+				}
+				return 0, err
+			}
+			if nr == 0 {
+				return 0, unix.EIO // EOF on device
+			}
+			return nr, nil
+		}
 	}
 }
 
+// WriteContext writes to the file descriptor with context cancellation support.
+// Uses poll() to wait for write readiness, periodically checking if context is done.
 func (w *Writer) WriteContext(ctx context.Context, p []byte) (int, error) {
-	writeChan := make(chan result, 1)
+	w.mu.Lock()
+	defer w.mu.Unlock()
 
-	go func() {
-		written := 0
-		total := len(p)
-		for written < total {
-			n, err := unix.Write(w.fd, p[written:])
-			if err != nil {
-				writeChan <- result{n: written, err: err}
-				return
-			}
-			written += n
-		}
-		writeChan <- result{n: written, err: nil}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return 0, ctx.Err()
-	case res := <-writeChan:
-		if errors.Is(res.err, os.ErrDeadlineExceeded) {
-			return 0, ctx.Err()
-		}
-		return res.n, res.err
+	if w.closed {
+		return 0, os.ErrClosed
 	}
+
+	if len(p) == 0 {
+		return 0, nil
+	}
+
+	pollFds := []unix.PollFd{
+		{Fd: int32(w.fd), Events: unix.POLLOUT},
+	}
+	timeoutMs := int(pollInterval.Milliseconds())
+
+	written := 0
+	total := len(p)
+
+	for written < total {
+		// Check context before polling
+		select {
+		case <-ctx.Done():
+			return written, ctx.Err()
+		default:
+		}
+
+		// Poll with timeout so we can check context periodically
+		n, err := unix.Poll(pollFds, timeoutMs)
+		if err != nil {
+			if errors.Is(err, unix.EINTR) {
+				continue // Interrupted, retry
+			}
+			return written, err
+		}
+
+		if n == 0 {
+			// Timeout - check context and retry
+			continue
+		}
+
+		// Check for errors on the fd
+		if pollFds[0].Revents&(unix.POLLERR|unix.POLLHUP|unix.POLLNVAL) != 0 {
+			return written, unix.EIO
+		}
+
+		// Ready for write
+		if pollFds[0].Revents&unix.POLLOUT != 0 {
+			nw, err := unix.Write(w.fd, p[written:])
+			if err != nil {
+				if errors.Is(err, unix.EAGAIN) || errors.Is(err, unix.EWOULDBLOCK) {
+					continue // Not ready, retry poll
+				}
+				return written, err
+			}
+			written += nw
+		}
+	}
+
+	return written, nil
+}
+
+// Close marks the reader as closed. The underlying fd is managed by os.File.
+func (r *Reader) Close() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.closed = true
+	return nil
+}
+
+// Close marks the writer as closed. The underlying fd is managed by os.File.
+func (w *Writer) Close() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.closed = true
+	return nil
 }

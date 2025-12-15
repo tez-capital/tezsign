@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/tez-capital/tezsign/app/gadget/common"
@@ -426,14 +428,31 @@ func run(l *slog.Logger) error {
 
 	// IF0: sign channel
 	signBroker := broker.New(r0, w0, bLogger, broker.WithHandler(handleSignAndStatus(handleAll)))
-	defer signBroker.Stop()
 	// IF1: management channel
 	mgmtBroker := broker.New(r1, w1, bLogger, broker.WithHandler(handleMgmtOnly(handleAll)))
-	defer mgmtBroker.Stop()
 
 	cleanupSock := serveReadySocket(l)
-	defer cleanupSock()
 
 	l.Info("Signer gadget online; awaiting requests.")
-	select {}
+
+	// Graceful shutdown on SIGTERM/SIGINT
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+
+	sig := <-sigCh
+	l.Info("Received shutdown signal, cleaning up...", slog.String("signal", sig.String()))
+
+	// Clean up in reverse order of creation
+	cleanupSock()
+	mgmtBroker.Stop()
+	signBroker.Stop()
+
+	// Close readers/writers
+	r0.Close()
+	w0.Close()
+	r1.Close()
+	w1.Close()
+
+	l.Info("Gadget shutdown complete")
+	return nil
 }

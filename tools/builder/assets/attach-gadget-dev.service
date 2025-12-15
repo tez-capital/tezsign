@@ -1,13 +1,20 @@
 [Unit]
 Description=Attaches USB Gadget to USB Controller
 After=setup-gadget-dev.service
+Requires=setup-gadget-dev.service
 
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/attach-gadget-dev.sh
 RemainAfterExit=yes
-Restart=on-failure
-RestartSec=3
+
+# Restart policy: always restart to ensure resilience
+Restart=always
+RestartSec=2
+
+# Disable restart rate limiting
+StartLimitIntervalSec=0
+
 StandardOutput=journal+console
 StandardError=journal+console
 
