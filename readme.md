@@ -61,6 +61,8 @@
     * **Important:** Make sure you use a good quality USB cable and connect it to the **OTG port** of your board.
 5.  **(Linux Hosts Only) Add udev rules:**
 
+    > **Note:** *If you are installing with `tezbake` or using the AMI, you do not need to install udev rules manually. Both `tezbake` and the AMI handle this automatically during `setup-tezsign`.*
+
     To allow your host machine to communicate with the gadget without root privileges, you need to add a `udev` rule. Run the helper script (it writes `/etc/udev/rules.d/99-tezsign.rules` and reloads `udev`) to install the required rule:
     ```bash
     sudo ./tools/add_udev_rules.sh
