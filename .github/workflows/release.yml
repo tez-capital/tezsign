@@ -45,6 +45,7 @@ jobs:
                   armbian_release: ${{ matrix.armbian_release }}
                   armbian_boot_scenario: ${{ matrix.armbian_boot_scenario || '' }}
                   tezsign_flavour: ${{ matrix.tezsign_flavour }}
+                  armbian_kernel_branch: ${{ matrix.armbian_kernel_branch || 'current' }}
 
     build-gadget:
         runs-on: ubuntu-latest
