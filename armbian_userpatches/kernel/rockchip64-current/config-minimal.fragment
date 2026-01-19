@@ -1,0 +1,614 @@
+#
+# Minimal Kernel Configuration Fragment for Radxa Zero 3 / tezsign
+# This fragment is merged with the base Armbian kernel config
+#
+# Target: Rockchip RK3566 (Radxa Zero 3)
+# Purpose: Minimal, secure, air-gapped USB signing device
+# Date: 2025-11-11
+#
+
+# =============================================================================
+# DISABLE UNUSED FILE SYSTEMS
+# tezsign only needs ext4 and vfat/fat
+# =============================================================================
+
+# Keep essential filesystems
+CONFIG_EXT4_FS=y
+CONFIG_EXT4_FS_SECURITY=y
+CONFIG_EXT4_USE_FOR_EXT2=y
+CONFIG_VFAT_FS=y
+CONFIG_FAT_FS=y
+CONFIG_FAT_DEFAULT_CODEPAGE=437
+CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-1"
+CONFIG_NLS_CODEPAGE_437=y
+CONFIG_NLS_ISO8859_1=y
+
+# Disable all other filesystems
+# CONFIG_BTRFS_FS is not set
+# CONFIG_XFS_FS is not set
+# CONFIG_F2FS_FS is not set
+# CONFIG_JFS_FS is not set
+# CONFIG_REISERFS_FS is not set
+# CONFIG_NILFS2_FS is not set
+# CONFIG_OCFS2_FS is not set
+# CONFIG_GFS2_FS is not set
+# CONFIG_UBIFS_FS is not set
+# CONFIG_JFFS2_FS is not set
+# CONFIG_CRAMFS is not set
+# CONFIG_SQUASHFS is not set
+# CONFIG_ROMFS_FS is not set
+# CONFIG_MINIX_FS is not set
+# CONFIG_HPFS_FS is not set
+# CONFIG_QNX4FS_FS is not set
+# CONFIG_QNX6FS_FS is not set
+# CONFIG_SYSV_FS is not set
+# CONFIG_UFS_FS is not set
+# CONFIG_EROFS_FS is not set
+# CONFIG_ZONEFS_FS is not set
+
+# Disable network filesystems
+# CONFIG_NFS_FS is not set
+# CONFIG_NFSD is not set
+# CONFIG_CIFS is not set
+# CONFIG_CEPH_FS is not set
+# CONFIG_AFS_FS is not set
+# CONFIG_9P_FS is not set
+# CONFIG_ORANGEFS_FS is not set
+
+# Disable overlay and other special filesystems
+# CONFIG_OVERLAY_FS is not set
+# CONFIG_FUSE_FS is not set
+# CONFIG_ISO9660_FS is not set
+# CONFIG_UDF_FS is not set
+# CONFIG_NTFS_FS is not set
+# CONFIG_NTFS3_FS is not set
+
+# =============================================================================
+# DISABLE NETWORKING (Air-gapped device)
+# =============================================================================
+
+# CONFIG_INET is not set
+# CONFIG_NETDEVICES is not set
+# CONFIG_WIRELESS is not set
+# CONFIG_WLAN is not set
+# CONFIG_CFG80211 is not set
+# CONFIG_MAC80211 is not set
+# CONFIG_BT is not set
+# CONFIG_NET is not set
+# CONFIG_NETFILTER is not set
+# CONFIG_BRIDGE is not set
+# CONFIG_VLAN_8021Q is not set
+# CONFIG_ETHERNET is not set
+
+# Disable wireless drivers
+# CONFIG_ATH9K is not set
+# CONFIG_ATH10K is not set
+# CONFIG_ATH11K is not set
+# CONFIG_BRCMFMAC is not set
+# CONFIG_RTW88 is not set
+# CONFIG_RTW89 is not set
+# CONFIG_MT76 is not set
+# CONFIG_IWLWIFI is not set
+# CONFIG_MWIFIEX is not set
+
+# Disable additional network protocols
+# CONFIG_PACKET is not set
+# CONFIG_XFRM is not set
+# CONFIG_IPV6 is not set
+# CONFIG_NETWORK_SECMARK is not set
+# CONFIG_NETWORK_PHY_TIMESTAMPING is not set
+# CONFIG_CAN is not set
+
+# Note: CONFIG_UNIX (Unix domain sockets) may be needed for systemd/IPC
+# If issues occur, enable it: CONFIG_UNIX=y
+
+# =============================================================================
+# DISABLE BLUETOOTH
+# =============================================================================
+
+# CONFIG_BT is not set
+# CONFIG_BT_HIDP is not set
+# CONFIG_BT_RFCOMM is not set
+# CONFIG_BT_BNEP is not set
+
+# =============================================================================
+# DISABLE SOUND/AUDIO
+# =============================================================================
+
+# CONFIG_SOUND is not set
+# CONFIG_SND is not set
+# CONFIG_SND_SOC is not set
+# CONFIG_SND_USB is not set
+# CONFIG_SND_HDA is not set
+
+# =============================================================================
+# DISABLE VIDEO/GRAPHICS
+# =============================================================================
+
+# CONFIG_DRM is not set
+# CONFIG_FB is not set
+# CONFIG_VGA_CONSOLE is not set
+# CONFIG_FRAMEBUFFER_CONSOLE is not set
+# CONFIG_VIDEO_DEV is not set
+# CONFIG_V4L2 is not set
+# CONFIG_MEDIA_SUPPORT is not set
+# CONFIG_USB_VIDEO_CLASS is not set
+
+# =============================================================================
+# DISABLE INPUT DEVICES (Headless operation)
+# =============================================================================
+
+# Keep minimal input for debugging/console only
+CONFIG_INPUT=y
+CONFIG_INPUT_KEYBOARD=y
+# CONFIG_INPUT_MOUSE is not set
+# CONFIG_MOUSE_PS2 is not set
+# CONFIG_INPUT_TOUCHSCREEN is not set
+# CONFIG_INPUT_TABLET is not set
+# CONFIG_INPUT_JOYSTICK is not set
+# CONFIG_INPUT_MISC is not set
+# CONFIG_HID_BATTERY_STRENGTH is not set
+# CONFIG_USB_HID is not set
+
+# =============================================================================
+# ENABLE USB GADGET SUPPORT (Critical for tezsign)
+# =============================================================================
+
+CONFIG_USB=y
+CONFIG_USB_SUPPORT=y
+CONFIG_USB_COMMON=y
+CONFIG_USB_ARCH_HAS_HCD=y
+
+# USB Device/Gadget support
+CONFIG_USB_GADGET=y
+CONFIG_USB_GADGET_VBUS_DRAW=500
+CONFIG_USB_CONFIGFS=y
+# CONFIG_USB_CONFIGFS_SERIAL is not set
+# CONFIG_USB_CONFIGFS_ACM is not set
+# CONFIG_USB_CONFIGFS_OBEX is not set
+# CONFIG_USB_CONFIGFS_NCM is not set
+CONFIG_USB_CONFIGFS_ECM=y
+# CONFIG_USB_CONFIGFS_RNDIS is not set
+# CONFIG_USB_CONFIGFS_EEM is not set
+# CONFIG_USB_CONFIGFS_MASS_STORAGE is not set
+CONFIG_USB_CONFIGFS_F_FS=y
+CONFIG_USB_FUNCTIONFS=y
+# CONFIG_USB_FUNCTIONFS_ETH is not set
+# CONFIG_USB_FUNCTIONFS_RNDIS is not set
+CONFIG_USB_FUNCTIONFS_GENERIC=y
+
+# USB DWC3 controller (used in RK3566)
+CONFIG_USB_DWC3=y
+CONFIG_USB_DWC3_DUAL_ROLE=y
+CONFIG_USB_DWC3_GADGET=y
+CONFIG_USB_DWC3_HOST=y
+CONFIG_USB_DWC3_OF_SIMPLE=y
+
+# USB Gadget functions
+CONFIG_USB_LIBCOMPOSITE=y
+CONFIG_USB_F_FS=y
+CONFIG_USB_F_ECM=y
+
+# USB PHY support
+CONFIG_USB_PHY=y
+CONFIG_GENERIC_PHY=y
+CONFIG_PHY_ROCKCHIP_INNO_USB2=y
+CONFIG_PHY_ROCKCHIP_TYPEC=y
+
+# USB role switching
+CONFIG_USB_ROLE_SWITCH=y
+
+# =============================================================================
+# MMC/SD SUPPORT (Boot device)
+# =============================================================================
+
+CONFIG_MMC=y
+CONFIG_MMC_BLOCK=y
+CONFIG_MMC_DW=y
+CONFIG_MMC_DW_ROCKCHIP=y
+CONFIG_MMC_SDHCI=y
+CONFIG_MMC_SDHCI_OF_ARASAN=y
+
+# =============================================================================
+# CRYPTO SUPPORT (Essential for signing operations)
+# =============================================================================
+
+CONFIG_CRYPTO=y
+CONFIG_CRYPTO_ALGAPI=y
+CONFIG_CRYPTO_AEAD=y
+CONFIG_CRYPTO_HASH=y
+CONFIG_CRYPTO_MANAGER=y
+CONFIG_CRYPTO_USER_API=y
+CONFIG_CRYPTO_USER_API_HASH=y
+CONFIG_CRYPTO_USER_API_SKCIPHER=y
+CONFIG_CRYPTO_USER_API_RNG=y
+CONFIG_CRYPTO_USER_API_AEAD=y
+
+# Hash algorithms
+CONFIG_CRYPTO_SHA1=y
+CONFIG_CRYPTO_SHA256=y
+CONFIG_CRYPTO_SHA512=y
+CONFIG_CRYPTO_BLAKE2B=y
+CONFIG_CRYPTO_BLAKE2S=y
+
+# Ciphers
+CONFIG_CRYPTO_AES=y
+CONFIG_CRYPTO_AES_ARM64=y
+CONFIG_CRYPTO_AES_ARM64_CE=y
+CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
+CONFIG_CRYPTO_CHACHA20=y
+CONFIG_CRYPTO_CHACHA20_NEON=y
+
+# Random number generation
+CONFIG_CRYPTO_RNG=y
+CONFIG_CRYPTO_DRBG=y
+CONFIG_CRYPTO_DRBG_HASH=y
+CONFIG_CRYPTO_DRBG_CTR=y
+CONFIG_CRYPTO_JITTERENTROPY=y
+CONFIG_HW_RANDOM=y
+CONFIG_HW_RANDOM_ROCKCHIP=y
+
+# Hardware crypto acceleration
+CONFIG_CRYPTO_DEV_ROCKCHIP=y
+
+# Additional hash algorithms for Tezos
+CONFIG_CRYPTO_SHA3=y
+CONFIG_CRYPTO_POLY1305=y
+CONFIG_CRYPTO_POLY1305_NEON=y
+
+# Disable unnecessary crypto algorithms
+# CONFIG_CRYPTO_DES is not set
+# CONFIG_CRYPTO_BLOWFISH is not set
+# CONFIG_CRYPTO_TWOFISH is not set
+# CONFIG_CRYPTO_SERPENT is not set
+# CONFIG_CRYPTO_CAST5 is not set
+# CONFIG_CRYPTO_CAST6 is not set
+# CONFIG_CRYPTO_ARC4 is not set
+# CONFIG_CRYPTO_SEED is not set
+# CONFIG_CRYPTO_ANUBIS is not set
+
+# Crypto compression (not needed)
+# CONFIG_CRYPTO_DEFLATE is not set
+# CONFIG_CRYPTO_LZO is not set
+# CONFIG_CRYPTO_842 is not set
+# CONFIG_CRYPTO_LZ4 is not set
+# CONFIG_CRYPTO_LZ4HC is not set
+# CONFIG_CRYPTO_ZSTD is not set
+
+# =============================================================================
+# FILE SYSTEM FEATURES
+# =============================================================================
+
+CONFIG_TMPFS=y
+CONFIG_TMPFS_POSIX_ACL=y
+CONFIG_CONFIGFS_FS=y
+CONFIG_SYSFS=y
+CONFIG_PROC_FS=y
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+
+# =============================================================================
+# DISABLE UNNECESSARY FEATURES
+# =============================================================================
+
+# Disable staging drivers
+# CONFIG_STAGING is not set
+
+# Disable virtualization
+# CONFIG_VIRTUALIZATION is not set
+# CONFIG_KVM is not set
+
+# Disable containers/namespaces (reduce attack surface)
+# CONFIG_NAMESPACES is not set
+# CONFIG_USER_NS is not set
+# CONFIG_PID_NS is not set
+# CONFIG_NET_NS is not set
+
+# Disable profiling/debugging in production
+# CONFIG_PROFILING is not set
+# CONFIG_KPROBES is not set
+# CONFIG_FTRACE is not set
+# CONFIG_DEBUG_KERNEL is not set
+# CONFIG_DEBUG_INFO is not set
+# CONFIG_SLUB_DEBUG is not set
+# CONFIG_DEBUG_FS is not set
+# CONFIG_KALLSYMS is not set
+
+# Disable hardware monitoring
+# CONFIG_HWMON is not set
+# CONFIG_THERMAL_HWMON is not set
+# CONFIG_SENSORS_ARM_SCMI is not set
+
+# Disable industrial I/O
+# CONFIG_IIO is not set
+
+# Disable NFC, IrDA
+# CONFIG_NFC is not set
+# CONFIG_IRDA is not set
+
+# Disable PCMCIA
+# CONFIG_PCCARD is not set
+
+# Disable RAID/LVM/DM
+# CONFIG_MD is not set
+# CONFIG_BLK_DEV_MD is not set
+# CONFIG_BLK_DEV_DM is not set
+
+# Disable miscellaneous features
+# CONFIG_ACCESSIBILITY is not set
+# CONFIG_AUXDISPLAY is not set
+# CONFIG_UIO is not set
+# CONFIG_VFIO is not set
+# CONFIG_VHOST is not set
+# CONFIG_TEE is not set
+
+# Disable additional drivers and subsystems
+# CONFIG_MTD is not set
+# CONFIG_PARPORT is not set
+# CONFIG_ISDN is not set
+# CONFIG_PHONE is not set
+# CONFIG_HSI is not set
+# CONFIG_COMEDI is not set
+# CONFIG_X86_PLATFORM_DEVICES is not set
+# CONFIG_CHROME_PLATFORMS is not set
+# CONFIG_MELLANOX_PLATFORM is not set
+
+# Disable LED subsystem (not needed for headless)
+# CONFIG_NEW_LEDS is not set
+# CONFIG_LEDS_CLASS is not set
+# CONFIG_LEDS_TRIGGERS is not set
+
+# Disable unnecessary block devices
+# CONFIG_BLK_DEV_LOOP is not set
+# CONFIG_BLK_DEV_NBD is not set
+# CONFIG_BLK_DEV_RAM is not set
+
+# Disable remote processors and remoteproc
+# CONFIG_REMOTEPROC is not set
+# CONFIG_RPMSG is not set
+
+# Disable hardware breakpoint and perf events
+# CONFIG_HW_PERF_EVENTS is not set
+# CONFIG_PERF_EVENTS is not set
+
+# Disable EFI and ACPI (not used on ARM/Rockchip)
+# CONFIG_EFI is not set
+# CONFIG_EFI_VARS is not set
+# CONFIG_ACPI is not set
+
+# Disable UEFI and bootloader features
+# CONFIG_EFI_CAPSULE_LOADER is not set
+# CONFIG_EFI_TEST is not set
+# CONFIG_RESET_ATTACK_MITIGATION is not set
+
+# Disable power supply class (batteries, AC adapters)
+# CONFIG_POWER_SUPPLY is not set
+
+# Disable memtest
+# CONFIG_MEMTEST is not set
+
+# =============================================================================
+# KEEP ESSENTIAL ROCKCHIP PLATFORM SUPPORT
+# =============================================================================
+
+CONFIG_ARCH_ROCKCHIP=y
+CONFIG_ARM64=y
+CONFIG_64BIT=y
+CONFIG_HAVE_ARM_ARCH_TIMER=y
+
+# Clock and power management
+CONFIG_COMMON_CLK=y
+CONFIG_COMMON_CLK_ROCKCHIP=y
+CONFIG_ROCKCHIP_PM_DOMAINS=y
+CONFIG_ROCKCHIP_IOMMU=y
+
+# Serial console (essential for debugging)
+CONFIG_SERIAL_8250=y
+CONFIG_SERIAL_8250_CONSOLE=y
+CONFIG_SERIAL_8250_DW=y
+CONFIG_SERIAL_OF_PLATFORM=y
+
+# GPIO support
+CONFIG_GPIOLIB=y
+CONFIG_GPIO_ROCKCHIP=y
+
+# I2C support (minimal)
+CONFIG_I2C=y
+CONFIG_I2C_CHARDEV=y
+CONFIG_I2C_RK3X=y
+
+# SPI support (may be needed for some peripherals)
+CONFIG_SPI=y
+CONFIG_SPI_MASTER=y
+CONFIG_SPI_ROCKCHIP=y
+CONFIG_SPI_ROCKCHIP_SFC=y
+
+# Thermal zone support (essential for CPU thermal management)
+CONFIG_THERMAL=y
+CONFIG_THERMAL_OF=y
+CONFIG_THERMAL_GOV_STEP_WISE=y
+CONFIG_ROCKCHIP_THERMAL=y
+CONFIG_CPU_THERMAL=y
+
+# Pinctrl
+CONFIG_PINCTRL=y
+CONFIG_PINCTRL_ROCKCHIP=y
+
+# Reset controller
+CONFIG_RESET_CONTROLLER=y
+
+# Regulator support
+CONFIG_REGULATOR=y
+CONFIG_REGULATOR_FIXED_VOLTAGE=y
+CONFIG_REGULATOR_PWM=y
+
+# DMA Engine support (required for USB, MMC, SPI)
+CONFIG_DMADEVICES=y
+CONFIG_DMA_ENGINE=y
+CONFIG_DMA_OF=y
+CONFIG_PL330_DMA=y
+
+# RTC support (for timestamping)
+CONFIG_RTC_CLASS=y
+CONFIG_RTC_DRV_RK808=y
+
+# Watchdog support (system reliability)
+CONFIG_WATCHDOG=y
+CONFIG_WATCHDOG_CORE=y
+CONFIG_DW_WATCHDOG=y
+
+# PWM support (for regulators, backlights)
+CONFIG_PWM=y
+CONFIG_PWM_ROCKCHIP=y
+
+# Device Tree support
+CONFIG_OF=y
+CONFIG_OF_EARLY_FLATTREE=y
+CONFIG_OF_FLATTREE=y
+CONFIG_OF_ADDRESS=y
+CONFIG_OF_IRQ=y
+CONFIG_OF_RESERVED_MEM=y
+
+# =============================================================================
+# KERNEL FEATURES
+# =============================================================================
+
+# Kernel compression
+CONFIG_KERNEL_LZ4=y
+
+# Preemption model
+CONFIG_PREEMPT_VOLUNTARY=y
+
+# Timer frequency
+CONFIG_HZ_250=y
+
+# CPU frequency scaling
+CONFIG_CPU_FREQ=y
+CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y
+CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
+CONFIG_CPU_FREQ_GOV_POWERSAVE=y
+CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
+CONFIG_CPUFREQ_DT=y
+
+# =============================================================================
+# SECURITY FEATURES (Basic)
+# =============================================================================
+
+CONFIG_SECURITY=y
+# CONFIG_SECURITY_SELINUX is not set
+# CONFIG_SECURITY_SMACK is not set
+# CONFIG_SECURITY_APPARMOR is not set
+# CONFIG_SECURITY_TOMOYO is not set
+# CONFIG_SECURITY_LOADPIN is not set
+# CONFIG_SECURITY_YAMA is not set
+CONFIG_SECCOMP=y
+CONFIG_SECCOMP_FILTER=y
+
+# Additional security hardening
+# CONFIG_CHECKPOINT_RESTORE is not set
+# CONFIG_USERFAULTFD is not set
+# CONFIG_LEGACY_PTYS is not set
+CONFIG_HARDENED_USERCOPY=y
+CONFIG_FORTIFY_SOURCE=y
+
+# Stack protection
+CONFIG_STACKPROTECTOR=y
+CONFIG_STACKPROTECTOR_STRONG=y
+CONFIG_STRICT_KERNEL_RWX=y
+CONFIG_STRICT_MODULE_RWX=y
+
+# Disable coredumps and crash dumps
+# CONFIG_CRASH_DUMP is not set
+# CONFIG_PROC_VMCORE is not set
+# CONFIG_COREDUMP is not set
+
+# Disable BPF JIT (reduce attack surface)
+# CONFIG_BPF_JIT is not set
+# CONFIG_BPF_SYSCALL is not set
+
+# Disable user namespace (not needed, reduces attack surface)
+# CONFIG_USER_NS is not set
+
+# =============================================================================
+# MODULE SUPPORT (Minimal)
+# =============================================================================
+
+# Build most features statically to reduce attack surface
+CONFIG_MODULES=y
+# CONFIG_MODULE_FORCE_LOAD is not set
+# CONFIG_MODULE_UNLOAD is not set
+# CONFIG_MODULE_FORCE_UNLOAD is not set
+# CONFIG_MODVERSIONS is not set
+# CONFIG_MODULE_SRCVERSION_ALL is not set
+# CONFIG_MODULE_SIG is not set
+# CONFIG_MODULE_SIG_FORCE is not set
+
+# =============================================================================
+# POWER MANAGEMENT
+# =============================================================================
+
+CONFIG_PM=y
+CONFIG_PM_SLEEP=y
+CONFIG_SUSPEND=y
+CONFIG_PM_RUNTIME=y
+CONFIG_PM_CLK=y
+CONFIG_CPU_PM=y
+CONFIG_ARM_PSCI_CPUIDLE=y
+
+# =============================================================================
+# END OF MINIMAL CONFIGURATION
+# =============================================================================
+
+# =============================================================================
+# VERIFICATION NOTES
+# =============================================================================
+#
+# This minimal configuration has been designed to:
+# 1. Maximize security by disabling unnecessary features
+# 2. Reduce kernel size by 50-60% (target: 3-5 MB vs 8-10 MB standard)
+# 3. Minimize attack surface for air-gapped signing device
+# 4. Maintain all functionality required for tezsign operation
+#
+# Critical features that MUST remain enabled:
+# - USB Gadget support (FunctionFS, ConfigFS)
+# - USB DWC3 controller for RK3566
+# - Crypto subsystem (SHA256, BLAKE2, AES, etc.)
+# - MMC/SD card support
+# - ext4 and vfat filesystems
+# - Serial console for debugging
+# - RTC for timestamping
+# - DMA engine for performance
+# - Thermal management for stability
+#
+# Features disabled for security:
+# - All networking (WiFi, Bluetooth, Ethernet, network stack)
+# - All multimedia (audio, video, graphics)
+# - Most input devices (except minimal keyboard for console)
+# - Virtualization and containers
+# - Debug and profiling interfaces
+# - Unused filesystems and block devices
+# - Remote processor and IPC mechanisms
+#
+# Testing checklist before deployment:
+# 1. Boot successfully on Radxa Zero 3
+# 2. USB gadget enumeration works
+# 3. tezsign init/new/list/sign operations succeed
+# 4. No kernel panics or errors in dmesg
+# 5. All partitions mount correctly
+# 6. Crypto operations complete successfully
+# 7. System stable for 24+ hours of operation
+#
+# If you encounter issues, check:
+# - dmesg for missing drivers or failed initialization
+# - lsmod for required modules not loading
+# - /proc/config.gz for actual applied configuration
+# - journalctl for service failures
+#
+# For development/debugging, you may need to temporarily enable:
+# - CONFIG_USB_CONFIGFS_ECM=y (already enabled for dev mode)
+# - CONFIG_DEBUG_KERNEL=y and CONFIG_DEBUG_INFO=y
+# - CONFIG_KALLSYMS=y for better stack traces
+# - CONFIG_FTRACE=y for kernel tracing
+#
+# =============================================================================
+
