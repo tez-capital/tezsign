@@ -37,6 +37,7 @@ var (
 		"/etc/profile.d/armbian-check-first-login.sh",
 		"/etc/systemd/system/getty@.service.d",        // remove custom getty settings - mainly auto-login
 		"/etc/systemd/system/serial-getty@.service.d", // remove custom getty settings - mainly auto-login
+		"/usr/lib/firmware/qcom",                      // qcom firmware
 	}
 
 	ArmbianRootFsCreateDirs = []string{
