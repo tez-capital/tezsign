@@ -131,10 +131,10 @@ runs:
             SHARE_LOG="yes" \
             NETWORKING_STACK=none \
             CONSOLE_AUTOLOGIN=false \
-            FIXED_IMAGE_SIZE=1300 \
+            FIXED_IMAGE_SIZE=1500 \
             ROOTFS_TYPE=ext4 \
             INCLUDE_HOME_DIR=false \
-            EXTRA_ROOTFS_MIB_SIZE=16 \
+            EXTRA_ROOTFS_MIB_SIZE=128 \
             # ENABLE_EXTENSIONS=cleanup-packages \
             REMOVE_PACKAGES=alsa-utils,bash-completion,bc,bsdextrautils,command-not-found,cracklib-runtime,debconf-utils,debsums,dialog,evtest,f3,figlet,hdparm,htop,html2text,i2c-tools,iotop,jq,less,locales,logrotate,lsof,man-db,mc,ncurses-term,nano,pciutils,psmisc,pv,qrencode,readline-common,screen,smartmontools,stress,sysfsutils,toilet,toilet-fonts,unicode-data,unzip,usbutils,whiptail,xkb-data,avahi-autoipd,bluez,bluez-firmware,curl,ethtool,fping,iperf3,iputils-ping,iw,nfs-common,openssh-client,openssh-server,openssh-sftp-server,rfkill,rsync,systemd-resolved,vnstat,wget,wireguard-tools,wireless-regdb,wpasupplicant,apt-file,aptitude,armbian-config,cron,dkms,gpiod,libnss-myhostname,plymouth,plymouth-themes,rng-tools,unattended-upgrades,automake,bison,build-essential,expect,flex,git,gnupg2,libdigest-sha-perl,libnl-3-dev,libnl-genl-3-dev,libperl5.40,libproc-processtable-perl,libtirpc-common,libtirpc3t64,libwrap0-dev,libyaml-0-2,python3,btrfs-progs,device-tree-compiler,dosfstools,f2fs-tools,fbset,mmc-utils,mtd-utils,ntfs-3g \
             EXPERT="yes"
