@@ -95,9 +95,9 @@ runs:
         # declare -g UEFISIZE=512 -> declare -g UEFISIZE=128
         sed -i 's/declare -g UEFISIZE=[0-9]\+/declare -g UEFISIZE=128/' build/config/sources/families/bcm2711.conf
 
-        # config/boards/radxa-zero3.csc comment out enable_extension "radxa-aic8800"
+        # config/boards/radxa-zero3.conf comment out enable_extension "radxa-aic8800"
         # disables wifi/bluetooth driver
-        sed -i '/enable_extension "radxa-aic8800"/ s/^/#/' build/config/boards/radxa-zero3.csc
+        sed -i '/enable_extension "radxa-aic8800"/ s/^/#/' build/config/boards/radxa-zero3.conf
 
     - shell: bash
       run: |
