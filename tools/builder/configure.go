@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 
 	"github.com/diskfs/go-diskfs"
 	"github.com/diskfs/go-diskfs/disk"
@@ -269,6 +270,10 @@ func patchAppPartition(imgPath string, appPartition part.Partition, flavour imag
 		return fmt.Errorf("failed to write image date file %s: %w", dateFilePath, err)
 	}
 
+	if err := zeroFillFreeSpace(appfs, logger); err != nil {
+		return fmt.Errorf("failed to zero-fill app filesystem free space: %w", err)
+	}
+
 	return nil
 }
 
@@ -293,12 +298,63 @@ func patchDataPartition(imgPath string, dataPartition part.Partition, flavour im
 		return fmt.Errorf("failed to chown data mount point %s: %w", dataMountPoint, err)
 	}
 
+	if err := zeroFillFreeSpace(datafs, logger); err != nil {
+		return fmt.Errorf("failed to zero-fill data filesystem free space: %w", err)
+	}
+
 	return nil
 }
 
 func setupModules(rootFsPath, fileName string, modules []string, logger *slog.Logger) error {
 	modulesLoadPath := path.Join(rootFsPath, "etc", "modules-load.d", fileName)
 	return os.WriteFile(modulesLoadPath, []byte(strings.Join(modules, "\n")), 0644)
+}
+
+func zeroFillFreeSpace(mountPoint string, logger *slog.Logger) error {
+	zeroFillPath := path.Join(mountPoint, ".zero.fill")
+	logger.Info("Zero-filling free space", slog.String("path", zeroFillPath))
+
+	file, err := os.OpenFile(zeroFillPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to create zero-fill file %s: %w", zeroFillPath, err)
+	}
+
+	closed := false
+	defer func() {
+		if !closed {
+			_ = file.Close()
+		}
+		if removeErr := os.Remove(zeroFillPath); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+			logger.Warn("Failed to remove zero-fill file", slog.String("path", zeroFillPath), slog.Any("error", removeErr))
+		}
+	}()
+
+	zeroChunk := make([]byte, 1024*1024)
+	for {
+		_, err := file.Write(zeroChunk)
+		if err == nil {
+			continue
+		}
+		if errors.Is(err, syscall.ENOSPC) {
+			break
+		}
+		return fmt.Errorf("failed to write zero-fill file %s: %w", zeroFillPath, err)
+	}
+
+	if err := file.Sync(); err != nil && !errors.Is(err, syscall.ENOSPC) {
+		return fmt.Errorf("failed to sync zero-fill file %s: %w", zeroFillPath, err)
+	}
+	if err := file.Close(); err != nil && !errors.Is(err, syscall.ENOSPC) {
+		return fmt.Errorf("failed to close zero-fill file %s: %w", zeroFillPath, err)
+	}
+	closed = true
+
+	if err := os.Remove(zeroFillPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("failed to remove zero-fill file %s: %w", zeroFillPath, err)
+	}
+
+	logger.Info("Finished zero-filling free space", slog.String("mount_point", mountPoint))
+	return nil
 }
 
 func patchRootPartition(imgPath string, rootPartition part.Partition, flavour imageFlavour, logger *slog.Logger) error {
@@ -421,6 +477,10 @@ func patchRootPartition(imgPath string, rootPartition part.Partition, flavour im
 
 	if err = setupModules(rootfs, "tezsign-usb.conf", PreloadTezsignUsbModules, logger); err != nil {
 		return fmt.Errorf("failed to setup tezsign-usb modules: %w", err)
+	}
+
+	if err = zeroFillFreeSpace(rootfs, logger); err != nil {
+		return fmt.Errorf("failed to zero-fill root filesystem free space: %w", err)
 	}
 
 	return nil
