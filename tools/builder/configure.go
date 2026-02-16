@@ -270,10 +270,6 @@ func patchAppPartition(imgPath string, appPartition part.Partition, flavour imag
 		return fmt.Errorf("failed to write image date file %s: %w", dateFilePath, err)
 	}
 
-	if err := zeroFillFreeSpace(appfs, logger); err != nil {
-		return fmt.Errorf("failed to zero-fill app filesystem free space: %w", err)
-	}
-
 	return nil
 }
 
@@ -296,10 +292,6 @@ func patchDataPartition(imgPath string, dataPartition part.Partition, flavour im
 	}
 	if err := os.Chown(dataMountPoint, 1000, 1000); err != nil {
 		return fmt.Errorf("failed to chown data mount point %s: %w", dataMountPoint, err)
-	}
-
-	if err := zeroFillFreeSpace(datafs, logger); err != nil {
-		return fmt.Errorf("failed to zero-fill data filesystem free space: %w", err)
 	}
 
 	return nil
