@@ -12,8 +12,9 @@ const (
 )
 
 const (
-	appPartitionSizeMB  = 64
-	dataPartitionSizeMB = 128
+	appPartitionSizeMB   = 64
+	dataPartitionSizeMB  = 128
+	rootfsShrinkTargetMB = 300
 
 	workDir  = "/tmp/tezsign_image_builder"
 	tmpImage = workDir + "/image.img"
