@@ -61,7 +61,7 @@ func parseResize2fsMinBlocks(output string) (uint64, error) {
 	return 0, errors.New("resize2fs minimum size line not found")
 }
 
-func canRunRootfsShrinkTools() bool {
+func canRunRootfsResizeTools() bool {
 	if _, err := exec.LookPath("e2fsck"); err != nil {
 		return false
 	}
@@ -74,21 +74,42 @@ func canRunRootfsShrinkTools() bool {
 	return true
 }
 
-func maybeShrinkRootfs(imagePath string, rootPartition part.Partition, logicalBlockSize int64, logger *slog.Logger) (uint64, error) {
-	if !canRunRootfsShrinkTools() {
-		logger.Warn("Skipping rootfs shrink: required tools not available", "required", "e2fsck, resize2fs")
-		return uint64(rootPartition.GetSize() / logicalBlockSize), nil
+func normalizeImageID(imageID string) string {
+	base := strings.ToLower(strings.TrimSpace(imageID))
+	return strings.TrimSuffix(base, ".dev")
+}
+
+func rootfsTargetSizeMBForImage(imageID string) (uint64, error) {
+	switch normalizeImageID(imageID) {
+	case "raspberry_pi":
+		return rootfsPartitionSizeRaspberryPiMB, nil
+	case "radxa_zero3", "radxa-zero3":
+		return rootfsPartitionSizeRadxaZero3MB, nil
+	default:
+		return 0, fmt.Errorf("unsupported IMAGE_ID %q; expected one of: raspberry_pi, radxa_zero3", imageID)
+	}
+}
+
+func ensureRootfsPartitionSize(imagePath string, rootPartition part.Partition, logicalBlockSize int64, targetRootSizeMB uint64, logger *slog.Logger) (uint64, error) {
+	rootPartSizeBytes := uint64(rootPartition.GetSize())
+	targetRootSizeBytes := targetRootSizeMB * 1024 * 1024
+	targetRootSizeSectors := targetRootSizeBytes / uint64(logicalBlockSize)
+	if targetRootSizeSectors == 0 {
+		return 0, fmt.Errorf("invalid rootfs target size: %dMB does not map to any sectors with logical block size %d", targetRootSizeMB, logicalBlockSize)
 	}
 
-	rootPartSizeBytes := uint64(rootPartition.GetSize())
-	rootfsShrinkBytes := uint64(rootfsShrinkTargetMB * 1024 * 1024)
-	if rootPartSizeBytes <= rootfsShrinkBytes {
-		logger.Warn("Skipping rootfs shrink: rootfs partition too small", slog.Uint64("rootfs_size_bytes", rootPartSizeBytes))
-		return uint64(rootPartition.GetSize() / logicalBlockSize), nil
+	if rootPartSizeBytes == targetRootSizeBytes {
+		logger.Info("Rootfs already matches fixed partition size", slog.Uint64("target_rootfs_size_bytes", targetRootSizeBytes))
+		return targetRootSizeSectors, nil
+	}
+
+	if !canRunRootfsResizeTools() {
+		return 0, fmt.Errorf("cannot resize rootfs to fixed %dMB target: missing required tools (e2fsck, resize2fs, dumpe2fs)", targetRootSizeMB)
 	}
 
 	tmpRootfsPath := filepath.Join(workDir, "rootfs-partition.img")
 	_ = os.Remove(tmpRootfsPath)
+	defer os.Remove(tmpRootfsPath)
 
 	tmpFile, err := os.Create(tmpRootfsPath)
 	if err != nil {
@@ -112,11 +133,16 @@ func maybeShrinkRootfs(imagePath string, rootPartition part.Partition, logicalBl
 	if int64(rootPartSizeBytes) != readBytes {
 		return 0, fmt.Errorf("expected to extract %d bytes from rootfs partition, got %d", rootPartSizeBytes, readBytes)
 	}
+	if rootPartSizeBytes < targetRootSizeBytes {
+		if err := os.Truncate(tmpRootfsPath, int64(targetRootSizeBytes)); err != nil {
+			return 0, fmt.Errorf("failed to extend temporary rootfs image to target size: %w", err)
+		}
+	}
 
-	logger.Info("Checking rootfs shrinkability", slog.String("temp_image", tmpRootfsPath), slog.Uint64("target_shrink_MB", rootfsShrinkTargetMB))
+	logger.Info("Checking rootfs fit for fixed partition size", slog.String("temp_image", tmpRootfsPath), slog.Uint64("target_rootfs_size_MB", targetRootSizeMB))
 
 	if out, err := exec.Command("e2fsck", "-pf", tmpRootfsPath).CombinedOutput(); err != nil {
-		return 0, fmt.Errorf("e2fsck failed before rootfs shrink: %w: %s", err, strings.TrimSpace(string(out)))
+		return 0, fmt.Errorf("e2fsck failed before rootfs resize: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 
 	minOut, err := exec.Command("resize2fs", "-P", tmpRootfsPath).CombinedOutput()
@@ -142,13 +168,19 @@ func maybeShrinkRootfs(imagePath string, rootPartition part.Partition, logicalBl
 		if strings.HasPrefix(line, "Block count:") {
 			parts := strings.Fields(line)
 			if len(parts) >= 3 {
-				blockCount, _ = strconv.ParseUint(parts[2], 10, 64)
+				blockCount, err = strconv.ParseUint(parts[2], 10, 64)
+				if err != nil {
+					return 0, fmt.Errorf("failed to parse ext4 block count from %q: %w", line, err)
+				}
 			}
 		}
 		if strings.HasPrefix(line, "Block size:") {
 			parts := strings.Fields(line)
 			if len(parts) >= 3 {
-				blockSize, _ = strconv.ParseUint(parts[2], 10, 64)
+				blockSize, err = strconv.ParseUint(parts[2], 10, 64)
+				if err != nil {
+					return 0, fmt.Errorf("failed to parse ext4 block size from %q: %w", line, err)
+				}
 			}
 		}
 	}
@@ -159,36 +191,31 @@ func maybeShrinkRootfs(imagePath string, rootPartition part.Partition, logicalBl
 		return 0, fmt.Errorf("could not determine ext4 block count/size (block_count=%d block_size=%d)", blockCount, blockSize)
 	}
 
-	shrinkBlocks := rootfsShrinkBytes / blockSize
-	if shrinkBlocks == 0 {
-		return uint64(rootPartition.GetSize() / logicalBlockSize), nil
+	targetBlocks := targetRootSizeBytes / blockSize
+	if targetBlocks == 0 {
+		return 0, fmt.Errorf("target rootfs size %d bytes is smaller than ext4 block size %d", targetRootSizeBytes, blockSize)
 	}
-	if blockCount <= shrinkBlocks {
-		logger.Warn("Skipping rootfs shrink: not enough blocks", slog.Uint64("block_count", blockCount), slog.Uint64("requested_shrink_blocks", shrinkBlocks))
-		return uint64(rootPartition.GetSize() / logicalBlockSize), nil
-	}
-
-	targetBlocks := blockCount - shrinkBlocks
 	if targetBlocks < minBlocks {
-		logger.Warn("Skipping rootfs shrink: requested shrink exceeds free space", slog.Uint64("block_count", blockCount), slog.Uint64("min_blocks", minBlocks), slog.Uint64("target_blocks", targetBlocks))
-		return uint64(rootPartition.GetSize() / logicalBlockSize), nil
+		minBytes := minBlocks * blockSize
+		return 0, fmt.Errorf("rootfs minimum size (%d bytes) exceeds fixed rootfs target (%d bytes)", minBytes, targetRootSizeBytes)
 	}
 
-	logger.Info("Shrinking rootfs filesystem", slog.Uint64("from_blocks", blockCount), slog.Uint64("to_blocks", targetBlocks), slog.Uint64("block_size", blockSize))
-	if out, err := exec.Command("resize2fs", tmpRootfsPath, strconv.FormatUint(targetBlocks, 10)).CombinedOutput(); err != nil {
-		return 0, fmt.Errorf("resize2fs shrink failed: %w: %s", err, strings.TrimSpace(string(out)))
+	if blockCount != targetBlocks {
+		logger.Info("Resizing rootfs filesystem to fixed size", slog.Uint64("from_blocks", blockCount), slog.Uint64("to_blocks", targetBlocks), slog.Uint64("block_size", blockSize))
+		if out, err := exec.Command("resize2fs", tmpRootfsPath, strconv.FormatUint(targetBlocks, 10)).CombinedOutput(); err != nil {
+			return 0, fmt.Errorf("resize2fs failed: %w: %s", err, strings.TrimSpace(string(out)))
+		}
+	} else {
+		logger.Info("Rootfs filesystem already matches fixed target blocks", slog.Uint64("target_blocks", targetBlocks), slog.Uint64("block_size", blockSize))
 	}
 
 	if out, err := exec.Command("e2fsck", "-pf", tmpRootfsPath).CombinedOutput(); err != nil {
-		return 0, fmt.Errorf("e2fsck failed after rootfs shrink: %w: %s", err, strings.TrimSpace(string(out)))
+		return 0, fmt.Errorf("e2fsck failed after rootfs resize: %w: %s", err, strings.TrimSpace(string(out)))
 	}
-
-	newRootSizeBytes := targetBlocks * blockSize
-	newRootSizeSectors := newRootSizeBytes / uint64(logicalBlockSize)
 
 	src, err := os.Open(tmpRootfsPath)
 	if err != nil {
-		return 0, fmt.Errorf("failed to reopen shrunk rootfs image: %w", err)
+		return 0, fmt.Errorf("failed to reopen resized rootfs image: %w", err)
 	}
 	defer src.Close()
 
@@ -202,15 +229,20 @@ func maybeShrinkRootfs(imagePath string, rootPartition part.Partition, logicalBl
 	if _, err = dst.Seek(int64(rootStart), io.SeekStart); err != nil {
 		return 0, fmt.Errorf("failed to seek image for rootfs writeback: %w", err)
 	}
-	if _, err = io.CopyN(dst, src, int64(newRootSizeBytes)); err != nil {
-		return 0, fmt.Errorf("failed to write back shrunk rootfs image: %w", err)
+	if _, err = io.CopyN(dst, src, int64(targetRootSizeBytes)); err != nil {
+		return 0, fmt.Errorf("failed to write back resized rootfs image: %w", err)
 	}
 
-	logger.Info("Rootfs shrink completed", slog.Uint64("old_size_bytes", rootPartSizeBytes), slog.Uint64("new_size_bytes", newRootSizeBytes))
-	return newRootSizeSectors, nil
+	logger.Info("Rootfs resize completed", slog.Uint64("old_size_bytes", rootPartSizeBytes), slog.Uint64("new_size_bytes", targetRootSizeBytes))
+	return targetRootSizeSectors, nil
 }
 
-func resizeImage(imagePath string, flavour imageFlavour, logger *slog.Logger) (*partitions, error) {
+func resizeImage(imagePath string, flavour imageFlavour, imageID string, logger *slog.Logger) (*partitions, error) {
+	targetRootfsSizeMB, err := rootfsTargetSizeMBForImage(imageID)
+	if err != nil {
+		return nil, err
+	}
+
 	img, err := diskfs.Open(imagePath)
 	if err != nil {
 		return nil, errors.Join(common.ErrFailedToOpenImage, err)
@@ -238,26 +270,35 @@ func resizeImage(imagePath string, flavour imageFlavour, logger *slog.Logger) (*
 	rootFsPartitionStart := rootPartition.GetStart() / logicalBlockSize // 0 indexed
 	rootfsSizeInSectors := uint64(rootPartition.GetSize() / logicalBlockSize)
 	sectorsPerMB := uint64(1024 * 1024 / logicalBlockSize)
-	if shrunkRootfsSizeSectors, err := maybeShrinkRootfs(imagePath, rootPartition, logicalBlockSize, logger); err != nil {
+	if fixedRootfsSizeSectors, err := ensureRootfsPartitionSize(imagePath, rootPartition, logicalBlockSize, targetRootfsSizeMB, logger); err != nil {
 		return nil, err
 	} else {
-		rootfsSizeInSectors = shrunkRootfsSizeSectors
+		rootfsSizeInSectors = fixedRootfsSizeSectors
 	}
 	img.Close()
 
 	appSizeInSectors := uint64(appPartitionSizeMB * sectorsPerMB)
 	dataSizeInSectors := uint64(dataPartitionSizeMB * sectorsPerMB)
 
-	rootPartEnd := uint64(rootFsPartitionStart) + rootfsSizeInSectors
+	rootPartEnd := uint64(rootFsPartitionStart) + rootfsSizeInSectors - 1
 	appPartStart := rootPartEnd + 1
-	appPartEnd := appPartStart + appSizeInSectors
+	appPartEnd := appPartStart + appSizeInSectors - 1
 	dataPartStart := appPartEnd + 1
-	dataPartEnd := dataPartStart + dataSizeInSectors
+	dataPartEnd := dataPartStart + dataSizeInSectors - 1
 
 	lastSector := dataPartEnd
 
-	requiredSizeBytes := lastSector * uint64(logicalBlockSize)
-	logger.Info("Resizing image", slog.Int("sectors_per_MB", int(sectorsPerMB)), "rootfs", fmt.Sprintf("%d - %d", rootFsPartitionStart, rootPartEnd), "app_partition", fmt.Sprintf("%d - %d", appPartStart, appPartEnd), "data_partition", fmt.Sprintf("%d - %d", dataPartStart, dataPartEnd), slog.Uint64("size_MB", requiredSizeBytes/(1024*1024)))
+	requiredSizeBytes := (lastSector + 1) * uint64(logicalBlockSize)
+	logger.Info(
+		"Resizing image",
+		slog.String("image_id", imageID),
+		slog.Uint64("target_rootfs_size_MB", targetRootfsSizeMB),
+		slog.Int("sectors_per_MB", int(sectorsPerMB)),
+		"rootfs", fmt.Sprintf("%d - %d", rootFsPartitionStart, rootPartEnd),
+		"app_partition", fmt.Sprintf("%d - %d", appPartStart, appPartEnd),
+		"data_partition", fmt.Sprintf("%d - %d", dataPartStart, dataPartEnd),
+		slog.Uint64("size_MB", requiredSizeBytes/(1024*1024)),
+	)
 	if err := os.Truncate(imagePath, int64(requiredSizeBytes)); err != nil {
 		return nil, errors.Join(common.ErrFailedToResizeImage, err)
 	}
@@ -411,8 +452,8 @@ func formatPartitionTable(path string, flavour imageFlavour, logger *slog.Logger
 	return nil
 }
 
-func PartitionImage(path string, flavour imageFlavour, logger *slog.Logger) error {
-	partitionSpecs, err := resizeImage(path, flavour, logger)
+func PartitionImage(path string, flavour imageFlavour, imageID string, logger *slog.Logger) error {
+	partitionSpecs, err := resizeImage(path, flavour, imageID, logger)
 	if err != nil {
 		return errors.Join(common.ErrFailedToPartitionImage, err)
 	}
