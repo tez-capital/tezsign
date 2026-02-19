@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -90,6 +91,36 @@ func rootfsTargetSizeMBForImage(imageID string) (uint64, error) {
 	}
 }
 
+func pruneRootfsForSizing(rootfsImagePath string, logger *slog.Logger) error {
+	mountPoint := filepath.Join(workDir, "rootfs-sizing")
+	unmount, err := fuse2fs_mount(rootfsImagePath, mountPoint, 0, logger)
+	if err != nil {
+		return fmt.Errorf("failed to mount temporary rootfs for pruning: %w", err)
+	}
+	defer unmount(true)
+
+	for _, filePath := range ArmbianRootfsRemove {
+		fullPath := path.Join(mountPoint, filePath)
+		if err := os.RemoveAll(fullPath); err != nil {
+			return fmt.Errorf("failed to remove %s during rootfs pre-prune: %w", fullPath, err)
+		}
+	}
+
+	for _, dirPath := range ArmbianRootFsCreateDirs {
+		fullPath := path.Join(mountPoint, dirPath)
+		if err := os.MkdirAll(fullPath, 0755); err != nil {
+			return fmt.Errorf("failed to create %s during rootfs pre-prune: %w", fullPath, err)
+		}
+	}
+
+	if err := pruneRootfsUnusedFiles(mountPoint, logger); err != nil {
+		return fmt.Errorf("failed to prune temporary rootfs before sizing: %w", err)
+	}
+
+	unmount(false)
+	return nil
+}
+
 func ensureRootfsPartitionSize(imagePath string, rootPartition part.Partition, logicalBlockSize int64, targetRootSizeMB uint64, logger *slog.Logger) (uint64, error) {
 	rootPartSizeBytes := uint64(rootPartition.GetSize())
 	targetRootSizeBytes := targetRootSizeMB * 1024 * 1024
@@ -139,10 +170,23 @@ func ensureRootfsPartitionSize(imagePath string, rootPartition part.Partition, l
 		}
 	}
 
+	if err := pruneRootfsForSizing(tmpRootfsPath, logger); err != nil {
+		return 0, err
+	}
+
 	logger.Info("Checking rootfs fit for fixed partition size", slog.String("temp_image", tmpRootfsPath), slog.Uint64("target_rootfs_size_MB", targetRootSizeMB))
 
 	if out, err := exec.Command("e2fsck", "-pf", tmpRootfsPath).CombinedOutput(); err != nil {
 		return 0, fmt.Errorf("e2fsck failed before rootfs resize: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+
+	// Compact filesystem first so extents are relocated toward lower blocks before sizing.
+	logger.Info("Compacting rootfs filesystem to minimum")
+	if out, err := exec.Command("resize2fs", "-M", tmpRootfsPath).CombinedOutput(); err != nil {
+		return 0, fmt.Errorf("resize2fs -M failed: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	if out, err := exec.Command("e2fsck", "-pf", tmpRootfsPath).CombinedOutput(); err != nil {
+		return 0, fmt.Errorf("e2fsck failed after rootfs compaction: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 
 	minOut, err := exec.Command("resize2fs", "-P", tmpRootfsPath).CombinedOutput()
@@ -211,6 +255,9 @@ func ensureRootfsPartitionSize(imagePath string, rootPartition part.Partition, l
 
 	if out, err := exec.Command("e2fsck", "-pf", tmpRootfsPath).CombinedOutput(); err != nil {
 		return 0, fmt.Errorf("e2fsck failed after rootfs resize: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	if err := os.Truncate(tmpRootfsPath, int64(targetRootSizeBytes)); err != nil {
+		return 0, fmt.Errorf("failed to truncate temporary rootfs image to target size: %w", err)
 	}
 
 	src, err := os.Open(tmpRootfsPath)

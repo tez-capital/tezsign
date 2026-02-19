@@ -108,7 +108,7 @@ case "$IMAGE_ID" in
     ROOTFS_TARGET_MB=1400
     ;;
   radxa_zero3*|radxa-zero3*)
-    ROOTFS_TARGET_MB=2200
+    ROOTFS_TARGET_MB=1500
     ;;
   *)
     echo "No rootfs target mapping for image-id '$IMAGE_ID'." >&2

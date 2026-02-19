@@ -15,7 +15,7 @@ const (
 	appPartitionSizeMB               = 64
 	dataPartitionSizeMB              = 128
 	rootfsPartitionSizeRaspberryPiMB = 1400
-	rootfsPartitionSizeRadxaZero3MB  = 2200
+	rootfsPartitionSizeRadxaZero3MB  = 1500
 
 	workDir  = "/tmp/tezsign_image_builder"
 	tmpImage = workDir + "/image.img"
@@ -45,6 +45,30 @@ var (
 	ArmbianRootFsCreateDirs = []string{
 		"/app",
 		"/data",
+	}
+
+	// Relative globs under the mounted rootfs that are safe to prune for a headless appliance image.
+	ArmbianRootFsPruneGlobs = []string{
+		"usr/share/doc/*",
+		"usr/share/man/*",
+		"usr/share/info/*",
+		"usr/share/lintian/*",
+		"usr/share/bug/*",
+		"var/cache/man/*",
+		"var/cache/apt/*.bin",
+		"var/cache/apt/archives/*.deb",
+		"var/cache/apt/archives/partial/*",
+		"var/lib/apt/lists/*",
+		"var/log/*.log",
+		"var/log/journal/*",
+	}
+
+	ArmbianRootFsKeepLocales = map[string]bool{
+		"C":       true,
+		"C.UTF-8": true,
+		"en":      true,
+		"en_US":   true,
+		"en_GB":   true,
 	}
 
 	ArmbianInjectFiles = map[string]string{
