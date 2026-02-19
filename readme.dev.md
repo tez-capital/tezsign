@@ -67,3 +67,33 @@ Once you are finished with your changes, the easiest way to return the device to
 ```bash
 sudo reboot
 ```
+
+
+### local_build_check.sh
+
+Run from main repo folder:
+
+raspberry pi
+```sh
+tools/builder/local_build_check.sh \
+  --image-id raspberry_pi \
+  --flavour prod \
+  --output ./imgs/raspberry_pi.local.img.xz
+```
+
+radxa:
+```sh
+tools/builder/local_build_check.sh \
+  --image-id radxa_zero3 \
+  --flavour prod \
+  --output ./imgs/radxa_zero3.local.img.xz
+```
+
+with source-url:
+```sh
+tools/builder/local_build_check.sh \
+  --image-id raspberry_pi \
+  --source-url "https://dl.armbian.com/rpi4b/Trixie_legacy_minimal" \
+  --flavour prod
+  --output ./imgs/raspberry_pi.local.img.xz
+```
