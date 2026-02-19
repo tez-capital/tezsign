@@ -97,7 +97,12 @@ func pruneRootfsForSizing(rootfsImagePath string, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("failed to mount temporary rootfs for pruning: %w", err)
 	}
-	defer unmount(true)
+	shouldUnmount := true
+	defer func() {
+		if shouldUnmount {
+			unmount(true)
+		}
+	}()
 
 	for _, filePath := range ArmbianRootfsRemove {
 		fullPath := path.Join(mountPoint, filePath)
@@ -117,7 +122,9 @@ func pruneRootfsForSizing(rootfsImagePath string, logger *slog.Logger) error {
 		return fmt.Errorf("failed to prune temporary rootfs before sizing: %w", err)
 	}
 
+	_ = exec.Command("sync").Run()
 	unmount(false)
+	shouldUnmount = false
 	return nil
 }
 

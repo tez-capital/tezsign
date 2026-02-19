@@ -6,8 +6,48 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
+
+func isMountPointMounted(mountPoint string) (bool, error) {
+	content, err := os.ReadFile("/proc/self/mountinfo")
+	if err != nil {
+		return false, fmt.Errorf("failed to read mountinfo: %w", err)
+	}
+
+	for _, line := range strings.Split(string(content), "\n") {
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 5 {
+			continue
+		}
+		if fields[4] == mountPoint {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func waitForUnmount(mountPoint string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		mounted, err := isMountPointMounted(mountPoint)
+		if err != nil {
+			return err
+		}
+		if !mounted {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timed out waiting for unmount of %s", mountPoint)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
 
 func fusefat_mount(imagePath string, mountPoint string, logger *slog.Logger) (func(silent bool), error) {
 	logger.Info("Mounting FAT filesystem", slog.String("image", imagePath), slog.String("mount_point", mountPoint))
@@ -45,6 +85,10 @@ func fusefat_mount(imagePath string, mountPoint string, logger *slog.Logger) (fu
 		err := exec.Command("fusermount", "-u", mountPoint).Run()
 		if err != nil && !silent {
 			logger.Error("Failed to unmount FAT filesystem", slog.String("mount_point", mountPoint), "error", err)
+			return
+		}
+		if err := waitForUnmount(mountPoint, 10*time.Second); err != nil && !silent {
+			logger.Error("Timed out waiting for FAT unmount", slog.String("mount_point", mountPoint), "error", err)
 		}
 	}, nil
 }
@@ -75,6 +119,10 @@ func fuse2fs_mount(imagePath string, mountPoint string, offset int, logger *slog
 		err := exec.Command("fusermount", "-u", mountPoint).Run()
 		if err != nil && !silent {
 			logger.Error("Failed to unmount FAT filesystem", slog.String("mount_point", mountPoint), "error", err)
+			return
+		}
+		if err := waitForUnmount(mountPoint, 10*time.Second); err != nil && !silent {
+			logger.Error("Timed out waiting for EXT unmount", slog.String("mount_point", mountPoint), "error", err)
 		}
 	}, nil
 }
