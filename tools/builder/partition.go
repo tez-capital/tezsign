@@ -80,14 +80,24 @@ func normalizeImageID(imageID string) string {
 	return strings.TrimSuffix(base, ".dev")
 }
 
-func rootfsTargetSizeMBForImage(imageID string) (uint64, error) {
+type rootfsSizingConfig struct {
+	enforceFixedSize bool
+	fixedSizeMB      uint64
+}
+
+func rootfsSizingConfigForImage(imageID string) (rootfsSizingConfig, error) {
 	switch normalizeImageID(imageID) {
 	case "raspberry_pi":
-		return rootfsPartitionSizeRaspberryPiMB, nil
+		return rootfsSizingConfig{
+			enforceFixedSize: true,
+			fixedSizeMB:      rootfsPartitionSizeRaspberryPiMB,
+		}, nil
 	case "radxa_zero3", "radxa-zero3":
-		return rootfsPartitionSizeRadxaZero3MB, nil
+		return rootfsSizingConfig{
+			enforceFixedSize: false,
+		}, nil
 	default:
-		return 0, fmt.Errorf("unsupported IMAGE_ID %q; expected one of: raspberry_pi, radxa_zero3", imageID)
+		return rootfsSizingConfig{}, fmt.Errorf("unsupported IMAGE_ID %q; expected one of: raspberry_pi, radxa_zero3", imageID)
 	}
 }
 
@@ -292,7 +302,7 @@ func ensureRootfsPartitionSize(imagePath string, rootPartition part.Partition, l
 }
 
 func resizeImage(imagePath string, flavour imageFlavour, imageID string, logger *slog.Logger) (*partitions, error) {
-	targetRootfsSizeMB, err := rootfsTargetSizeMBForImage(imageID)
+	rootfsSizing, err := rootfsSizingConfigForImage(imageID)
 	if err != nil {
 		return nil, err
 	}
@@ -314,6 +324,11 @@ func resizeImage(imagePath string, flavour imageFlavour, imageID string, logger 
 		logger.Warn("Could not determine block size, falling back to 512.")
 	}
 	imgPartitions := partitionTable.GetPartitions()
+	if len(imgPartitions) == 0 {
+		_ = img.Close()
+		return nil, errors.New("image has no partitions")
+	}
+
 	var rootPartition part.Partition
 	if len(imgPartitions) > 1 {
 		rootPartition = imgPartitions[1] // second partition is rootfs
@@ -324,10 +339,20 @@ func resizeImage(imagePath string, flavour imageFlavour, imageID string, logger 
 	rootFsPartitionStart := rootPartition.GetStart() / logicalBlockSize // 0 indexed
 	rootfsSizeInSectors := uint64(rootPartition.GetSize() / logicalBlockSize)
 	sectorsPerMB := uint64(1024 * 1024 / logicalBlockSize)
-	if fixedRootfsSizeSectors, err := ensureRootfsPartitionSize(imagePath, rootPartition, logicalBlockSize, targetRootfsSizeMB, logger); err != nil {
-		return nil, err
-	} else {
+
+	if rootfsSizing.enforceFixedSize {
+		fixedRootfsSizeSectors, err := ensureRootfsPartitionSize(imagePath, rootPartition, logicalBlockSize, rootfsSizing.fixedSizeMB, logger)
+		if err != nil {
+			return nil, err
+		}
 		rootfsSizeInSectors = fixedRootfsSizeSectors
+	} else {
+		logger.Info(
+			"Skipping rootfs fixed-size resize for image",
+			slog.String("image_id", imageID),
+			slog.Uint64("rootfs_size_bytes", uint64(rootPartition.GetSize())),
+			slog.Uint64("rootfs_size_MB", uint64(rootPartition.GetSize())/(1024*1024)),
+		)
 	}
 	img.Close()
 
@@ -346,7 +371,8 @@ func resizeImage(imagePath string, flavour imageFlavour, imageID string, logger 
 	logger.Info(
 		"Resizing image",
 		slog.String("image_id", imageID),
-		slog.Uint64("target_rootfs_size_MB", targetRootfsSizeMB),
+		slog.Bool("fixed_rootfs_enforced", rootfsSizing.enforceFixedSize),
+		slog.Uint64("rootfs_size_MB", (rootfsSizeInSectors*uint64(logicalBlockSize))/(1024*1024)),
 		slog.Int("sectors_per_MB", int(sectorsPerMB)),
 		"rootfs", fmt.Sprintf("%d - %d", rootFsPartitionStart, rootPartEnd),
 		"app_partition", fmt.Sprintf("%d - %d", appPartStart, appPartEnd),

@@ -103,15 +103,17 @@ if [[ -z "$IMAGE_ID" ]]; then
 fi
 
 ROOTFS_TARGET_MB=0
+CHECK_FIXED_ROOTFS="false"
 case "$IMAGE_ID" in
   raspberry_pi*|raspberry-pi*)
     ROOTFS_TARGET_MB=1400
+    CHECK_FIXED_ROOTFS="true"
     ;;
   radxa_zero3*|radxa-zero3*)
-    ROOTFS_TARGET_MB=2100
+    CHECK_FIXED_ROOTFS="false"
     ;;
   *)
-    echo "No rootfs target mapping for image-id '$IMAGE_ID'." >&2
+    echo "No build check mapping for image-id '$IMAGE_ID'." >&2
     exit 1
     ;;
 esac
@@ -138,13 +140,15 @@ require_cmd fdisk
 require_cmd dd
 require_cmd xz
 require_cmd curl
-require_cmd resize2fs
-require_cmd dumpe2fs
-require_cmd e2fsck
 require_cmd awk
 require_cmd sort
 require_cmd mktemp
 require_cmd file
+if [[ "$CHECK_FIXED_ROOTFS" == "true" ]]; then
+  require_cmd resize2fs
+  require_cmd dumpe2fs
+  require_cmd e2fsck
+fi
 
 mkdir -p "$(dirname "$SOURCE_IMG")"
 mkdir -p "$(dirname "$OUTPUT_IMG_XZ")"
@@ -295,80 +299,85 @@ trap cleanup EXIT
 raw_img="$tmp_dir/output.img"
 rootfs_img="$tmp_dir/rootfs.img"
 
-echo "===> Checking fixed rootfs size in built image"
 xz -dc "$OUTPUT_IMG_XZ" > "$raw_img"
 
-root_entry="$(
-  fdisk -l "$raw_img" | awk -v img="$raw_img" '
-    $1 ~ ("^" img "[0-9]+$") {
-      start=""; end=""; sectors=""
-      for (i=2; i<=NF; i++) {
-        if ($i ~ /^[0-9]+$/) {
-          if (start=="") { start=$i; continue }
-          if (end=="") { end=$i; continue }
-          if (sectors=="") { sectors=$i; break }
+if [[ "$CHECK_FIXED_ROOTFS" == "true" ]]; then
+  echo "===> Checking fixed rootfs size in built image"
+
+  root_entry="$(
+    fdisk -l "$raw_img" | awk -v img="$raw_img" '
+      $1 ~ ("^" img "[0-9]+$") {
+        start=""; end=""; sectors=""
+        for (i=2; i<=NF; i++) {
+          if ($i ~ /^[0-9]+$/) {
+            if (start=="") { start=$i; continue }
+            if (end=="") { end=$i; continue }
+            if (sectors=="") { sectors=$i; break }
+          }
+        }
+        if (sectors != "" && $0 ~ /Linux/) {
+          print $1 " " start " " sectors
         }
       }
-      if (sectors != "" && $0 ~ /Linux/) {
-        print $1 " " start " " sectors
-      }
-    }
-  ' | sort -k3,3nr | head -n1
-)"
+    ' | sort -k3,3nr | head -n1
+  )"
 
-if [[ -z "$root_entry" ]]; then
-  echo "Could not detect Linux rootfs partition in built image." >&2
-  fdisk -l "$raw_img" >&2 || true
-  exit 1
-fi
+  if [[ -z "$root_entry" ]]; then
+    echo "Could not detect Linux rootfs partition in built image." >&2
+    fdisk -l "$raw_img" >&2 || true
+    exit 1
+  fi
 
-read -r root_part_name root_part_start root_part_sectors <<< "$root_entry"
-logical_sector_size="$(fdisk -l "$raw_img" | awk '/Sector size \(logical\/physical\):/ {for (i=1; i<=NF; i++) if ($i=="bytes") {print $(i-1); exit}}')"
-if [[ -z "$logical_sector_size" ]]; then
-  echo "Failed to determine logical sector size from image." >&2
-  exit 1
-fi
+  read -r root_part_name root_part_start root_part_sectors <<< "$root_entry"
+  logical_sector_size="$(fdisk -l "$raw_img" | awk '/Sector size \(logical\/physical\):/ {for (i=1; i<=NF; i++) if ($i=="bytes") {print $(i-1); exit}}')"
+  if [[ -z "$logical_sector_size" ]]; then
+    echo "Failed to determine logical sector size from image." >&2
+    exit 1
+  fi
 
-target_bytes=$((ROOTFS_TARGET_MB * 1024 * 1024))
-if (( target_bytes % logical_sector_size != 0 )); then
-  echo "Target rootfs size ${ROOTFS_TARGET_MB}MB is not aligned to logical sector size $logical_sector_size." >&2
-  exit 1
-fi
+  target_bytes=$((ROOTFS_TARGET_MB * 1024 * 1024))
+  if (( target_bytes % logical_sector_size != 0 )); then
+    echo "Target rootfs size ${ROOTFS_TARGET_MB}MB is not aligned to logical sector size $logical_sector_size." >&2
+    exit 1
+  fi
 
-target_sectors=$((target_bytes / logical_sector_size))
+  target_sectors=$((target_bytes / logical_sector_size))
 
-echo "Partition: $root_part_name (start=$root_part_start sectors=$root_part_sectors)"
-echo "Logical sector size: $logical_sector_size"
-echo "Target sectors (${ROOTFS_TARGET_MB} MiB): $target_sectors"
+  echo "Partition: $root_part_name (start=$root_part_start sectors=$root_part_sectors)"
+  echo "Logical sector size: $logical_sector_size"
+  echo "Target sectors (${ROOTFS_TARGET_MB} MiB): $target_sectors"
 
-if (( root_part_sectors != target_sectors )); then
-  echo "FAIL: Rootfs partition size is ${root_part_sectors} sectors, expected ${target_sectors} sectors (${ROOTFS_TARGET_MB}MB)." >&2
-  exit 2
-fi
+  if (( root_part_sectors != target_sectors )); then
+    echo "FAIL: Rootfs partition size is ${root_part_sectors} sectors, expected ${target_sectors} sectors (${ROOTFS_TARGET_MB}MB)." >&2
+    exit 2
+  fi
 
-dd if="$raw_img" of="$rootfs_img" bs="$logical_sector_size" skip="$root_part_start" count="$root_part_sectors" status=none
+  dd if="$raw_img" of="$rootfs_img" bs="$logical_sector_size" skip="$root_part_start" count="$root_part_sectors" status=none
 
-e2fsck -pf "$rootfs_img" >/dev/null 2>&1 || true
-min_blocks="$(resize2fs -P "$rootfs_img" | awk '{print $NF}' | tail -n1)"
-block_size="$(dumpe2fs -h "$rootfs_img" 2>/dev/null | awk '/Block size:/ {print $3; exit}')"
+  e2fsck -pf "$rootfs_img" >/dev/null 2>&1 || true
+  min_blocks="$(resize2fs -P "$rootfs_img" | awk '{print $NF}' | tail -n1)"
+  block_size="$(dumpe2fs -h "$rootfs_img" 2>/dev/null | awk '/Block size:/ {print $3; exit}')"
 
-if [[ -z "$min_blocks" || -z "$block_size" ]]; then
-  echo "Failed to read ext4 min blocks / block size." >&2
-  exit 1
-fi
+  if [[ -z "$min_blocks" || -z "$block_size" ]]; then
+    echo "Failed to read ext4 min blocks / block size." >&2
+    exit 1
+  fi
 
-target_blocks=$((target_bytes / block_size))
+  target_blocks=$((target_bytes / block_size))
 
-min_bytes=$((min_blocks * block_size))
-min_mib="$(awk -v b="$min_bytes" 'BEGIN { printf "%.2f", b/1024/1024 }')"
+  min_bytes=$((min_blocks * block_size))
+  min_mib="$(awk -v b="$min_bytes" 'BEGIN { printf "%.2f", b/1024/1024 }')"
 
-echo "Block size: $block_size"
-echo "Minimum blocks: $min_blocks (~${min_mib} MiB)"
-echo "Target blocks (${ROOTFS_TARGET_MB} MiB): $target_blocks"
+  echo "Block size: $block_size"
+  echo "Minimum blocks: $min_blocks (~${min_mib} MiB)"
+  echo "Target blocks (${ROOTFS_TARGET_MB} MiB): $target_blocks"
 
-if (( min_blocks <= target_blocks )); then
-  echo "PASS: Built image satisfies ${ROOTFS_TARGET_MB}MB rootfs target."
+  if (( min_blocks <= target_blocks )); then
+    echo "PASS: Built image satisfies ${ROOTFS_TARGET_MB}MB rootfs target."
+  else
+    echo "FAIL: Built image does not satisfy ${ROOTFS_TARGET_MB}MB rootfs target." >&2
+    exit 2
+  fi
 else
-  echo "FAIL: Built image does not satisfy ${ROOTFS_TARGET_MB}MB rootfs target." >&2
-  exit 2
+  echo "===> Skipping fixed rootfs size check for IMAGE_ID=$IMAGE_ID (rootfs is kept at source size)."
 fi
