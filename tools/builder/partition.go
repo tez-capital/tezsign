@@ -281,11 +281,12 @@ func rootfsSizingConfigForImage(imageID string) (rootfsSizingConfig, error) {
 	case "raspberry_pi":
 		return rootfsSizingConfig{
 			enforceFixedSize: true,
-			fixedSizeMB:      rootfsPartitionSizeRaspberryPiMB,
+			fixedSizeMB:      rootfsPartitionSizeRaspberryPiZeroMB,
 		}, nil
 	case "radxa_zero3", "radxa-zero3":
 		return rootfsSizingConfig{
-			enforceFixedSize: false,
+			enforceFixedSize: true,
+			fixedSizeMB:      rootfsPartitionSizeRadxaZero3MB,
 		}, nil
 	default:
 		return rootfsSizingConfig{}, fmt.Errorf("unsupported IMAGE_ID %q; expected one of: raspberry_pi, radxa_zero3", imageID)

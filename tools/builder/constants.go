@@ -12,9 +12,10 @@ const (
 )
 
 const (
-	appPartitionSizeMB               = 64
-	dataPartitionSizeMB              = 128
-	rootfsPartitionSizeRaspberryPiMB = 1400
+	appPartitionSizeMB                   = 64
+	dataPartitionSizeMB                  = 128
+	rootfsPartitionSizeRaspberryPiZeroMB = 700
+	rootfsPartitionSizeRadxaZero3MB      = 1200
 
 	workDir  = "/tmp/tezsign_image_builder"
 	tmpImage = workDir + "/image.img"
