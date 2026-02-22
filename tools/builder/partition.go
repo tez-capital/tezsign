@@ -14,6 +14,8 @@ import (
 	"strings"
 
 	"github.com/diskfs/go-diskfs"
+	"github.com/diskfs/go-diskfs/disk"
+	diskpartition "github.com/diskfs/go-diskfs/partition"
 	"github.com/diskfs/go-diskfs/partition/gpt"
 	"github.com/diskfs/go-diskfs/partition/mbr"
 	"github.com/diskfs/go-diskfs/partition/part"
@@ -33,6 +35,85 @@ type partitions struct {
 	root partition
 	app  partition
 	data partition
+}
+
+func resolveLogicalBlockSize(table diskpartition.Table, fallback int64) int64 {
+	switch typed := table.(type) {
+	case *gpt.Table:
+		if typed.LogicalSectorSize > 0 {
+			return int64(typed.LogicalSectorSize)
+		}
+	case *mbr.Table:
+		if typed.LogicalSectorSize > 0 {
+			return int64(typed.LogicalSectorSize)
+		}
+	}
+
+	if fallback > 0 {
+		return fallback
+	}
+	return 0
+}
+
+func openImageWithDetectedSectorSize(imagePath string, logger *slog.Logger) (*disk.Disk, diskpartition.Table, int64, error) {
+	type probe struct {
+		name       string
+		openOption diskfs.OpenOpt
+	}
+	probes := []probe{
+		{name: "default"}, // diskfs default (typically 512 for regular image files)
+		{name: "512", openOption: diskfs.WithSectorSize(diskfs.SectorSize512)},
+		{name: "1024", openOption: diskfs.WithSectorSize(diskfs.SectorSize(1024))},
+		{name: "2048", openOption: diskfs.WithSectorSize(diskfs.SectorSize(2048))},
+		{name: "4096", openOption: diskfs.WithSectorSize(diskfs.SectorSize4k)},
+	}
+
+	var firstErr error
+	for _, probe := range probes {
+		var (
+			img *disk.Disk
+			err error
+		)
+		if probe.openOption == nil {
+			img, err = diskfs.Open(imagePath)
+		} else {
+			img, err = diskfs.Open(imagePath, probe.openOption)
+		}
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+
+		table, err := img.GetPartitionTable()
+		if err != nil {
+			_ = img.Close()
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+
+		logicalBlockSize := resolveLogicalBlockSize(table, img.LogicalBlocksize)
+		if logicalBlockSize <= 0 {
+			_ = img.Close()
+			if firstErr == nil {
+				firstErr = errors.New("could not determine logical block size from image")
+			}
+			continue
+		}
+
+		if probe.name != "default" {
+			logger.Info("Detected image sector size using probe", slog.String("probe", probe.name), slog.Int64("logical_block_size", logicalBlockSize))
+		}
+		return img, table, logicalBlockSize, nil
+	}
+
+	if firstErr == nil {
+		firstErr = errors.New("failed to open image and detect logical block size")
+	}
+	return nil, nil, 0, firstErr
 }
 
 func parseResize2fsMinBlocks(output string) (uint64, error) {
@@ -307,21 +388,9 @@ func resizeImage(imagePath string, flavour imageFlavour, imageID string, logger 
 		return nil, err
 	}
 
-	img, err := diskfs.Open(imagePath)
+	img, partitionTable, logicalBlockSize, err := openImageWithDetectedSectorSize(imagePath, logger)
 	if err != nil {
 		return nil, errors.Join(common.ErrFailedToOpenImage, err)
-	}
-
-	partitionTable, err := img.GetPartitionTable()
-	if err != nil {
-		return nil, errors.Join(common.ErrFailedToOpenPartitionTable, err)
-	}
-
-	logicalBlockSize := img.LogicalBlocksize
-	if logicalBlockSize == 0 {
-		// Fallback in case the library can't determine the size
-		logicalBlockSize = 512
-		logger.Warn("Could not determine block size, falling back to 512.")
 	}
 	imgPartitions := partitionTable.GetPartitions()
 	if len(imgPartitions) == 0 {
@@ -403,17 +472,13 @@ func resizeImage(imagePath string, flavour imageFlavour, imageID string, logger 
 	}, nil
 }
 
-func createPartitions(path string, partitionSpecs *partitions) error {
-	img, err := diskfs.Open(path)
+func createPartitions(path string, partitionSpecs *partitions, logger *slog.Logger) error {
+	img, table, _, err := openImageWithDetectedSectorSize(path, logger)
 	if err != nil {
 		return errors.Join(common.ErrFailedToOpenImage, err)
 	}
 	defer img.Close()
 
-	table, err := img.GetPartitionTable()
-	if err != nil {
-		return errors.Join(common.ErrFailedToOpenPartitionTable, err)
-	}
 	switch table := table.(type) {
 	case *gpt.Table:
 		gptTable := table
@@ -494,16 +559,11 @@ func createPartitions(path string, partitionSpecs *partitions) error {
 }
 
 func formatPartitionTable(path string, flavour imageFlavour, logger *slog.Logger) error {
-	img, err := diskfs.Open(path)
+	img, table, _, err := openImageWithDetectedSectorSize(path, logger)
 	if err != nil {
 		return errors.Join(common.ErrFailedToOpenImage, err)
 	}
 	defer img.Close()
-
-	table, err := img.GetPartitionTable()
-	if err != nil {
-		return errors.Join(common.ErrFailedToOpenPartitionTable, err)
-	}
 
 	partitions := table.GetPartitions()
 	appPartitionIndex := len(partitions) - 2
@@ -538,7 +598,7 @@ func PartitionImage(path string, flavour imageFlavour, imageID string, logger *s
 		return errors.Join(common.ErrFailedToPartitionImage, err)
 	}
 
-	if err := createPartitions(path, partitionSpecs); err != nil {
+	if err := createPartitions(path, partitionSpecs, logger); err != nil {
 		return errors.Join(common.ErrFailedToPartitionImage, err)
 	}
 
