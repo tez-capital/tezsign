@@ -37,6 +37,116 @@ type partitions struct {
 	data partition
 }
 
+func selectLargestPartition(candidates []part.Partition) part.Partition {
+	var (
+		best     part.Partition
+		bestSize int64
+	)
+	for _, p := range candidates {
+		if p == nil {
+			continue
+		}
+		size := p.GetSize()
+		if size <= 0 {
+			continue
+		}
+		if best == nil || size > bestSize {
+			best = p
+			bestSize = size
+		}
+	}
+	return best
+}
+
+func isLikelyLinuxRootGPTType(t gpt.Type) bool {
+	switch t {
+	case gpt.LinuxFilesystem, gpt.LinuxServerData, gpt.LinuxRootArm64, gpt.LinuxRootArm, gpt.LinuxRootX86_64, gpt.LinuxRootX86, gpt.LinuxRootIA64:
+		return true
+	default:
+		return false
+	}
+}
+
+func selectRootPartition(table diskpartition.Table, logger *slog.Logger) (part.Partition, error) {
+	switch typed := table.(type) {
+	case *gpt.Table:
+		if len(typed.Partitions) == 0 {
+			return nil, errors.New("GPT image has no partitions")
+		}
+
+		// Prefer explicit root labels if present.
+		for i, p := range typed.Partitions {
+			if p == nil {
+				continue
+			}
+			name := strings.ToLower(strings.TrimSpace(p.Name))
+			if name == "root" || name == "rootfs" {
+				logger.Info("Selected rootfs partition by GPT label", slog.Int("index", i), slog.String("name", p.Name), slog.String("type", string(p.Type)))
+				return p, nil
+			}
+		}
+
+		// Next, prefer Linux-like root partition types and pick the largest.
+		linuxCandidates := make([]part.Partition, 0)
+		for _, p := range typed.Partitions {
+			if p == nil {
+				continue
+			}
+			if isLikelyLinuxRootGPTType(p.Type) {
+				linuxCandidates = append(linuxCandidates, p)
+			}
+		}
+		if root := selectLargestPartition(linuxCandidates); root != nil {
+			logger.Info("Selected rootfs partition as largest GPT Linux candidate")
+			return root, nil
+		}
+
+		// Fallback: largest defined GPT partition.
+		all := make([]part.Partition, 0, len(typed.Partitions))
+		for _, p := range typed.Partitions {
+			all = append(all, p)
+		}
+		if root := selectLargestPartition(all); root != nil {
+			logger.Warn("Falling back to largest GPT partition as rootfs candidate")
+			return root, nil
+		}
+		return nil, errors.New("unable to select GPT root partition")
+	case *mbr.Table:
+		if len(typed.Partitions) == 0 {
+			return nil, errors.New("MBR image has no partitions")
+		}
+
+		linuxCandidates := make([]part.Partition, 0)
+		nonZero := make([]part.Partition, 0)
+		for _, p := range typed.Partitions {
+			if p == nil || p.Size == 0 {
+				continue
+			}
+			nonZero = append(nonZero, p)
+			if p.Type == mbr.Linux {
+				linuxCandidates = append(linuxCandidates, p)
+			}
+		}
+
+		if root := selectLargestPartition(linuxCandidates); root != nil {
+			logger.Info("Selected rootfs partition as largest MBR Linux candidate")
+			return root, nil
+		}
+		if root := selectLargestPartition(nonZero); root != nil {
+			logger.Warn("Falling back to largest non-empty MBR partition as rootfs candidate")
+			return root, nil
+		}
+		return nil, errors.New("unable to select MBR root partition")
+	default:
+		parts := table.GetPartitions()
+		if root := selectLargestPartition(parts); root != nil {
+			logger.Warn("Selected rootfs partition from generic table fallback (largest partition)")
+			return root, nil
+		}
+		return nil, errors.New("unable to select root partition for partition table type")
+	}
+}
+
 func resolveLogicalBlockSize(table diskpartition.Table, fallback int64) int64 {
 	switch typed := table.(type) {
 	case *gpt.Table:
@@ -398,15 +508,58 @@ func resizeImage(imagePath string, flavour imageFlavour, imageID string, logger 
 		return nil, errors.New("image has no partitions")
 	}
 
-	var rootPartition part.Partition
-	if len(imgPartitions) > 1 {
-		rootPartition = imgPartitions[1] // second partition is rootfs
-	} else {
-		rootPartition = imgPartitions[0] // fallback to first partition if only one exists e.g. radxa with binman
+	rootPartition, err := selectRootPartition(partitionTable, logger)
+	if err != nil {
+		_ = img.Close()
+		return nil, err
 	}
 
-	rootFsPartitionStart := rootPartition.GetStart() / logicalBlockSize // 0 indexed
-	rootfsSizeInSectors := uint64(rootPartition.GetSize() / logicalBlockSize)
+	rootPartitionStartBytes := rootPartition.GetStart()
+	rootPartitionSizeBytes := rootPartition.GetSize()
+	if rootPartitionStartBytes < 0 {
+		_ = img.Close()
+		return nil, fmt.Errorf("invalid rootfs partition start: %d", rootPartitionStartBytes)
+	}
+	if rootPartitionSizeBytes <= 0 {
+		_ = img.Close()
+		return nil, fmt.Errorf("invalid rootfs partition size: %d", rootPartitionSizeBytes)
+	}
+	if rootPartitionStartBytes%logicalBlockSize != 0 {
+		_ = img.Close()
+		return nil, fmt.Errorf("rootfs partition start (%d) is not aligned to logical block size (%d)", rootPartitionStartBytes, logicalBlockSize)
+	}
+	if rootPartitionSizeBytes%logicalBlockSize != 0 {
+		_ = img.Close()
+		return nil, fmt.Errorf("rootfs partition size (%d) is not aligned to logical block size (%d)", rootPartitionSizeBytes, logicalBlockSize)
+	}
+
+	rootFsPartitionStart := uint64(rootPartitionStartBytes / logicalBlockSize) // 0 indexed
+	rootfsSizeInSectors := uint64(rootPartitionSizeBytes / logicalBlockSize)
+
+	rootPartitionEndBytes := rootPartitionStartBytes + rootPartitionSizeBytes
+	if rootPartitionEndBytes > img.Size {
+		if img.Size <= rootPartitionStartBytes {
+			_ = img.Close()
+			return nil, fmt.Errorf("rootfs partition start (%d) is beyond image size (%d)", rootPartitionStartBytes, img.Size)
+		}
+
+		availableRootBytes := img.Size - rootPartitionStartBytes
+		clampedSectors := uint64(availableRootBytes / logicalBlockSize)
+		if clampedSectors == 0 {
+			_ = img.Close()
+			return nil, fmt.Errorf("rootfs partition has no addressable sectors within image size (start=%d image_size=%d logical_block=%d)", rootPartitionStartBytes, img.Size, logicalBlockSize)
+		}
+
+		logger.Warn(
+			"Rootfs partition extends beyond image EOF; clamping rootfs span to available bytes",
+			slog.Int64("root_start_bytes", rootPartitionStartBytes),
+			slog.Int64("root_size_bytes_table", rootPartitionSizeBytes),
+			slog.Int64("image_size_bytes", img.Size),
+			slog.Uint64("root_size_sectors_clamped", clampedSectors),
+		)
+		rootfsSizeInSectors = clampedSectors
+	}
+
 	sectorsPerMB := uint64(1024 * 1024 / logicalBlockSize)
 
 	if rootfsSizing.enforceFixedSize {
