@@ -14,16 +14,16 @@ const (
 const (
 	appPartitionSizeMB                   = 64
 	dataPartitionSizeMB                  = 128
-	rootfsPartitionSizeRaspberryPiZeroMB = 700
-	rootfsPartitionSizeRadxaZero3MB      = 1200
-
-	workDir  = "/tmp/tezsign_image_builder"
-	tmpImage = workDir + "/image.img"
+	rootfsPartitionSizeRaspberryPiZeroMB = 900
+	rootfsPartitionSizeRadxaZero3MB      = 1300
 
 	DISABLE_UNMOUNTS = false // set to true to disable unmounts for debugging
 )
 
 var (
+	workDir  = "/tmp/tezsign_image_builder"
+	tmpImage = workDir + "/image.img"
+
 	// alignPartitionsTo = uint64(3 * 1024 * 1024 * 1024) // Default to 2GB alignment
 
 	PreloadTezsignUsbModules = []string{

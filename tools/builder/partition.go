@@ -266,6 +266,26 @@ func canRunRootfsResizeTools() bool {
 	return true
 }
 
+func runE2fsckAutoFix(imagePath string) error {
+	out, err := exec.Command("e2fsck", "-fy", imagePath).CombinedOutput()
+	if err == nil {
+		return nil
+	}
+
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		// e2fsck returns non-zero when it fixed issues:
+		//   1 => filesystem errors corrected
+		//   2 => corrected, reboot needed (not relevant for image files)
+		code := exitErr.ExitCode()
+		if code == 1 || code == 2 {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("e2fsck failed: %w: %s", err, strings.TrimSpace(string(out)))
+}
+
 func normalizeImageID(imageID string) string {
 	base := strings.ToLower(strings.TrimSpace(imageID))
 	return strings.TrimSuffix(base, ".dev")
@@ -385,17 +405,23 @@ func ensureRootfsPartitionSize(imagePath string, rootPartition part.Partition, l
 
 	logger.Info("Checking rootfs fit for fixed partition size", slog.String("temp_image", tmpRootfsPath), slog.Uint64("target_rootfs_size_MB", targetRootSizeMB))
 
-	if out, err := exec.Command("e2fsck", "-pf", tmpRootfsPath).CombinedOutput(); err != nil {
-		return 0, fmt.Errorf("e2fsck failed before rootfs resize: %w: %s", err, strings.TrimSpace(string(out)))
+	if err := runE2fsckAutoFix(tmpRootfsPath); err != nil {
+		return 0, fmt.Errorf("e2fsck failed before rootfs resize: %w", err)
 	}
 
 	// Compact filesystem first so extents are relocated toward lower blocks before sizing.
 	logger.Info("Compacting rootfs filesystem to minimum")
 	if out, err := exec.Command("resize2fs", "-M", tmpRootfsPath).CombinedOutput(); err != nil {
-		return 0, fmt.Errorf("resize2fs -M failed: %w: %s", err, strings.TrimSpace(string(out)))
+		logger.Warn("resize2fs -M failed; attempting e2fsck repair and one retry", slog.Any("error", err), slog.String("output", strings.TrimSpace(string(out))))
+		if repairErr := runE2fsckAutoFix(tmpRootfsPath); repairErr != nil {
+			return 0, fmt.Errorf("resize2fs -M failed and repair step failed: %w", repairErr)
+		}
+		if retryOut, retryErr := exec.Command("resize2fs", "-M", tmpRootfsPath).CombinedOutput(); retryErr != nil {
+			return 0, fmt.Errorf("resize2fs -M failed after repair retry: %w: %s", retryErr, strings.TrimSpace(string(retryOut)))
+		}
 	}
-	if out, err := exec.Command("e2fsck", "-pf", tmpRootfsPath).CombinedOutput(); err != nil {
-		return 0, fmt.Errorf("e2fsck failed after rootfs compaction: %w: %s", err, strings.TrimSpace(string(out)))
+	if err := runE2fsckAutoFix(tmpRootfsPath); err != nil {
+		return 0, fmt.Errorf("e2fsck failed after rootfs compaction: %w", err)
 	}
 
 	minOut, err := exec.Command("resize2fs", "-P", tmpRootfsPath).CombinedOutput()
@@ -462,8 +488,8 @@ func ensureRootfsPartitionSize(imagePath string, rootPartition part.Partition, l
 		logger.Info("Rootfs filesystem already matches fixed target blocks", slog.Uint64("target_blocks", targetBlocks), slog.Uint64("block_size", blockSize))
 	}
 
-	if out, err := exec.Command("e2fsck", "-pf", tmpRootfsPath).CombinedOutput(); err != nil {
-		return 0, fmt.Errorf("e2fsck failed after rootfs resize: %w: %s", err, strings.TrimSpace(string(out)))
+	if err := runE2fsckAutoFix(tmpRootfsPath); err != nil {
+		return 0, fmt.Errorf("e2fsck failed after rootfs resize: %w", err)
 	}
 	if err := os.Truncate(tmpRootfsPath, int64(targetRootSizeBytes)); err != nil {
 		return 0, fmt.Errorf("failed to truncate temporary rootfs image to target size: %w", err)

@@ -88,6 +88,10 @@ func main() {
 	logger := slog.Default()
 	imageID := resolveImageID(sourcePath, destPath, logger)
 
+	// Keep temporary build artifacts alongside the destination image directory.
+	workDir = filepath.Join(filepath.Dir(destPath), ".tezsign_image_builder")
+	tmpImage = filepath.Join(workDir, "image.img")
+
 	logger.Info("Creating working directory", slog.String("path", workDir))
 	err := os.MkdirAll(workDir, 0755)
 	if err != nil {
