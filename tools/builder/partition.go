@@ -4,11 +4,9 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -226,98 +224,158 @@ func openImageWithDetectedSectorSize(imagePath string, logger *slog.Logger) (*di
 	return nil, nil, 0, firstErr
 }
 
-func parseResize2fsMinBlocks(output string) (uint64, error) {
-	scanner := bufio.NewScanner(strings.NewReader(output))
-	for scanner.Scan() {
-		line := scanner.Text()
-		if !strings.Contains(line, "Estimated minimum size of the filesystem:") {
-			continue
-		}
-
-		fields := strings.Fields(line)
-		if len(fields) == 0 {
-			break
-		}
-
-		blocks, err := strconv.ParseUint(fields[len(fields)-1], 10, 64)
-		if err != nil {
-			return 0, fmt.Errorf("failed to parse minimum filesystem blocks from %q: %w", line, err)
-		}
-		return blocks, nil
-	}
-
-	if err := scanner.Err(); err != nil {
-		return 0, err
-	}
-
-	return 0, errors.New("resize2fs minimum size line not found")
-}
-
-func canRunRootfsResizeTools() bool {
-	if _, err := exec.LookPath("e2fsck"); err != nil {
-		return false
-	}
-	if _, err := exec.LookPath("resize2fs"); err != nil {
-		return false
-	}
-	if _, err := exec.LookPath("dumpe2fs"); err != nil {
-		return false
-	}
-	return true
-}
-
-func runE2fsckAutoFix(imagePath string) error {
-	out, err := exec.Command("e2fsck", "-fy", imagePath).CombinedOutput()
-	if err == nil {
-		return nil
-	}
-
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
-		// e2fsck returns non-zero when it fixed issues:
-		//   1 => filesystem errors corrected
-		//   2 => corrected, reboot needed (not relevant for image files)
-		code := exitErr.ExitCode()
-		if code == 1 || code == 2 {
-			return nil
-		}
-	}
-
-	return fmt.Errorf("e2fsck failed: %w: %s", err, strings.TrimSpace(string(out)))
-}
-
 func normalizeImageID(imageID string) string {
 	base := strings.ToLower(strings.TrimSpace(imageID))
 	return strings.TrimSuffix(base, ".dev")
 }
 
 type rootfsSizingConfig struct {
-	enforceFixedSize bool
-	fixedSizeMB      uint64
+	fixedSizeMB uint64
+}
+
+type rootfsFilesystemMetadata struct {
+	uuid  string
+	label string
+}
+
+type rootfsBackup struct {
+	backupDir string
+	metadata  rootfsFilesystemMetadata
 }
 
 func rootfsSizingConfigForImage(imageID string) (rootfsSizingConfig, error) {
 	switch normalizeImageID(imageID) {
 	case "raspberry_pi":
 		return rootfsSizingConfig{
-			enforceFixedSize: true,
-			fixedSizeMB:      rootfsPartitionSizeRaspberryPiZeroMB,
+			fixedSizeMB: rootfsPartitionSizeRaspberryPiZeroMB,
 		}, nil
 	case "radxa_zero3", "radxa-zero3":
 		return rootfsSizingConfig{
-			enforceFixedSize: true,
-			fixedSizeMB:      rootfsPartitionSizeRadxaZero3MB,
+			fixedSizeMB: rootfsPartitionSizeRadxaZero3MB,
 		}, nil
 	default:
 		return rootfsSizingConfig{}, fmt.Errorf("unsupported IMAGE_ID %q; expected one of: raspberry_pi, radxa_zero3", imageID)
 	}
 }
 
-func pruneRootfsForSizing(rootfsImagePath string, logger *slog.Logger) error {
-	mountPoint := filepath.Join(workDir, "rootfs-sizing")
-	unmount, err := fuse2fs_mount(rootfsImagePath, mountPoint, 0, logger)
+func findRootPartitionInImage(imagePath string, logger *slog.Logger) (part.Partition, error) {
+	img, table, _, err := openImageWithDetectedSectorSize(imagePath, logger)
 	if err != nil {
-		return fmt.Errorf("failed to mount temporary rootfs for pruning: %w", err)
+		return nil, errors.Join(common.ErrFailedToOpenImage, err)
+	}
+	defer img.Close()
+
+	rootPartition, err := selectRootPartition(table, logger)
+	if err != nil {
+		return nil, err
+	}
+	if rootPartition == nil {
+		return nil, errors.New("root partition is nil")
+	}
+	if rootPartition.GetStart() < 0 {
+		return nil, fmt.Errorf("invalid root partition start offset: %d", rootPartition.GetStart())
+	}
+	if rootPartition.GetSize() <= 0 {
+		return nil, fmt.Errorf("invalid root partition size: %d", rootPartition.GetSize())
+	}
+
+	return rootPartition, nil
+}
+
+func captureRootfsFilesystemMetadata(imagePath string, rootPartition part.Partition, logger *slog.Logger) (rootfsFilesystemMetadata, error) {
+	var metadata rootfsFilesystemMetadata
+
+	if _, err := exec.LookPath("blkid"); err != nil {
+		logger.Warn("blkid is not available; rootfs filesystem UUID/label will not be preserved", slog.Any("error", err))
+		return metadata, nil
+	}
+
+	out, err := exec.Command(
+		"blkid",
+		"-p",
+		"-o", "export",
+		"-O", strconv.FormatInt(rootPartition.GetStart(), 10),
+		"-S", strconv.FormatInt(rootPartition.GetSize(), 10),
+		imagePath,
+	).CombinedOutput()
+	if err != nil {
+		return metadata, fmt.Errorf("failed to probe rootfs metadata with blkid: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader(string(out)))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		switch parts[0] {
+		case "UUID":
+			metadata.uuid = strings.TrimSpace(parts[1])
+		case "LABEL":
+			metadata.label = strings.TrimSpace(parts[1])
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return metadata, fmt.Errorf("failed to parse blkid output: %w", err)
+	}
+
+	logger.Info(
+		"Captured rootfs filesystem metadata",
+		slog.String("uuid", metadata.uuid),
+		slog.String("label", metadata.label),
+	)
+	return metadata, nil
+}
+
+func pruneRootfsBeforeBackup(rootfs string, flavour imageFlavour, logger *slog.Logger) error {
+	removePaths := make([]string, 0, len(ArmbianRootfsRemove)+len(DevArmbianRootfsRemove))
+	removePaths = append(removePaths, ArmbianRootfsRemove...)
+	if flavour == DevImage {
+		removePaths = append(removePaths, DevArmbianRootfsRemove...)
+	}
+
+	for _, filePath := range removePaths {
+		fullPath := filepath.Join(rootfs, strings.TrimPrefix(filePath, "/"))
+		if err := os.RemoveAll(fullPath); err != nil {
+			return fmt.Errorf("failed to remove %s before backup: %w", fullPath, err)
+		}
+	}
+
+	for _, dirPath := range ArmbianRootFsCreateDirs {
+		fullPath := filepath.Join(rootfs, strings.TrimPrefix(dirPath, "/"))
+		if err := os.MkdirAll(fullPath, 0755); err != nil {
+			return fmt.Errorf("failed to create %s before backup: %w", fullPath, err)
+		}
+	}
+
+	if err := pruneRootfsUnusedFiles(rootfs, logger); err != nil {
+		return fmt.Errorf("failed to prune rootfs before backup: %w", err)
+	}
+	return nil
+}
+
+func backupRootfsWithRsync(imagePath string, rootPartition part.Partition, flavour imageFlavour, logger *slog.Logger) (string, error) {
+	if _, err := exec.LookPath("rsync"); err != nil {
+		return "", fmt.Errorf("rsync is required for rootfs migration but was not found: %w", err)
+	}
+
+	mountPoint := filepath.Join(workDir, "rootfs-rsync-source")
+	backupDir := filepath.Join(workDir, "rootfs-rsync-backup")
+
+	_ = os.RemoveAll(mountPoint)
+	if err := os.MkdirAll(mountPoint, 0755); err != nil {
+		return "", fmt.Errorf("failed to create rootfs source mount point %s: %w", mountPoint, err)
+	}
+	_ = os.RemoveAll(backupDir)
+	if err := os.MkdirAll(backupDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create rootfs backup directory %s: %w", backupDir, err)
+	}
+
+	unmount, err := fuse2fs_mount(imagePath, mountPoint, int(rootPartition.GetStart()), logger)
+	if err != nil {
+		return "", fmt.Errorf("failed to mount rootfs for backup: %w", err)
 	}
 	shouldUnmount := true
 	defer func() {
@@ -326,197 +384,82 @@ func pruneRootfsForSizing(rootfsImagePath string, logger *slog.Logger) error {
 		}
 	}()
 
-	for _, filePath := range ArmbianRootfsRemove {
-		fullPath := path.Join(mountPoint, filePath)
-		if err := os.RemoveAll(fullPath); err != nil {
-			return fmt.Errorf("failed to remove %s during rootfs pre-prune: %w", fullPath, err)
-		}
+	if err := pruneRootfsBeforeBackup(mountPoint, flavour, logger); err != nil {
+		return "", err
 	}
 
-	for _, dirPath := range ArmbianRootFsCreateDirs {
-		fullPath := path.Join(mountPoint, dirPath)
-		if err := os.MkdirAll(fullPath, 0755); err != nil {
-			return fmt.Errorf("failed to create %s during rootfs pre-prune: %w", fullPath, err)
-		}
+	out, err := exec.Command("rsync", "-aH", "--numeric-ids", mountPoint+"/", backupDir+"/").CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to rsync rootfs to backup directory: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 
-	if err := pruneRootfsUnusedFiles(mountPoint, logger); err != nil {
-		return fmt.Errorf("failed to prune temporary rootfs before sizing: %w", err)
+	_ = exec.Command("sync").Run()
+	unmount(false)
+	shouldUnmount = false
+
+	logger.Info("Backed up rootfs to temporary directory", slog.String("path", backupDir))
+	return backupDir, nil
+}
+
+func backupRootfsBeforeRepartition(imagePath string, flavour imageFlavour, logger *slog.Logger) (*rootfsBackup, error) {
+	rootPartition, err := findRootPartitionInImage(imagePath, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata, err := captureRootfsFilesystemMetadata(imagePath, rootPartition, logger)
+	if err != nil {
+		logger.Warn("Failed to capture rootfs filesystem metadata; proceeding with defaults", slog.Any("error", err))
+		metadata = rootfsFilesystemMetadata{}
+	}
+
+	backupDir, err := backupRootfsWithRsync(imagePath, rootPartition, flavour, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	return &rootfsBackup{
+		backupDir: backupDir,
+		metadata:  metadata,
+	}, nil
+}
+
+func restoreRootfsFromBackup(imagePath string, backupDir string, logger *slog.Logger) error {
+	if _, err := exec.LookPath("rsync"); err != nil {
+		return fmt.Errorf("rsync is required for rootfs migration but was not found: %w", err)
+	}
+
+	rootPartition, err := findRootPartitionInImage(imagePath, logger)
+	if err != nil {
+		return err
+	}
+
+	mountPoint := filepath.Join(workDir, "rootfs-rsync-target")
+	_ = os.RemoveAll(mountPoint)
+	if err := os.MkdirAll(mountPoint, 0755); err != nil {
+		return fmt.Errorf("failed to create rootfs target mount point %s: %w", mountPoint, err)
+	}
+
+	unmount, err := fuse2fs_mount(imagePath, mountPoint, int(rootPartition.GetStart()), logger)
+	if err != nil {
+		return fmt.Errorf("failed to mount recreated rootfs for restore: %w", err)
+	}
+	shouldUnmount := true
+	defer func() {
+		if shouldUnmount {
+			unmount(true)
+		}
+	}()
+
+	out, err := exec.Command("rsync", "-aH", "--numeric-ids", backupDir+"/", mountPoint+"/").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to restore rootfs from backup directory: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 
 	_ = exec.Command("sync").Run()
 	unmount(false)
 	shouldUnmount = false
 	return nil
-}
-
-func ensureRootfsPartitionSize(imagePath string, rootPartition part.Partition, logicalBlockSize int64, targetRootSizeMB uint64, logger *slog.Logger) (uint64, error) {
-	rootPartSizeBytes := uint64(rootPartition.GetSize())
-	targetRootSizeBytes := targetRootSizeMB * 1024 * 1024
-	targetRootSizeSectors := targetRootSizeBytes / uint64(logicalBlockSize)
-	if targetRootSizeSectors == 0 {
-		return 0, fmt.Errorf("invalid rootfs target size: %dMB does not map to any sectors with logical block size %d", targetRootSizeMB, logicalBlockSize)
-	}
-
-	if rootPartSizeBytes == targetRootSizeBytes {
-		logger.Info("Rootfs already matches fixed partition size", slog.Uint64("target_rootfs_size_bytes", targetRootSizeBytes))
-		return targetRootSizeSectors, nil
-	}
-
-	if !canRunRootfsResizeTools() {
-		return 0, fmt.Errorf("cannot resize rootfs to fixed %dMB target: missing required tools (e2fsck, resize2fs, dumpe2fs)", targetRootSizeMB)
-	}
-
-	tmpRootfsPath := filepath.Join(workDir, "rootfs-partition.img")
-	_ = os.Remove(tmpRootfsPath)
-	defer os.Remove(tmpRootfsPath)
-
-	tmpFile, err := os.Create(tmpRootfsPath)
-	if err != nil {
-		return 0, fmt.Errorf("failed to create temporary rootfs image: %w", err)
-	}
-
-	img, err := diskfs.Open(imagePath)
-	if err != nil {
-		_ = tmpFile.Close()
-		return 0, errors.Join(common.ErrFailedToOpenImage, err)
-	}
-
-	readBytes, err := rootPartition.ReadContents(img.Backend, tmpFile)
-	_ = img.Close()
-	if closeErr := tmpFile.Close(); closeErr != nil && err == nil {
-		err = closeErr
-	}
-	if err != nil {
-		return 0, fmt.Errorf("failed to extract rootfs partition: %w", err)
-	}
-	if int64(rootPartSizeBytes) != readBytes {
-		return 0, fmt.Errorf("expected to extract %d bytes from rootfs partition, got %d", rootPartSizeBytes, readBytes)
-	}
-	if rootPartSizeBytes < targetRootSizeBytes {
-		if err := os.Truncate(tmpRootfsPath, int64(targetRootSizeBytes)); err != nil {
-			return 0, fmt.Errorf("failed to extend temporary rootfs image to target size: %w", err)
-		}
-	}
-
-	if err := pruneRootfsForSizing(tmpRootfsPath, logger); err != nil {
-		return 0, err
-	}
-
-	logger.Info("Checking rootfs fit for fixed partition size", slog.String("temp_image", tmpRootfsPath), slog.Uint64("target_rootfs_size_MB", targetRootSizeMB))
-
-	if err := runE2fsckAutoFix(tmpRootfsPath); err != nil {
-		return 0, fmt.Errorf("e2fsck failed before rootfs resize: %w", err)
-	}
-
-	// Compact filesystem first so extents are relocated toward lower blocks before sizing.
-	logger.Info("Compacting rootfs filesystem to minimum")
-	if out, err := exec.Command("resize2fs", "-M", tmpRootfsPath).CombinedOutput(); err != nil {
-		logger.Warn("resize2fs -M failed; attempting e2fsck repair and one retry", slog.Any("error", err), slog.String("output", strings.TrimSpace(string(out))))
-		if repairErr := runE2fsckAutoFix(tmpRootfsPath); repairErr != nil {
-			return 0, fmt.Errorf("resize2fs -M failed and repair step failed: %w", repairErr)
-		}
-		if retryOut, retryErr := exec.Command("resize2fs", "-M", tmpRootfsPath).CombinedOutput(); retryErr != nil {
-			return 0, fmt.Errorf("resize2fs -M failed after repair retry: %w: %s", retryErr, strings.TrimSpace(string(retryOut)))
-		}
-	}
-	if err := runE2fsckAutoFix(tmpRootfsPath); err != nil {
-		return 0, fmt.Errorf("e2fsck failed after rootfs compaction: %w", err)
-	}
-
-	minOut, err := exec.Command("resize2fs", "-P", tmpRootfsPath).CombinedOutput()
-	if err != nil {
-		return 0, fmt.Errorf("resize2fs -P failed: %w: %s", err, strings.TrimSpace(string(minOut)))
-	}
-
-	minBlocks, err := parseResize2fsMinBlocks(string(minOut))
-	if err != nil {
-		return 0, err
-	}
-
-	fsInfoOut, err := exec.Command("dumpe2fs", "-h", tmpRootfsPath).CombinedOutput()
-	if err != nil {
-		return 0, fmt.Errorf("dumpe2fs failed: %w: %s", err, strings.TrimSpace(string(fsInfoOut)))
-	}
-
-	var blockCount uint64
-	var blockSize uint64
-	scanner := bufio.NewScanner(strings.NewReader(string(fsInfoOut)))
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if strings.HasPrefix(line, "Block count:") {
-			parts := strings.Fields(line)
-			if len(parts) >= 3 {
-				blockCount, err = strconv.ParseUint(parts[2], 10, 64)
-				if err != nil {
-					return 0, fmt.Errorf("failed to parse ext4 block count from %q: %w", line, err)
-				}
-			}
-		}
-		if strings.HasPrefix(line, "Block size:") {
-			parts := strings.Fields(line)
-			if len(parts) >= 3 {
-				blockSize, err = strconv.ParseUint(parts[2], 10, 64)
-				if err != nil {
-					return 0, fmt.Errorf("failed to parse ext4 block size from %q: %w", line, err)
-				}
-			}
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return 0, err
-	}
-	if blockCount == 0 || blockSize == 0 {
-		return 0, fmt.Errorf("could not determine ext4 block count/size (block_count=%d block_size=%d)", blockCount, blockSize)
-	}
-
-	targetBlocks := targetRootSizeBytes / blockSize
-	if targetBlocks == 0 {
-		return 0, fmt.Errorf("target rootfs size %d bytes is smaller than ext4 block size %d", targetRootSizeBytes, blockSize)
-	}
-	if targetBlocks < minBlocks {
-		minBytes := minBlocks * blockSize
-		return 0, fmt.Errorf("rootfs minimum size (%d bytes) exceeds fixed rootfs target (%d bytes)", minBytes, targetRootSizeBytes)
-	}
-
-	if blockCount != targetBlocks {
-		logger.Info("Resizing rootfs filesystem to fixed size", slog.Uint64("from_blocks", blockCount), slog.Uint64("to_blocks", targetBlocks), slog.Uint64("block_size", blockSize))
-		if out, err := exec.Command("resize2fs", tmpRootfsPath, strconv.FormatUint(targetBlocks, 10)).CombinedOutput(); err != nil {
-			return 0, fmt.Errorf("resize2fs failed: %w: %s", err, strings.TrimSpace(string(out)))
-		}
-	} else {
-		logger.Info("Rootfs filesystem already matches fixed target blocks", slog.Uint64("target_blocks", targetBlocks), slog.Uint64("block_size", blockSize))
-	}
-
-	if err := runE2fsckAutoFix(tmpRootfsPath); err != nil {
-		return 0, fmt.Errorf("e2fsck failed after rootfs resize: %w", err)
-	}
-	if err := os.Truncate(tmpRootfsPath, int64(targetRootSizeBytes)); err != nil {
-		return 0, fmt.Errorf("failed to truncate temporary rootfs image to target size: %w", err)
-	}
-
-	src, err := os.Open(tmpRootfsPath)
-	if err != nil {
-		return 0, fmt.Errorf("failed to reopen resized rootfs image: %w", err)
-	}
-	defer src.Close()
-
-	dst, err := os.OpenFile(imagePath, os.O_RDWR, 0644)
-	if err != nil {
-		return 0, fmt.Errorf("failed to open image for rootfs writeback: %w", err)
-	}
-	defer dst.Close()
-
-	rootStart := rootPartition.GetStart()
-	if _, err = dst.Seek(int64(rootStart), io.SeekStart); err != nil {
-		return 0, fmt.Errorf("failed to seek image for rootfs writeback: %w", err)
-	}
-	if _, err = io.CopyN(dst, src, int64(targetRootSizeBytes)); err != nil {
-		return 0, fmt.Errorf("failed to write back resized rootfs image: %w", err)
-	}
-
-	logger.Info("Rootfs resize completed", slog.Uint64("old_size_bytes", rootPartSizeBytes), slog.Uint64("new_size_bytes", targetRootSizeBytes))
-	return targetRootSizeSectors, nil
 }
 
 func resizeImage(imagePath string, flavour imageFlavour, imageID string, logger *slog.Logger) (*partitions, error) {
@@ -542,68 +485,33 @@ func resizeImage(imagePath string, flavour imageFlavour, imageID string, logger 
 	}
 
 	rootPartitionStartBytes := rootPartition.GetStart()
-	rootPartitionSizeBytes := rootPartition.GetSize()
 	if rootPartitionStartBytes < 0 {
 		_ = img.Close()
 		return nil, fmt.Errorf("invalid rootfs partition start: %d", rootPartitionStartBytes)
-	}
-	if rootPartitionSizeBytes <= 0 {
-		_ = img.Close()
-		return nil, fmt.Errorf("invalid rootfs partition size: %d", rootPartitionSizeBytes)
 	}
 	if rootPartitionStartBytes%logicalBlockSize != 0 {
 		_ = img.Close()
 		return nil, fmt.Errorf("rootfs partition start (%d) is not aligned to logical block size (%d)", rootPartitionStartBytes, logicalBlockSize)
 	}
-	if rootPartitionSizeBytes%logicalBlockSize != 0 {
+	if img.Size <= rootPartitionStartBytes {
 		_ = img.Close()
-		return nil, fmt.Errorf("rootfs partition size (%d) is not aligned to logical block size (%d)", rootPartitionSizeBytes, logicalBlockSize)
+		return nil, fmt.Errorf("rootfs partition start (%d) is beyond image size (%d)", rootPartitionStartBytes, img.Size)
 	}
 
 	rootFsPartitionStart := uint64(rootPartitionStartBytes / logicalBlockSize) // 0 indexed
-	rootfsSizeInSectors := uint64(rootPartitionSizeBytes / logicalBlockSize)
-
-	rootPartitionEndBytes := rootPartitionStartBytes + rootPartitionSizeBytes
-	if rootPartitionEndBytes > img.Size {
-		if img.Size <= rootPartitionStartBytes {
-			_ = img.Close()
-			return nil, fmt.Errorf("rootfs partition start (%d) is beyond image size (%d)", rootPartitionStartBytes, img.Size)
-		}
-
-		availableRootBytes := img.Size - rootPartitionStartBytes
-		clampedSectors := uint64(availableRootBytes / logicalBlockSize)
-		if clampedSectors == 0 {
-			_ = img.Close()
-			return nil, fmt.Errorf("rootfs partition has no addressable sectors within image size (start=%d image_size=%d logical_block=%d)", rootPartitionStartBytes, img.Size, logicalBlockSize)
-		}
-
-		logger.Warn(
-			"Rootfs partition extends beyond image EOF; clamping rootfs span to available bytes",
-			slog.Int64("root_start_bytes", rootPartitionStartBytes),
-			slog.Int64("root_size_bytes_table", rootPartitionSizeBytes),
-			slog.Int64("image_size_bytes", img.Size),
-			slog.Uint64("root_size_sectors_clamped", clampedSectors),
-		)
-		rootfsSizeInSectors = clampedSectors
+	targetRootSizeBytes := rootfsSizing.fixedSizeMB * 1024 * 1024
+	if targetRootSizeBytes == 0 {
+		_ = img.Close()
+		return nil, fmt.Errorf("invalid rootfs target size: %dMB", rootfsSizing.fixedSizeMB)
 	}
+	if targetRootSizeBytes%uint64(logicalBlockSize) != 0 {
+		_ = img.Close()
+		return nil, fmt.Errorf("rootfs target size %d bytes is not aligned to logical block size %d", targetRootSizeBytes, logicalBlockSize)
+	}
+	rootfsSizeInSectors := targetRootSizeBytes / uint64(logicalBlockSize)
 
 	sectorsPerMB := uint64(1024 * 1024 / logicalBlockSize)
-
-	if rootfsSizing.enforceFixedSize {
-		fixedRootfsSizeSectors, err := ensureRootfsPartitionSize(imagePath, rootPartition, logicalBlockSize, rootfsSizing.fixedSizeMB, logger)
-		if err != nil {
-			return nil, err
-		}
-		rootfsSizeInSectors = fixedRootfsSizeSectors
-	} else {
-		logger.Info(
-			"Skipping rootfs fixed-size resize for image",
-			slog.String("image_id", imageID),
-			slog.Uint64("rootfs_size_bytes", uint64(rootPartition.GetSize())),
-			slog.Uint64("rootfs_size_MB", uint64(rootPartition.GetSize())/(1024*1024)),
-		)
-	}
-	img.Close()
+	_ = img.Close()
 
 	appSizeInSectors := uint64(appPartitionSizeMB * sectorsPerMB)
 	dataSizeInSectors := uint64(dataPartitionSizeMB * sectorsPerMB)
@@ -620,7 +528,6 @@ func resizeImage(imagePath string, flavour imageFlavour, imageID string, logger 
 	logger.Info(
 		"Resizing image",
 		slog.String("image_id", imageID),
-		slog.Bool("fixed_rootfs_enforced", rootfsSizing.enforceFixedSize),
 		slog.Uint64("rootfs_size_MB", (rootfsSizeInSectors*uint64(logicalBlockSize))/(1024*1024)),
 		slog.Int("sectors_per_MB", int(sectorsPerMB)),
 		"rootfs", fmt.Sprintf("%d - %d", rootFsPartitionStart, rootPartEnd),
@@ -662,13 +569,32 @@ func createPartitions(path string, partitionSpecs *partitions, logger *slog.Logg
 	switch table := table.(type) {
 	case *gpt.Table:
 		gptTable := table
-
-		newPartitions := gptTable.Partitions
-		if len(newPartitions) > 2 {
-			newPartitions = newPartitions[:2] // keep only first two partitions, there may be more but with size 0
+		rootPartition, err := selectRootPartition(gptTable, logger)
+		if err != nil {
+			return fmt.Errorf("failed to select GPT root partition while creating partitions: %w", err)
 		}
-		if len(newPartitions) >= 2 {
-			newPartitions[1].End = partitionSpecs.root.end
+		rootGPTPartition, ok := rootPartition.(*gpt.Partition)
+		if !ok {
+			return fmt.Errorf("selected GPT root partition has unexpected type %T", rootPartition)
+		}
+
+		// Keep existing non-TezSign partitions, but always resize the actual root partition.
+		newPartitions := make([]*gpt.Partition, 0, len(gptTable.Partitions)+2)
+		for _, p := range gptTable.Partitions {
+			if p == nil {
+				continue
+			}
+			if p == rootGPTPartition {
+				p.End = partitionSpecs.root.end
+				// Ensure go-diskfs can reconcile Start/End/Size during GPT serialization.
+				p.Size = 0
+				newPartitions = append(newPartitions, p)
+				continue
+			}
+			if p.Name == constants.AppPartitionLabel || p.Name == constants.DataPartitionLabel {
+				continue
+			}
+			newPartitions = append(newPartitions, p)
 		}
 
 		partitionsToAdd := []*gpt.Partition{
@@ -702,12 +628,26 @@ func createPartitions(path string, partitionSpecs *partitions, logger *slog.Logg
 			return errors.New("MBR table already has more than 2 partitions defined, cannot add 2 more for TezSign")
 		}
 
-		newPartitions := mbrTable.Partitions
-		if len(newPartitions) > 2 {
-			newPartitions = newPartitions[:2] // keep only first two partitions, there may be more but with size 0
+		rootPartition, err := selectRootPartition(mbrTable, logger)
+		if err != nil {
+			return fmt.Errorf("failed to select MBR root partition while creating partitions: %w", err)
 		}
-		if len(newPartitions) >= 2 {
-			newPartitions[1].Size = uint32(partitionSpecs.root.sectorCount)
+		rootMBRPartition, ok := rootPartition.(*mbr.Partition)
+		if !ok {
+			return fmt.Errorf("selected MBR root partition has unexpected type %T", rootPartition)
+		}
+
+		newPartitions := make([]*mbr.Partition, 0, len(mbrTable.Partitions)+2)
+		for _, p := range mbrTable.Partitions {
+			if p == nil || p.Size == 0 {
+				continue
+			}
+			if p == rootMBRPartition {
+				p.Size = uint32(partitionSpecs.root.sectorCount)
+				newPartitions = append(newPartitions, p)
+				continue
+			}
+			newPartitions = append(newPartitions, p)
 		}
 
 		partitionsToAdd := []*mbr.Partition{
@@ -738,14 +678,23 @@ func createPartitions(path string, partitionSpecs *partitions, logger *slog.Logg
 	return nil
 }
 
-func formatPartitionTable(path string, flavour imageFlavour, logger *slog.Logger) error {
+func formatPartitionTable(path string, flavour imageFlavour, rootfsMetadata rootfsFilesystemMetadata, logger *slog.Logger) error {
+	_ = flavour
 	img, table, _, err := openImageWithDetectedSectorSize(path, logger)
 	if err != nil {
 		return errors.Join(common.ErrFailedToOpenImage, err)
 	}
 	defer img.Close()
 
+	rootPartition, err := selectRootPartition(table, logger)
+	if err != nil {
+		return errors.Join(common.ErrFailedToFormatPartition, err)
+	}
+
 	partitions := table.GetPartitions()
+	if len(partitions) < 2 {
+		return fmt.Errorf("unexpected partition count %d while formatting image", len(partitions))
+	}
 	appPartitionIndex := len(partitions) - 2
 	dataPartitionIndex := len(partitions) - 1
 	logger.Info("Formatting partitions", slog.Int("app_partition_index", appPartitionIndex), slog.Int("data_partition_index", dataPartitionIndex))
@@ -753,26 +702,60 @@ func formatPartitionTable(path string, flavour imageFlavour, logger *slog.Logger
 	appPartition := partitions[appPartitionIndex]
 	dataPartition := partitions[dataPartitionIndex]
 
+	rootPartitionOffset := int64(rootPartition.GetStart())
+	rootPartitionSize := int64(rootPartition.GetSize())
 	appPartitionOffset := int64(appPartition.GetStart())
 	dataPartitionOffset := int64(dataPartition.GetStart())
 	appPartitionSize := int64(appPartition.GetSize())
 	dataPartitionSize := int64(dataPartition.GetSize())
 
+	rootMkfsArgs := []string{
+		"-E", fmt.Sprintf("offset=%d", rootPartitionOffset),
+		"-F", path,
+		fmt.Sprintf("%dK", rootPartitionSize/1024),
+	}
+	if rootfsMetadata.uuid != "" {
+		rootMkfsArgs = append(rootMkfsArgs, "-U", rootfsMetadata.uuid)
+	}
+	if rootfsMetadata.label != "" {
+		rootMkfsArgs = append(rootMkfsArgs, "-L", rootfsMetadata.label)
+	}
+	slog.Info(
+		"Formatting root partition",
+		slog.Int64("root_offset", rootPartitionOffset),
+		slog.Int64("root_size", rootPartitionSize),
+		slog.String("root_uuid", rootfsMetadata.uuid),
+		slog.String("root_label", rootfsMetadata.label),
+	)
+	if out, err := exec.Command("mkfs.ext4", rootMkfsArgs...).CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to format root partition: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+
 	// mkfs.ext4 -E offset=104857600,root_owner=1000:1000 -F disk.img 51200K
 	slog.Info("Formatting app and data partitions", slog.Int64("app_offset", appPartitionOffset), slog.Int64("app_size", appPartitionSize), slog.Int64("data_offset", dataPartitionOffset), slog.Int64("data_size", dataPartitionSize))
-	if err := exec.Command("mkfs.ext4", "-E", fmt.Sprintf("offset=%d", appPartitionOffset), "-F", path, fmt.Sprintf("%dK", appPartitionSize/1024), "-L", constants.AppPartitionLabel).Run(); err != nil {
-		return errors.Join(common.ErrFailedToFormatPartition, err)
+	if out, err := exec.Command("mkfs.ext4", "-E", fmt.Sprintf("offset=%d", appPartitionOffset), "-F", path, fmt.Sprintf("%dK", appPartitionSize/1024), "-L", constants.AppPartitionLabel).CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to format app partition: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 
 	slog.Info("Formatting data partition", slog.Int64("data_offset", dataPartitionOffset), slog.Int64("data_size", dataPartitionSize))
-	if err := exec.Command("mkfs.ext4", "-J", "size=8", "-m", "0", "-I", "1024", "-O", "inline_data,fast_commit", "-E", fmt.Sprintf("offset=%d", dataPartitionOffset), "-F", path, fmt.Sprintf("%dK", dataPartitionSize/1024), "-L", constants.DataPartitionLabel).Run(); err != nil {
-		return errors.Join(common.ErrFailedToFormatPartition, err)
+	if out, err := exec.Command("mkfs.ext4", "-J", "size=8", "-m", "0", "-I", "1024", "-O", "inline_data,fast_commit", "-E", fmt.Sprintf("offset=%d", dataPartitionOffset), "-F", path, fmt.Sprintf("%dK", dataPartitionSize/1024), "-L", constants.DataPartitionLabel).CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to format data partition: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 
 	return nil
 }
 
 func PartitionImage(path string, flavour imageFlavour, imageID string, logger *slog.Logger) error {
+	if _, err := rootfsSizingConfigForImage(imageID); err != nil {
+		return errors.Join(common.ErrFailedToPartitionImage, err)
+	}
+
+	rootfsBackup, err := backupRootfsBeforeRepartition(path, flavour, logger)
+	if err != nil {
+		return errors.Join(common.ErrFailedToPartitionImage, err)
+	}
+	defer os.RemoveAll(rootfsBackup.backupDir)
+
 	partitionSpecs, err := resizeImage(path, flavour, imageID, logger)
 	if err != nil {
 		return errors.Join(common.ErrFailedToPartitionImage, err)
@@ -782,7 +765,11 @@ func PartitionImage(path string, flavour imageFlavour, imageID string, logger *s
 		return errors.Join(common.ErrFailedToPartitionImage, err)
 	}
 
-	if err := formatPartitionTable(path, flavour, logger); err != nil {
+	if err := formatPartitionTable(path, flavour, rootfsBackup.metadata, logger); err != nil {
+		return errors.Join(common.ErrFailedToPartitionImage, err)
+	}
+
+	if err := restoreRootfsFromBackup(path, rootfsBackup.backupDir, logger); err != nil {
 		return errors.Join(common.ErrFailedToPartitionImage, err)
 	}
 

@@ -14,8 +14,8 @@ const (
 const (
 	appPartitionSizeMB                   = 64
 	dataPartitionSizeMB                  = 128
-	rootfsPartitionSizeRaspberryPiZeroMB = 900
-	rootfsPartitionSizeRadxaZero3MB      = 1300
+	rootfsPartitionSizeRaspberryPiZeroMB = 600
+	rootfsPartitionSizeRadxaZero3MB      = 900
 
 	DISABLE_UNMOUNTS = false // set to true to disable unmounts for debugging
 )

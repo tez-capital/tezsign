@@ -5,6 +5,7 @@ RUN apt-get update && \
     fusefat \
     fuse2fs \
     fuse3 \
+    rsync \
     xz-utils \
     e2fsprogs \
     wget \

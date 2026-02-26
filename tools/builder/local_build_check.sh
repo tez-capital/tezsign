@@ -9,7 +9,11 @@ Usage:
     [--container-tag <docker-tag>] \
     [--skip-build] \
     [--no-dev-fallback] \
-    [--sudo <auto|always|never>]
+    [--sudo <auto|always|never>] \
+    [--raspberry_pi] \
+    [--radxa_zero|--radxa_zero3] \
+    [--prod] \
+    [--dev]
 
 Description:
   Replays the GitHub Actions "build-gadget" matrix locally.
@@ -22,6 +26,14 @@ Description:
   If *_dev.img files are missing, the script falls back to the matching
   non-dev source image by default, so the dev matrix rows can still run.
   Generated archives are written to: <imgs-dir>/archives
+
+Examples:
+  tools/builder/local_build_check.sh --raspberry_pi --prod
+  tools/builder/local_build_check.sh --raspberry_pi --dev
+  tools/builder/local_build_check.sh --raspberry_pi
+  tools/builder/local_build_check.sh --radxa_zero --prod
+  tools/builder/local_build_check.sh --radxa_zero --dev
+  tools/builder/local_build_check.sh --radxa_zero
 EOF
 }
 
@@ -42,6 +54,10 @@ CONTAINER_TAG="tezsign/builder:local"
 SKIP_BUILD="false"
 ALLOW_DEV_FALLBACK="true"
 SUDO_MODE="auto"
+SELECT_RASPBERRY_PI="false"
+SELECT_RADXA_ZERO3="false"
+SELECT_PROD="false"
+SELECT_DEV="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -64,6 +80,22 @@ while [[ $# -gt 0 ]]; do
     --sudo)
       SUDO_MODE="$2"
       shift 2
+      ;;
+    --raspberry_pi)
+      SELECT_RASPBERRY_PI="true"
+      shift 1
+      ;;
+    --radxa_zero|--radxa_zero3)
+      SELECT_RADXA_ZERO3="true"
+      shift 1
+      ;;
+    --prod)
+      SELECT_PROD="true"
+      shift 1
+      ;;
+    --dev)
+      SELECT_DEV="true"
+      shift 1
       ;;
     -h|--help)
       usage
@@ -203,6 +235,11 @@ run_matrix_row() {
 }
 
 main() {
+  local run_raspberry_pi="false"
+  local run_radxa_zero3="false"
+  local run_prod="false"
+  local run_dev="false"
+
   cd "$REPO_ROOT"
 
   if [[ "$SKIP_BUILD" != "true" ]]; then
@@ -211,10 +248,34 @@ main() {
     echo "===> Skipping build steps (--skip-build)"
   fi
 
-  run_matrix_row "raspberry_pi" "raspberry_pi" "prod"
-  run_matrix_row "raspberry_pi" "raspberry_pi_dev" "dev"
-  run_matrix_row "radxa_zero3" "radxa_zero3" "prod"
-  run_matrix_row "radxa_zero3" "radxa_zero3_dev" "dev"
+  if [[ "$SELECT_RASPBERRY_PI" == "true" || "$SELECT_RADXA_ZERO3" == "true" ]]; then
+    [[ "$SELECT_RASPBERRY_PI" == "true" ]] && run_raspberry_pi="true"
+    [[ "$SELECT_RADXA_ZERO3" == "true" ]] && run_radxa_zero3="true"
+  else
+    run_raspberry_pi="true"
+    run_radxa_zero3="true"
+  fi
+
+  if [[ "$SELECT_PROD" == "true" || "$SELECT_DEV" == "true" ]]; then
+    [[ "$SELECT_PROD" == "true" ]] && run_prod="true"
+    [[ "$SELECT_DEV" == "true" ]] && run_dev="true"
+  else
+    run_prod="true"
+    run_dev="true"
+  fi
+
+  if [[ "$run_raspberry_pi" == "true" && "$run_prod" == "true" ]]; then
+    run_matrix_row "raspberry_pi" "raspberry_pi" "prod"
+  fi
+  if [[ "$run_raspberry_pi" == "true" && "$run_dev" == "true" ]]; then
+    run_matrix_row "raspberry_pi" "raspberry_pi_dev" "dev"
+  fi
+  if [[ "$run_radxa_zero3" == "true" && "$run_prod" == "true" ]]; then
+    run_matrix_row "radxa_zero3" "radxa_zero3" "prod"
+  fi
+  if [[ "$run_radxa_zero3" == "true" && "$run_dev" == "true" ]]; then
+    run_matrix_row "radxa_zero3" "radxa_zero3_dev" "dev"
+  fi
 
   echo
   echo "===> Local build-gadget matrix completed."
