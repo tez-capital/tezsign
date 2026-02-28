@@ -1,6 +1,6 @@
 module github.com/tez-capital/tezsign
 
-go 1.25.1
+go 1.26.0
 
 require (
 	github.com/mr-tron/base58 v1.2.0

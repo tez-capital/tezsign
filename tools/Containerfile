@@ -1,10 +1,11 @@
-FROM golang:1.25.3-trixie
+FROM golang:1.26-trixie
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     fusefat \
     fuse2fs \
     fuse3 \
+    rsync \
     xz-utils \
     e2fsprogs \
     wget \

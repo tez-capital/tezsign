@@ -12,5 +12,8 @@ grep -v '^\s*#' /tmp/overlay/packages_to_purge.txt | \
 
 sudo apt autoremove --assume-yes
 sudo apt install initramfs-tools --assume-yes # restore initramfs-tools-bin if it was removed
+sudo apt clean
+sudo rm -rf /var/lib/apt/lists/*
+sudo rm -rf /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*
 
 touch /root/.no_rootfs_resize

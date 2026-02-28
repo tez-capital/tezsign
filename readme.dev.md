@@ -67,3 +67,24 @@ Once you are finished with your changes, the easiest way to return the device to
 ```bash
 sudo reboot
 ```
+
+
+### local_build_check.sh
+
+Run the same matrix used by the GitHub `build-gadget` job against local source images:
+
+```sh
+tools/builder/local_build_check.sh
+```
+
+The script expects source images in `./imgs` and produces:
+
+- `./imgs/archives/raspberry_pi.img.xz`
+- `./imgs/archives/raspberry_pi.dev.img.xz`
+- `./imgs/archives/radxa_zero3.img.xz`
+- `./imgs/archives/radxa_zero3.dev.img.xz`
+
+Temporary builder workspace is created in `./imgs/.tezsign_image_builder`.
+
+If `raspberry_pi_dev.img` or `radxa_zero3_dev.img` are missing, it falls back to
+`raspberry_pi.img` / `radxa_zero3.img` for those dev rows.

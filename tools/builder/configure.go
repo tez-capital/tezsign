@@ -301,6 +301,48 @@ func setupModules(rootFsPath, fileName string, modules []string, logger *slog.Lo
 	return os.WriteFile(modulesLoadPath, []byte(strings.Join(modules, "\n")), 0644)
 }
 
+func pruneRootfsUnusedFiles(rootfs string, logger *slog.Logger) error {
+	for _, pattern := range ArmbianRootFsPruneGlobs {
+		matches, err := filepath.Glob(path.Join(rootfs, pattern))
+		if err != nil {
+			return fmt.Errorf("invalid prune glob %q: %w", pattern, err)
+		}
+		for _, matchedPath := range matches {
+			if err := os.RemoveAll(matchedPath); err != nil {
+				return fmt.Errorf("failed to prune path %s: %w", matchedPath, err)
+			}
+		}
+	}
+
+	localeDir := path.Join(rootfs, "usr", "share", "locale")
+	entries, err := os.ReadDir(localeDir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("failed to read locale directory %s: %w", localeDir, err)
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		name := entry.Name()
+		if ArmbianRootFsKeepLocales[name] || strings.HasPrefix(name, "en_") {
+			continue
+		}
+
+		target := path.Join(localeDir, name)
+		if err := os.RemoveAll(target); err != nil {
+			return fmt.Errorf("failed to prune locale %s: %w", target, err)
+		}
+	}
+
+	logger.Info("Pruned unused rootfs files")
+	return nil
+}
+
 func patchRootPartition(imgPath string, rootPartition part.Partition, flavour imageFlavour, logger *slog.Logger) error {
 	unmount, err := fuse2fs_mount(imgPath, path.Join(workDir, "rootfs"), int(rootPartition.GetStart()), logger)
 	if err != nil {
@@ -421,6 +463,10 @@ func patchRootPartition(imgPath string, rootPartition part.Partition, flavour im
 
 	if err = setupModules(rootfs, "tezsign-usb.conf", PreloadTezsignUsbModules, logger); err != nil {
 		return fmt.Errorf("failed to setup tezsign-usb modules: %w", err)
+	}
+
+	if err = pruneRootfsUnusedFiles(rootfs, logger); err != nil {
+		return fmt.Errorf("failed to prune root filesystem content: %w", err)
 	}
 
 	return nil

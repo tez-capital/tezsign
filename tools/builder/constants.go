@@ -12,16 +12,18 @@ const (
 )
 
 const (
-	appPartitionSizeMB  = 64
-	dataPartitionSizeMB = 128
-
-	workDir  = "/tmp/tezsign_image_builder"
-	tmpImage = workDir + "/image.img"
+	appPartitionSizeMB                   = 64
+	dataPartitionSizeMB                  = 128
+	rootfsPartitionSizeRaspberryPiZeroMB = 700
+	rootfsPartitionSizeRadxaZero3MB      = 1000
 
 	DISABLE_UNMOUNTS = false // set to true to disable unmounts for debugging
 )
 
 var (
+	workDir  = "/tmp/tezsign_image_builder"
+	tmpImage = workDir + "/image.img"
+
 	// alignPartitionsTo = uint64(3 * 1024 * 1024 * 1024) // Default to 2GB alignment
 
 	PreloadTezsignUsbModules = []string{
@@ -37,11 +39,36 @@ var (
 		"/etc/profile.d/armbian-check-first-login.sh",
 		"/etc/systemd/system/getty@.service.d",        // remove custom getty settings - mainly auto-login
 		"/etc/systemd/system/serial-getty@.service.d", // remove custom getty settings - mainly auto-login
+		"/usr/lib/firmware/qcom",                      // qcom firmware
 	}
 
 	ArmbianRootFsCreateDirs = []string{
 		"/app",
 		"/data",
+	}
+
+	// Relative globs under the mounted rootfs that are safe to prune for a headless appliance image.
+	ArmbianRootFsPruneGlobs = []string{
+		"usr/share/doc/*",
+		"usr/share/man/*",
+		"usr/share/info/*",
+		"usr/share/lintian/*",
+		"usr/share/bug/*",
+		"var/cache/man/*",
+		"var/cache/apt/*.bin",
+		"var/cache/apt/archives/*.deb",
+		"var/cache/apt/archives/partial/*",
+		"var/lib/apt/lists/*",
+		"var/log/*.log",
+		"var/log/journal/*",
+	}
+
+	ArmbianRootFsKeepLocales = map[string]bool{
+		"C":       true,
+		"C.UTF-8": true,
+		"en":      true,
+		"en_US":   true,
+		"en_GB":   true,
 	}
 
 	ArmbianInjectFiles = map[string]string{

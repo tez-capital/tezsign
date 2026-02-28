@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/x/term"
@@ -11,6 +13,31 @@ import (
 
 func isTTY(f *os.File) bool {
 	return term.IsTerminal(f.Fd())
+}
+
+func resolveImageID(sourcePath string, destPath string, logger *slog.Logger) string {
+	imageID := strings.TrimSpace(os.Getenv("IMAGE_ID"))
+	if imageID != "" {
+		return imageID
+	}
+
+	// Fallback for manual runs without IMAGE_ID: infer from filenames when possible.
+	candidates := []string{
+		strings.ToLower(filepath.Base(sourcePath)),
+		strings.ToLower(filepath.Base(destPath)),
+	}
+	for _, candidate := range candidates {
+		switch {
+		case strings.Contains(candidate, "raspberry_pi"):
+			logger.Warn("IMAGE_ID is not set; inferred from filename", slog.String("image_id", "raspberry_pi"))
+			return "raspberry_pi"
+		case strings.Contains(candidate, "radxa_zero3") || strings.Contains(candidate, "radxa-zero3"):
+			logger.Warn("IMAGE_ID is not set; inferred from filename", slog.String("image_id", "radxa_zero3"))
+			return "radxa_zero3"
+		}
+	}
+
+	return ""
 }
 
 func main() {
@@ -59,6 +86,11 @@ func main() {
 	}
 
 	logger := slog.Default()
+	imageID := resolveImageID(sourcePath, destPath, logger)
+
+	// Keep temporary build artifacts alongside the destination image directory.
+	workDir = filepath.Join(filepath.Dir(destPath), ".tezsign_image_builder")
+	tmpImage = filepath.Join(workDir, "image.img")
 
 	logger.Info("Creating working directory", slog.String("path", workDir))
 	err := os.MkdirAll(workDir, 0755)
@@ -75,7 +107,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = PartitionImage(tmpImage, flavour, logger); err != nil {
+	if err = PartitionImage(tmpImage, flavour, imageID, logger); err != nil {
 		logger.Error("Failed to partition image", slog.Any("error", err))
 		os.Exit(1)
 	}

@@ -2,9 +2,11 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/ulikunitz/xz"
@@ -29,6 +31,23 @@ func copyFile(src, dst string) error {
 }
 
 func copyFileToXZ(src, dst string) error {
+	if _, err := exec.LookPath("xz"); err == nil {
+		destFile, err := os.Create(dst)
+		if err != nil {
+			return err
+		}
+		defer destFile.Close()
+
+		var stderr bytes.Buffer
+		cmd := exec.Command("xz", "-z", "-9e", "-T1", "-c", src)
+		cmd.Stdout = destFile
+		cmd.Stderr = &stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("xz command failed: %w: %s", err, strings.TrimSpace(stderr.String()))
+		}
+		return nil
+	}
+
 	sourceFile, err := os.Open(src)
 	if err != nil {
 		return err
