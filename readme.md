@@ -17,7 +17,7 @@
 | **Companion App** | Required | Optional | No |
 | **Physical Pinlock** | ❌ No (App-based) | 👆 Yes (Touch Screen) | 👆 Yes (Touch Screen) |
 | **Auto Unlock on Boot**| ✅ **Yes** (Optional) | ❌ No | ❌ No |
-| **Compressed Image Size** | 💾 ~200MB | 📦 7MB | 🐘 1.95GB |
+| **Compressed Image Size** | 💾 ~140MB | 📦 7MB | 🐘 1.95GB |
 | **License** | 📜 SSPL | ⛔ UNLICENSED | 📜 MIT |
 
 > **Note:** The comparison table above is accurate as of December 2, 2025.
