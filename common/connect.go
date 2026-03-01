@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/gousb"
 	"github.com/tez-capital/tezsign/broker"
@@ -25,7 +26,9 @@ type ConnectParams struct {
 	// Optional broker handler for incoming gadget->host requests (host is usually client-only).
 	// If nil, a default handler that returns (nil, nil) is used.
 	BrokerHandler broker.Handler
-	Channel       Channel
+	// Optional write-idle keep-alive interval. Zero disables keep-alive.
+	KeepAlive time.Duration
+	Channel   Channel
 }
 
 type Channel int
@@ -41,11 +44,12 @@ type Session struct {
 	Dev *gousb.Device
 	Cfg *gousb.Config
 
-	Intf    *gousb.Interface
-	InEp    *gousb.InEndpoint
-	OutEp   *gousb.OutEndpoint
-	Broker  *broker.Broker
-	Channel Channel
+	Intf      *gousb.Interface
+	InEp      *gousb.InEndpoint
+	OutEp     *gousb.OutEndpoint
+	Broker    *broker.Broker
+	Channel   Channel
+	KeepAlive time.Duration
 
 	Serial string
 	Log    *slog.Logger
@@ -370,10 +374,14 @@ func Connect(p ConnectParams) (*Session, error) {
 	}
 
 	// Build broker
-	br := broker.New(inEp, newLibusbWriter(outEp),
+	brokerOpts := []broker.Option{
 		broker.WithLogger(l.With("component", "broker", "chan", map[Channel]string{ChanSign: "sign", ChanMgmt: "mgmt"}[p.Channel])),
 		broker.WithHandler(p.BrokerHandler),
-	)
+	}
+	if p.KeepAlive > 0 {
+		brokerOpts = append(brokerOpts, broker.WithKeepAlive(p.KeepAlive))
+	}
+	br := broker.New(inEp, newLibusbWriter(outEp), brokerOpts...)
 
 	l.Debug("using device", slog.String("serial", chosenSerial))
 
@@ -382,11 +390,12 @@ func Connect(p ConnectParams) (*Session, error) {
 		Dev: chosen,
 		Cfg: cfg,
 
-		Intf:    openIntf,
-		InEp:    inEp,
-		OutEp:   outEp,
-		Broker:  br,
-		Channel: p.Channel,
+		Intf:      openIntf,
+		InEp:      inEp,
+		OutEp:     outEp,
+		Broker:    br,
+		Channel:   p.Channel,
+		KeepAlive: p.KeepAlive,
 
 		Serial: chosenSerial,
 		Log:    l,

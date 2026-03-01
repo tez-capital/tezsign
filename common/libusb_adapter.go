@@ -6,11 +6,6 @@ import (
 	"github.com/google/gousb"
 )
 
-type result struct {
-	n   int
-	err error
-}
-
 type libusbWriter struct {
 	ep         *gousb.OutEndpoint
 	packetSize int

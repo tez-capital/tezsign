@@ -89,9 +89,10 @@ func runWatchdog(ctx context.Context, curRef *atomic.Value, initial *HostContext
 
 			// Try indefinitely until success or context cancelled
 			params := common.ConnectParams{
-				Serial:  oldSess.Serial,
-				Logger:  initial.Log,
-				Channel: oldSess.Channel,
+				Serial:    oldSess.Serial,
+				Logger:    initial.Log,
+				Channel:   oldSess.Channel,
+				KeepAlive: oldSess.KeepAlive,
 			}
 			oldSess.Close()
 
@@ -131,6 +132,13 @@ func withSession(channel common.Channel) func(ctx context.Context, cmd *cli.Comm
 		h := &HostContext{Log: l}
 
 		devSerial := cmd.String("device")
+		keepAlive := time.Duration(0)
+		if cmd.Name == "run" && cmd.IsSet("keep-alive") {
+			keepAlive = cmd.Duration("keep-alive")
+			if keepAlive < minKeepAlive {
+				return ctx, fmt.Errorf("--keep-alive must be at least %s", minKeepAlive)
+			}
+		}
 
 		l.Debug("opening USB", slog.String("cmd", cmd.Name), slog.String("channel", map[common.Channel]string{
 			common.ChanSign: "sign",
@@ -138,9 +146,10 @@ func withSession(channel common.Channel) func(ctx context.Context, cmd *cli.Comm
 		}[channel]))
 
 		sess, err := common.Connect(common.ConnectParams{
-			Serial:  devSerial,
-			Logger:  l,
-			Channel: channel,
+			Serial:    devSerial,
+			Logger:    l,
+			Channel:   channel,
+			KeepAlive: keepAlive,
 		})
 		if err != nil {
 			return ctx, err

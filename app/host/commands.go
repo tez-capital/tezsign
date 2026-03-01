@@ -158,6 +158,10 @@ func cmdRun() *cli.Command {
 				Name:  "listen",
 				Usage: fmt.Sprintf("HTTP listen address (default port %s). If empty, no server is started.", defaultPort),
 			},
+			&cli.DurationFlag{
+				Name:  "keep-alive",
+				Usage: fmt.Sprintf("Idle write keep-alive interval (example: 100ms, minimum: %s). Disabled when unset.", minKeepAlive),
+			},
 			&cli.BoolFlag{
 				Name:  "no-retry",
 				Usage: "Exit with non-zero on disconnect instead of auto-retrying",
