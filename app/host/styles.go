@@ -345,10 +345,15 @@ func (m *keyPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case " ":
 			if len(m.rows) > 0 {
-				m.selected[m.cursor] = !m.selected[m.cursor]
+				if m.selected[m.cursor] {
+					// Keep map sparse: selected keys exist, deselected keys are removed.
+					delete(m.selected, m.cursor)
+				} else {
+					m.selected[m.cursor] = true
+				}
 			}
 		case "a": // toggle all
-			all := len(m.selected) == len(m.rows)
+			all := allRowsSelected(m.rows, m.selected)
 			m.selected = make(map[int]bool)
 			if !all {
 				for i := range m.rows {
@@ -394,11 +399,35 @@ func runKeyPicker(b *broker.Broker) (selectedIDs []string, aborted bool, err err
 	if pm.aborted {
 		return nil, true, nil
 	}
-	for idx := range pm.selected {
-		selectedIDs = append(selectedIDs, pm.rows[idx].ID)
-	}
+	selectedIDs = selectedRowIDs(pm.rows, pm.selected)
 	sort.Strings(selectedIDs)
 	return selectedIDs, false, nil
+}
+
+func allRowsSelected(rows []statusRow, selected map[int]bool) bool {
+	if len(rows) == 0 {
+		return false
+	}
+	for i := range rows {
+		if !selected[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func selectedRowIDs(rows []statusRow, selected map[int]bool) []string {
+	out := make([]string, 0, len(selected))
+	for idx, isSelected := range selected {
+		if !isSelected {
+			continue
+		}
+		if idx < 0 || idx >= len(rows) {
+			continue
+		}
+		out = append(out, rows[idx].ID)
+	}
+	return out
 }
 
 func statusRows(statuses []*signerpb.KeyStatus) []statusRow {
