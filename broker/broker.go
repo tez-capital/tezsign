@@ -77,7 +77,9 @@ type Broker struct {
 	capacity int
 	logger   *slog.Logger
 	// keepAlive emits a keep-alive frame when no writes happened for this interval.
-	keepAlive time.Duration
+	keepAlive      time.Duration
+	keepAliveTimer *time.Timer
+	keepAliveTick  <-chan time.Time
 
 	ctx            context.Context
 	cancel         context.CancelFunc
@@ -103,12 +105,13 @@ func New(r ReadContexter, w WriteContexter, opts ...Option) *Broker {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	b := &Broker{
-		r:         r,
-		w:         w,
-		capacity:  o.bufSize,
-		logger:    o.logger,
-		handler:   o.handler,
-		keepAlive: o.keepAlive,
+		r:             r,
+		w:             w,
+		capacity:      o.bufSize,
+		logger:        o.logger,
+		handler:       o.handler,
+		keepAlive:     o.keepAlive,
+		keepAliveTick: nil,
 
 		writeChan:           make(chan []byte, 32),
 		processingRequests:  NewRequestMap[struct{}](),
@@ -117,6 +120,10 @@ func New(r ReadContexter, w WriteContexter, opts ...Option) *Broker {
 		stash:  newStash(o.bufSize, o.logger),
 		ctx:    ctx,
 		cancel: cancel,
+	}
+	if b.keepAlive > 0 {
+		b.keepAliveTimer = time.NewTimer(b.keepAlive)
+		b.keepAliveTick = b.keepAliveTimer.C
 	}
 
 	b.readLoopDone = b.readLoop()
@@ -165,8 +172,6 @@ func (b *Broker) writerLoop() <-chan struct{} {
 	go func() {
 		defer close(done)
 		var (
-			keepAliveTimer *time.Timer
-			keepAliveTick  <-chan time.Time
 			keepAliveFrame []byte
 		)
 
@@ -177,22 +182,7 @@ func (b *Broker) writerLoop() <-chan struct{} {
 				b.logger.Error("failed to create keep-alive frame", slog.Any("err", err))
 				return
 			}
-
-			keepAliveTimer = time.NewTimer(b.keepAlive)
-			keepAliveTick = keepAliveTimer.C
 		}
-
-		defer func() {
-			if keepAliveTimer == nil {
-				return
-			}
-			if !keepAliveTimer.Stop() {
-				select {
-				case <-keepAliveTimer.C:
-				default:
-				}
-			}
-		}()
 
 		for {
 			var (
@@ -201,15 +191,9 @@ func (b *Broker) writerLoop() <-chan struct{} {
 			)
 			select {
 			case data = <-b.writeChan:
-			case <-keepAliveTick:
-				// A real frame may have arrived concurrently with timer expiration.
-				// Prefer that over sending keep-alive.
-				select {
-				case data = <-b.writeChan:
-				default:
-					data = keepAliveFrame
-					isKeepAlive = true
-				}
+			case <-b.keepAliveTick:
+				data = keepAliveFrame
+				isKeepAlive = true
 			case <-b.ctx.Done():
 				return
 			}
@@ -223,15 +207,7 @@ func (b *Broker) writerLoop() <-chan struct{} {
 					return
 				}
 
-				if keepAliveTimer != nil {
-					if !keepAliveTimer.Stop() {
-						select {
-						case <-keepAliveTimer.C:
-						default:
-						}
-					}
-					keepAliveTimer.Reset(b.keepAlive)
-				}
+				b.resetKeepAliveTimerAfterSuccessfulWrite()
 
 				if isKeepAlive {
 					b.logger.Log(context.Background(), -100, "tx keep-alive")
@@ -356,6 +332,34 @@ func (b *Broker) Stop() {
 	b.cancel()
 	<-b.readLoopDone
 	<-b.writerLoopDone
+	b.stopKeepAliveTimer()
+}
+
+func (b *Broker) resetKeepAliveTimerAfterSuccessfulWrite() {
+	if b.keepAliveTimer == nil {
+		return
+	}
+	if !b.keepAliveTimer.Stop() {
+		select {
+		case <-b.keepAliveTimer.C:
+		default:
+		}
+	}
+	b.keepAliveTimer.Reset(b.keepAlive)
+}
+
+func (b *Broker) stopKeepAliveTimer() {
+	if b.keepAliveTimer == nil {
+		return
+	}
+	if !b.keepAliveTimer.Stop() {
+		select {
+		case <-b.keepAliveTimer.C:
+		default:
+		}
+	}
+	b.keepAliveTimer = nil
+	b.keepAliveTick = nil
 }
 
 func isRetryable(err error) bool {
