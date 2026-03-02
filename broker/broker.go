@@ -171,15 +171,10 @@ func (b *Broker) writerLoop() <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		var keepAliveFrame []byte
-
-		if b.keepAlive > 0 {
-			var err error
-			keepAliveFrame, err = newMessage(payloadTypeKeepAlive, [16]byte{}, nil)
-			if err != nil {
-				b.logger.Error("failed to create keep-alive frame", slog.Any("err", err))
-				return
-			}
+		keepAliveFrame, err := newMessage(payloadTypeKeepAlive, [16]byte{}, nil)
+		if err != nil {
+			b.logger.Error("failed to create keep-alive frame", slog.Any("err", err))
+			return
 		}
 
 		for {
