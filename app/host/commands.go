@@ -352,6 +352,14 @@ func cmdNewKeys() *cli.Command {
 			h := mustHost(ctx)
 			b := h.Session.Broker
 
+			info, err := common.ReqInitInfo(b)
+			if err != nil {
+				return fmt.Errorf("new keys: query init state: %w", err)
+			}
+			if !info.GetMasterPresent() {
+				return fmt.Errorf("device is not initialized; run `init` before `new`")
+			}
+
 			pass, err := obtainPassword("Master passphrase", false)
 			if err != nil {
 				return fmt.Errorf("new keys: %w", err)
