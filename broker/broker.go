@@ -186,6 +186,7 @@ func (b *Broker) writerLoop() <-chan struct{} {
 						return
 					}
 				}
+				b.logger.Log(context.Background(), -100, "keep-alive tick")
 				data = keepAliveFrame
 			case <-b.ctx.Done():
 				return
