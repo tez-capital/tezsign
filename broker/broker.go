@@ -171,29 +171,22 @@ func (b *Broker) writerLoop() <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		var (
-			keepAliveFrame []byte
-		)
-
-		if b.keepAlive > 0 {
-			var err error
-			keepAliveFrame, err = newMessage(payloadTypeKeepAlive, [16]byte{}, nil)
-			if err != nil {
-				b.logger.Error("failed to create keep-alive frame", slog.Any("err", err))
-				return
-			}
-		}
+		var keepAliveFrame []byte
 
 		for {
-			var (
-				data        []byte
-				isKeepAlive bool
-			)
+			var data []byte
 			select {
 			case data = <-b.writeChan:
 			case <-b.keepAliveTick:
+				if keepAliveFrame == nil {
+					var err error
+					keepAliveFrame, err = newMessage(payloadTypeKeepAlive, [16]byte{}, nil)
+					if err != nil {
+						b.logger.Error("failed to create keep-alive frame", slog.Any("err", err))
+						return
+					}
+				}
 				data = keepAliveFrame
-				isKeepAlive = true
 			case <-b.ctx.Done():
 				return
 			}
@@ -208,10 +201,6 @@ func (b *Broker) writerLoop() <-chan struct{} {
 				}
 
 				b.resetKeepAliveTimerAfterSuccessfulWrite()
-
-				if isKeepAlive {
-					b.logger.Log(context.Background(), -100, "tx keep-alive")
-				}
 				break
 			}
 		}
