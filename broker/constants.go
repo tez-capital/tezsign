@@ -37,4 +37,5 @@ const (
 	payloadTypeResponse      payloadType = 0x02
 	payloadTypeAcceptRequest payloadType = 0x03
 	payloadTypeRetry         payloadType = 0x04
+	payloadTypeKeepAlive     payloadType = 0x05
 )

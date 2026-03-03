@@ -17,7 +17,7 @@
 | **Companion App** | Required | Optional | No |
 | **Physical Pinlock** | ❌ No (App-based) | 👆 Yes (Touch Screen) | 👆 Yes (Touch Screen) |
 | **Auto Unlock on Boot**| ✅ **Yes** (Optional) | ❌ No | ❌ No |
-| **Compressed Image Size** | 💾 ~200MB | 📦 7MB | 🐘 1.95GB |
+| **Compressed Image Size** | 💾 ~140MB | 📦 7MB | 🐘 1.95GB |
 | **License** | 📜 SSPL | ⛔ UNLICENSED | 📜 MIT |
 
 > **Note:** The comparison table above is accurate as of December 2, 2025.
@@ -132,6 +132,11 @@ Assuming your host app is available in your path as `tezsign`:
     ```bash
     ./tezsign run --listen 127.0.0.1:20090
     ```
+    If you want periodic host-to-gadget keep-alive frames when no writes happen, add `--keep-alive`:
+    ```bash
+    ./tezsign run --listen 127.0.0.1:20090 --keep-alive=100ms
+    ```
+    > **Note:** Keep-alive is optional and the minimum accepted value is `10ms`.
     At this point, `tezsign` is ready for baking. Make sure your baker points to it when the registered keys activate, and it will sign baking operations automatically.
 
 ---

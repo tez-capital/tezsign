@@ -88,3 +88,30 @@ Temporary builder workspace is created in `./imgs/.tezsign_image_builder`.
 
 If `raspberry_pi_dev.img` or `radxa_zero3_dev.img` are missing, it falls back to
 `raspberry_pi.img` / `radxa_zero3.img` for those dev rows.
+
+#### usage help
+```sh
+tools/builder/local_build_check.sh --help
+```
+
+#### board only
+```sh
+tools/builder/local_build_check.sh --raspberry_pi
+```
+```sh
+tools/builder/local_build_check.sh --radxa_zero
+```
+
+#### board + flavour
+```sh
+tools/builder/local_build_check.sh --raspberry_pi --prod
+```
+```sh
+tools/builder/local_build_check.sh --raspberry_pi --dev
+```
+```sh
+tools/builder/local_build_check.sh --radxa_zero --prod
+```
+```sh
+tools/builder/local_build_check.sh --radxa_zero --dev
+```

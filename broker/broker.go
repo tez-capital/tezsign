@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/tez-capital/tezsign/logging"
 )
@@ -24,9 +25,10 @@ type WriteContexter interface {
 type Handler func(ctx context.Context, payload []byte) ([]byte, error)
 
 type options struct {
-	bufSize int
-	handler Handler
-	logger  *slog.Logger
+	bufSize   int
+	handler   Handler
+	logger    *slog.Logger
+	keepAlive time.Duration
 }
 
 type Option func(*options)
@@ -51,6 +53,14 @@ func WithLogger(l *slog.Logger) Option {
 	}
 }
 
+func WithKeepAlive(d time.Duration) Option {
+	return func(o *options) {
+		if d > 0 {
+			o.keepAlive = d
+		}
+	}
+}
+
 type Broker struct {
 	r ReadContexter
 	w WriteContexter
@@ -66,6 +76,10 @@ type Broker struct {
 
 	capacity int
 	logger   *slog.Logger
+	// keepAlive emits a keep-alive frame when no writes happened for this interval.
+	keepAlive      time.Duration
+	keepAliveTimer *time.Timer
+	keepAliveTick  <-chan time.Time
 
 	ctx            context.Context
 	cancel         context.CancelFunc
@@ -91,11 +105,13 @@ func New(r ReadContexter, w WriteContexter, opts ...Option) *Broker {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	b := &Broker{
-		r:        r,
-		w:        w,
-		capacity: o.bufSize,
-		logger:   o.logger,
-		handler:  o.handler,
+		r:             r,
+		w:             w,
+		capacity:      o.bufSize,
+		logger:        o.logger,
+		handler:       o.handler,
+		keepAlive:     o.keepAlive,
+		keepAliveTick: nil,
 
 		writeChan:           make(chan []byte, 32),
 		processingRequests:  NewRequestMap[struct{}](),
@@ -104,6 +120,10 @@ func New(r ReadContexter, w WriteContexter, opts ...Option) *Broker {
 		stash:  newStash(o.bufSize, o.logger),
 		ctx:    ctx,
 		cancel: cancel,
+	}
+	if b.keepAlive > 0 {
+		b.keepAliveTimer = time.NewTimer(b.keepAlive)
+		b.keepAliveTick = b.keepAliveTimer.C
 	}
 
 	b.readLoopDone = b.readLoop()
@@ -151,10 +171,19 @@ func (b *Broker) writerLoop() <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
+		keepAliveFrame, err := newMessage(payloadTypeKeepAlive, [16]byte{}, nil)
+		if err != nil {
+			b.logger.Error("failed to create keep-alive frame", slog.Any("err", err))
+			return
+		}
+
 		for {
 			var data []byte
 			select {
 			case data = <-b.writeChan:
+			case <-b.keepAliveTick:
+				b.logger.Log(context.Background(), -100, "keep-alive tick")
+				data = keepAliveFrame
 			case <-b.ctx.Done():
 				return
 			}
@@ -167,6 +196,8 @@ func (b *Broker) writerLoop() <-chan struct{} {
 					b.logger.Error("write loop exit", slog.Any("err", err))
 					return
 				}
+
+				b.resetKeepAliveTimerAfterSuccessfulWrite()
 				break
 			}
 		}
@@ -253,6 +284,8 @@ func (b *Broker) processStash() {
 				for reqID, reqPayload := range allUnconfirmed {
 					b.writeFrame(b.ctx, payloadTypeRequest, reqID, reqPayload)
 				}
+			case payloadTypeKeepAlive:
+				b.logger.Log(context.Background(), -100, "rx keep-alive")
 			default:
 				b.logger.Warn("unknown type; resync", slog.String("type", fmt.Sprintf("%02x", payloadType)), slog.String("id", fmt.Sprintf("%x", id)))
 			}
@@ -285,6 +318,34 @@ func (b *Broker) Stop() {
 	b.cancel()
 	<-b.readLoopDone
 	<-b.writerLoopDone
+	b.stopKeepAliveTimer()
+}
+
+func (b *Broker) resetKeepAliveTimerAfterSuccessfulWrite() {
+	if b.keepAliveTimer == nil {
+		return
+	}
+	if !b.keepAliveTimer.Stop() {
+		select {
+		case <-b.keepAliveTimer.C:
+		default:
+		}
+	}
+	b.keepAliveTimer.Reset(b.keepAlive)
+}
+
+func (b *Broker) stopKeepAliveTimer() {
+	if b.keepAliveTimer == nil {
+		return
+	}
+	if !b.keepAliveTimer.Stop() {
+		select {
+		case <-b.keepAliveTimer.C:
+		default:
+		}
+	}
+	b.keepAliveTimer = nil
+	b.keepAliveTick = nil
 }
 
 func isRetryable(err error) bool {

@@ -158,6 +158,10 @@ func cmdRun() *cli.Command {
 				Name:  "listen",
 				Usage: fmt.Sprintf("HTTP listen address (default port %s). If empty, no server is started.", defaultPort),
 			},
+			&cli.DurationFlag{
+				Name:  "keep-alive",
+				Usage: fmt.Sprintf("Idle write keep-alive interval (example: 100ms, minimum: %s). Disabled when unset.", minKeepAlive),
+			},
 			&cli.BoolFlag{
 				Name:  "no-retry",
 				Usage: "Exit with non-zero on disconnect instead of auto-retrying",
@@ -347,6 +351,14 @@ func cmdNewKeys() *cli.Command {
 		Action: func(ctx context.Context, c *cli.Command) error {
 			h := mustHost(ctx)
 			b := h.Session.Broker
+
+			info, err := common.ReqInitInfo(b)
+			if err != nil {
+				return fmt.Errorf("new keys: query init state: %w", err)
+			}
+			if !info.GetMasterPresent() {
+				return fmt.Errorf("device is not initialized; run `init` before `new`")
+			}
 
 			pass, err := obtainPassword("Master passphrase", false)
 			if err != nil {
