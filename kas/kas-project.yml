@@ -80,4 +80,4 @@ local_conf_header:
     DISTRO_FEATURES:append = " usrmerge"
     
     # Silent boot, load systemd from RAM disk, force DWC2 driver load
-    CMDLINE = "root=/dev/ram0 init=/lib/systemd/systemd quiet modules-load=dwc2"
+    CMDLINE = "root=/dev/ram0 init=/lib/systemd/systemd quiet modules-load=dwc2 pcie_aspm=off mmc_core.use_spi_crc=0"

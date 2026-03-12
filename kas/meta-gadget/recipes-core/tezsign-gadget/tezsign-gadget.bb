@@ -11,7 +11,9 @@ SRC_URI = " \
     file://generate-serial.service \
     file://setup-gadget-dev.sh \
     file://setup-gadget-dev.service \
+    file://tezsign.service \
     file://cpu-tuning.conf \
+    file://99-io-performance.rules \
 "
 
 # Inherit systemd and user creation
@@ -22,7 +24,7 @@ FILES:${PN}-ecm = "${bindir}/setup-gadget-dev.sh ${systemd_system_unitdir}/setup
 
 # Systemd configuration
 SYSTEMD_PACKAGES = "${PN} ${PN}-ecm"
-SYSTEMD_SERVICE:${PN} = "setup-gadget.service attach-gadget.service generate-serial.service"
+SYSTEMD_SERVICE:${PN} = "setup-gadget.service attach-gadget.service tezsign.service generate-serial.service"
 SYSTEMD_SERVICE:${PN}-ecm = "setup-gadget-dev.service"
 SYSTEMD_AUTO_ENABLE = "enable"
 
@@ -50,4 +52,8 @@ do_install() {
     # Install the CPU tuning tmpfiles configuration
     install -d ${D}${sysconfdir}/tmpfiles.d
     install -m 0644 ${WORKDIR}/cpu-tuning.conf ${D}${sysconfdir}/tmpfiles.d/
+
+    # Install the UDEV rules
+    install -d ${D}${sysconfdir}/udev/rules.d
+    install -m 0644 ${WORKDIR}/99-io-performance.rules ${D}${sysconfdir}/udev/rules.d/
 }
