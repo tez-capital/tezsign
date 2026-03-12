@@ -1,0 +1,12 @@
+[Unit]
+Description=Generate Tezsign Hardware Serial ID
+RequiresMountsFor=/app
+Before=setup-gadget.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/generate-serial-number.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

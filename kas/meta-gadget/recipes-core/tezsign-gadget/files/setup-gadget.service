@@ -1,0 +1,15 @@
+[Unit]
+Description=Enable tezsign FFS (create gadget, link functions, mount /dev/ffs/tezsign)
+# Ensure the SD card partitions are mounted BEFORE we run
+RequiresMountsFor=/app /data
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/setup-gadget.sh
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=Enable USB ECM Gadget Network (usb0)
+After=setup-gadget.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/setup-gadget-dev.sh
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

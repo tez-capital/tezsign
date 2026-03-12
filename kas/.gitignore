@@ -1,0 +1,11 @@
+build/*
+!build/.gitkeep
+deploy
+!deploy/.gitkeep
+downloads
+!downloads/.gitkeep
+release
+!release/.gitkeep
+
+meta-raspberrypi
+poky
