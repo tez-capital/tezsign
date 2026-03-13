@@ -11,6 +11,8 @@ SRC_URI = " \
     file://generate-serial.service \
     file://setup-gadget-dev.sh \
     file://setup-gadget-dev.service \
+    file://attach-gadget-dev.sh \
+    file://attach-gadget-dev.service \
     file://tezsign.service \
     file://cpu-tuning.conf \
     file://99-io-performance.rules \
@@ -20,7 +22,13 @@ SRC_URI = " \
 inherit systemd useradd
 
 PACKAGES =+ "${PN}-ecm"
-FILES:${PN}-ecm = "${bindir}/setup-gadget-dev.sh ${systemd_system_unitdir}/setup-gadget-dev.service"
+FILES:${PN}-ecm = " \
+    ${bindir}/setup-gadget-dev.sh \
+    ${systemd_system_unitdir}/setup-gadget-dev.service \
+    ${bindir}/attach-gadget-dev.sh \
+    ${systemd_system_unitdir}/attach-gadget-dev.service \
+"
+
 
 # Systemd configuration
 SYSTEMD_PACKAGES = "${PN} ${PN}-ecm"
@@ -40,6 +48,7 @@ do_install() {
     install -m 0755 ${WORKDIR}/attach-gadget.sh ${D}${bindir}/attach-gadget.sh
     install -m 0755 ${WORKDIR}/generate-serial-number.sh ${D}${bindir}/generate-serial-number.sh
     install -m 0755 ${WORKDIR}/setup-gadget-dev.sh ${D}${bindir}/
+    install -m 0755 ${WORKDIR}/attach-gadget-dev.sh ${D}${bindir}/
 
     # Install the systemd service file
     install -d ${D}${systemd_system_unitdir}
@@ -48,6 +57,7 @@ do_install() {
     install -m 0644 ${WORKDIR}/tezsign.service ${D}${systemd_system_unitdir}/
     install -m 0644 ${WORKDIR}/generate-serial.service ${D}${systemd_system_unitdir}/
     install -m 0644 ${WORKDIR}/setup-gadget-dev.service ${D}${systemd_system_unitdir}/
+    install -m 0644 ${WORKDIR}/attach-gadget-dev.service ${D}${systemd_system_unitdir}/
 
     # Install the CPU tuning tmpfiles configuration
     install -d ${D}${sysconfdir}/tmpfiles.d

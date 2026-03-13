@@ -5,6 +5,8 @@ set -eu
 
 readonly APP_ID_FILE="/app/tezsign_id"
 
+exec > /dev/console 2>&1 
+
 sanitize_serial() {
     # Extract only alphanumeric, convert to uppercase, pad to 12 if needed, truncate to 32
     local s
@@ -20,35 +22,38 @@ sanitize_serial() {
 
 compute_serial_raw() {
     if [ -r /etc/machine-id ]; then
-        head -c 32 /etc/machine-id | tr -d '\n'
+        # Use tr to drop newlines, cut for length
+        tr -d '\n' < /etc/machine-id | cut -c1-32
         return 0
     fi
     if [ -r /sys/firmware/devicetree/base/serial-number ]; then
-        tr -d '\0\n' < /sys/firmware/devicetree/base/serial-number | head -c 32
+        tr -d '\0\n' < /sys/firmware/devicetree/base/serial-number | cut -c1-32
         return 0
     fi
     if grep -qi '^Serial' /proc/cpuinfo 2>/dev/null; then
-        awk -F': *' '/^Serial/{s=$2} END{gsub(/^[ \t]+|[ \t]+$/, "", s); print s}' /proc/cpuinfo | head -c 32
+        awk -F': *' '/^Serial/{s=$2} END{gsub(/^[ \t]+|[ \t]+$/, "", s); print s}' /proc/cpuinfo | cut -c1-32
         return 0
     fi
     if [ -r /sys/block/mmcblk0/device/cid ]; then
-        head -c 32 /sys/block/mmcblk0/device/cid
+        cut -c1-32 /sys/block/mmcblk0/device/cid
         return 0
     fi
-    # Last resort: random bytes using od
-    head -c 16 /dev/urandom | od -An -v -t x1 | tr -d ' \n' | cut -c1-32
+    
+    dd if=/dev/urandom bs=1 count=16 2>/dev/null | od -An -v -t x1 | tr -d ' \n' | cut -c1-32
 }
 
 persist_serial() {
     local serial="$1"
     umask 077
     # Note: /app is already mounted RW by systemd in our setup
-    local tmp
-    tmp=$(mktemp "${APP_ID_FILE}.XXXXXX")
+    local tmp="/tmp/tezsign_id.tmp.$$"
     printf '%s' "$serial" > "$tmp"
     chmod 400 "$tmp" 2>/dev/null || true
     chown root:root "$tmp" 2>/dev/null || true
+
+    mount -o remount,rw /app
     mv -f "$tmp" "$APP_ID_FILE"
+    mount -o remount,ro /app
 }
 
 main() {
@@ -60,7 +65,8 @@ main() {
     raw=$(compute_serial_raw || true)
     
     if [ -z "$raw" ]; then
-        raw=$(head -c 16 /dev/urandom | od -An -v -t x1 | tr -d ' \n' | cut -c1-32)
+        # Also fix the failsafe random generator here!
+        raw=$(dd if=/dev/urandom bs=1 count=16 2>/dev/null | od -An -v -t x1 | tr -d ' \n' | cut -c1-32)
     fi
     
     local serial
@@ -68,5 +74,32 @@ main() {
     persist_serial "$serial"
     printf '%s\n' "$serial"
 }
+
+# --- DIAGNOSTIC BLOCK ---
+echo "========================================"
+echo "          FILESYSTEM DIAGNOSTICS        "
+echo "========================================"
+
+echo ">>> 1. CURRENT FSTAB:"
+cat /etc/fstab
+
+echo -e "\n>>> 2. KERNEL PARTITIONS:"
+cat /proc/partitions
+
+echo -e "\n>>> 3. BLKID (Checking for 'app' and 'data' labels):"
+blkid || echo "blkid command failed"
+
+echo -e "\n>>> 4. UDEV SYMLINKS:"
+ls -l /dev/disk/by-label/ || echo "WARNING: udev has not generated label symlinks!"
+
+echo -e "\n>>> 5. MANUAL MOUNT ATTEMPT:"
+# If systemd failed to mount it, let's try to do it manually with maximum verbosity
+mount -v -t ext4 LABEL=app /app || {
+    echo "MANUAL MOUNT FAILED! Dumping recent kernel logs:"
+    dmesg | tail -n 15
+}
+
+echo "========================================"
+sleep 10 # Pause for a moment so you can read it if it scrolls fast!
 
 main "$@"

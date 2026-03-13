@@ -5,6 +5,6 @@ do_install:append() {
 
     # Append the SD card partitions to the fstab
     # (Assuming p2 is App and p3 is Data based on your WKS file)
-    echo "LABEL=app /app   ext4  ro,exec,noatime,nofail,data=journal  0   2" >> ${D}${sysconfdir}/fstab
+    echo "LABEL=app /app   ext4  ro,exec,noatime,nofail  0   2" >> ${D}${sysconfdir}/fstab
     echo "LABEL=data  /data  ext4  rw,noatime,nofail,data=journal   0   2" >> ${D}${sysconfdir}/fstab
 }

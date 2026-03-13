@@ -6,16 +6,21 @@ header:
 local_conf_header:
   # This block overrides the strict security from the base file
   security_lockdown: |
-    IMAGE_INSTALL:append = " sudo bash tezsign-gadget-ecm"
-    # OVERRIDDEN FOR DEV MODE:
-    EXTRA_IMAGE_FEATURES:append = " ssh-server-openssh"
-    IMAGE_INSTALL:append = " sudo bash tezsign-gadget-ecm"
+    FINAL_IMAGE_NAME = "gadget-dev-os.img"
+
+    # 2. Strip the global locks from the base kas.yml
     IMAGE_INSTALL:remove = "wpa-supplicant networkmanager dropbear"
     hostname:pn-base-files = "tezsign-dev"
-    
+
+    # 3. INJECT THE DEV TOOLS (Strictly applied to this dev build only!)
+    PACKAGE_INSTALL:append:pn-core-image-minimal-initramfs = " openssh sudo bash tezsign-gadget-ecm"
+
+    # 4. Create the 'dev' user natively (Variables are perfectly legal here!)
     INHERIT += "extrausers"
-    EXTRA_USERS_PARAMS = "\
+    EXTRA_USERS_PARAMS:pn-core-image-minimal-initramfs = "\
         useradd -m -s /bin/bash dev; \
-        usermod -P tezsign dev; \
         usermod -aG sudo dev; \
     "
+    
+    # 5. Allow passwordless sudo for convenience in dev
+    EXTRA_OECONF:append:pn-sudo = " --with-passprompt=no"
