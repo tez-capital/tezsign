@@ -1,0 +1,72 @@
+header:
+  version: 14
+
+machine: raspberrypi0-2w-tezsign
+distro: minimal
+target: minimal-image
+
+repos:
+  poky:
+    url: git://git.yoctoproject.org/poky.git
+    branch: "scarthgap"
+    layers:
+      meta:
+      meta-poky:
+  meta-raspberrypi:
+    url: https://git.yoctoproject.org/meta-raspberrypi
+    branch: "scarthgap"
+  meta-tezsign:
+    path: meta-tezsign
+  meta-openembedded:
+    url: https://github.com/openembedded/meta-openembedded.git
+    branch: "scarthgap"
+    layers:
+      meta-oe: # This is where 'dash' lives
+  # meta-mainline:
+  #   url: https://gitlab.com/rootcommit/meta-mainline
+  #   branch: main
+
+
+local_conf_header:
+  tezsign-settings: |
+    TEZSIGN_DEV = "1"
+    TEZSIGN_DEBUG = "1"
+    VOLATILE_LOG_DIR = "no"
+
+  raspberrypi0-2w: |
+    EXTRA_IMAGE_FEATURES = "empty-root-password allow-empty-password allow-root-login"
+
+    RPI_EXTRA_CONFIG:append = "\ndtoverlay=dwc2,dr_mode=peripheral"
+    CMDLINE:append = " modules-load=dwc2,libcomposite"
+    CMDLINE:append = " systemd.log_target=console systemd.journald.forward_to_console=1 systemd.show_status=true"
+    CMDLINE:append = " video=HDMI-A-1:1920x1080@60e"
+    
+    # 2. Blacklist the Broadcom Wi-Fi and Bluetooth drivers from loading
+    CMDLINE:append = " modprobe.blacklist=brcmfmac,brcmutil,hci_uart,btbcm,bluetooth"
+
+  disable_wireless: |
+    MACHINE_FEATURES:remove = "wifi bluetooth"
+
+  # initramfs_setup: |
+  #   # Define the image type required for initramfs
+  #   IMAGE_FSTYPES = "cpio.gz"
+    
+  #   # Bundle the initramfs into the kernel image (zImage/uImage)
+  #   INITRAMFS_IMAGE = "core-image-base"
+  #   INITRAMFS_IMAGE_BUNDLE = "1"
+
+  #   CMDLINE_ROOTFS = "root=/dev/ram0 rw rootfstype=ramfs rootwait rdinit=/init"
+
+  speed_and_cache: |
+    # Tell Git to only download the latest snapshot, not the 20-year history
+    BB_GIT_SHALLOW = "1"
+    
+    # Use Yocto's high-speed source mirrors before trying the main servers
+    SOURCE_MIRROR_URL = "http://downloads.yoctoproject.org/mirror/sources/"
+    INHERIT += "own-mirrors"
+    
+    # Save downloads outside the build folder so they survive a clean rebuild
+    DL_DIR = "${TOPDIR}/../downloads"
+
+  licenses: |
+    LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"

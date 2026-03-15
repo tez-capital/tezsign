@@ -15,6 +15,7 @@ setup_permanent_ramdisk() {
 
     install -d ${IMAGE_ROOTFS}/app
     install -d ${IMAGE_ROOTFS}/data
+    install -d ${IMAGE_ROOTFS}/sys/kernel/config
     
     echo "configfs  /sys/kernel/config  configfs  defaults  0  0" >> ${IMAGE_ROOTFS}${sysconfdir}/fstab
     echo "LABEL=app /app   ext4  ro,exec,noatime,nofail  0   2" >> ${IMAGE_ROOTFS}${sysconfdir}/fstab

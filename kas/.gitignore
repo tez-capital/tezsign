@@ -9,3 +9,5 @@ release
 
 meta-raspberrypi
 poky
+meta-openembedded
+meta-mainline

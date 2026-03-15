@@ -1,6 +1,6 @@
 header:
   version: 14
-machine: raspberrypi0-2w-64
+machine: raspberrypi0-2w-mainline
 distro: poky
 
 # WIC will build this standard target to generate the SD card layout,
@@ -21,24 +21,18 @@ repos:
     path: "meta-gadget"
 
 local_conf_header:
+  # libc-settings: |
+  #   TCLIBC = "musl"
+  bootloader_deps: |
+    EXTRA_IMAGEDEPENDS += "virtual/bootloader"
+
   lts_bundling_config: |
     DEPLOY_DIR_IMAGE = "${TOPDIR}/../deploy"
-    PREFERRED_PROVIDER_virtual/kernel = "linux-raspberrypi"
-
-    # 2. THE NEW INITRAMFS STRATEGY (Standalone Sideloading)
-    INITRAMFS_IMAGE = "core-image-minimal-initramfs"
-    INITRAMFS_FSTYPES = "cpio.gz"
-    
-    # Force Yocto to copy the standalone RAM disk file into the SD card's boot partition
-    IMAGE_BOOT_FILES:append = " ${INITRAMFS_IMAGE}-${MACHINE}.${INITRAMFS_FSTYPES};initramfs.cpio.gz"
+    PREFERRED_PROVIDER_virtual/kernel = "linux-mainline"
+    PREFERRED_VERSION_linux-mainline = "6.18"
 
     # 3. Loop Breakers
-    MACHINE_ESSENTIAL_EXTRA_RDEPENDS = ""
-    MACHINE_EXTRA_RDEPENDS = ""
-    IMAGE_INSTALL:remove = "kernel-image kernel-modules kernel-devicetree"
-
-    # 4. RPi OTG Hardware Support AND the new RAM disk loader
-    RPI_EXTRA_CONFIG:append = "\ndtoverlay=dwc2,dr_mode=otg\ninitramfs initramfs.cpio.gz followkernel\n"
+    # IMAGE_INSTALL:remove = "kernel-image kernel-modules kernel-devicetree"
 
     # 5. Output Configuration
     IMAGE_FSTYPES = "wic wic.bmap"
@@ -56,27 +50,50 @@ local_conf_header:
     DL_DIR = "${TOPDIR}/../downloads"
 
   initramfs_additions: |
-    # Inject our custom recipe and the libcomposite USB kernel module into the RAM disk
-    PACKAGE_INSTALL:append:pn-core-image-minimal-initramfs = " tezsign-gadget kernel-module-libcomposite"
+    # Inject our custom recipe into the RAM disk
+    # Note: DWC2 and libcomposite are built-in (=y) via stripped.cfg, no module packages needed
+    # PACKAGE_INSTALL:append:pn-core-image-minimal-initramfs = " tezsign-gadget"
 
-  security_lockdown: |
-    # 1. Disable all root and user login passwords (air-gapped lockdown)
-    # This replaces the 'passwd -l' logic in your first-boot script
-    EXTRA_IMAGE_FEATURES:remove = "debug-tweaks"
+  # security_lockdown: |
+  #   # 1. Disable all root and user login passwords (air-gapped lockdown)
+  #   # This replaces the 'passwd -l' logic in your first-boot script
+  #   EXTRA_IMAGE_FEATURES:remove = "debug-tweaks"
     
-    # 2. Never install network managers, SSH, or sudo
-    # This ensures systemd-networkd, wpa_supplicant, and ssh are never built into the image
-    IMAGE_INSTALL:remove = "wpa-supplicant openssh dropbear sudo networkmanager"
+  #   # 2. Never install network managers, SSH, or sudo
+  #   # This ensures systemd-networkd, wpa_supplicant, and ssh are never built into the image
+  #   IMAGE_INSTALL:remove = "wpa-supplicant openssh dropbear sudo networkmanager"
     
-    # 3. Set a static hostname directly in the build
-    hostname:pn-base-files = "tezsign"
+  #   # 3. Set a static hostname directly in the build
+  #   hostname:pn-base-files = "tezsign"
 
   systemd_setup: |
-    # The modern Yocto way to completely replace sysvinit with pure systemd
+    # 1. Core Systemd & Usrmerge
     INIT_MANAGER = "systemd"
-    
-    # We still must include 'usrmerge' because modern systemd demands a merged /usr
     DISTRO_FEATURES:append = " usrmerge"
     
-    # Silent boot, load systemd from RAM disk, force DWC2 driver load
-    CMDLINE = "rdinit=/sbin/init modules-load=dwc2 pcie_aspm=off mmc_core.use_spi_crc=0 console=serial0,115200 console=tty1 earlyprintk systemd.log_level=debug systemd.journald.forward_to_console=1"
+    # 2. Bundle the Initramfs into the Kernel
+    # This creates a single 'Image' file containing your RAM disk
+    # INITRAMFS_IMAGE = "tezsign-ramdisk" 
+    # INITRAMFS_FSTYPES = "cpio.gz"
+    # INITRAMFS_IMAGE_BUNDLE = "1"
+    INITRAMFS_IMAGE = ""
+    INITRAMFS_IMAGE_BUNDLE = "0"
+
+    # Force Yocto to copy the standalone RAM disk file into the SD card's boot partition
+    # IMAGE_BOOT_FILES:append = " tezsign-ramdisk-${MACHINE}.cpio.gz;initramfs.cpio.gz"
+    
+    # 3. Correcting the RPi Command Line
+    # By default, meta-raspberrypi puts 'root=/dev/mmcblk0p2' in CMDLINE.
+    # We must override CMDLINE_ROOTFS to point to the RAM disk instead.
+    # CMDLINE_ROOTFS = "root=/dev/ram0 rw rootfstype=ramfs rootwait rdinit=/bin/sh"
+    # CMDLINE_ROOTFS = "root=/dev/mmcblk0p2 rootfstype=ext4 rootwait rw"
+
+    # 4. Debugging & Silence
+    # Adding earlycon/earlyprintk is vital when the screen is black.
+    # 'console=tty1' sends output to HDMI; 'console=ttyAMA0' sends to Serial pins.
+    CMDLINE:append = " console=ttyAMA0,115200 console=tty1 earlyprintk"
+
+    # 5. Ensure Kernel supports the bundle
+    # These are usually on by default, but required for your setup:
+    # CONFIG_BLK_DEV_RAM=y
+    # CONFIG_BLK_DEV_INITRD=y

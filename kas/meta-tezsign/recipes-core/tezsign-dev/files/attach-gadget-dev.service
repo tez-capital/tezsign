@@ -1,0 +1,19 @@
+[Unit]
+Description=Configure USB ECM Gadget Network IP (usb0)
+Requires=setup-gadget-dev.service
+After=setup-gadget-dev.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/attach-gadget-dev
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console
+
+Restart=on-failure
+RestartSec=5s
+
+ExecStop=/sbin/ip addr flush dev usb0
+
+[Install]
+WantedBy=multi-user.target

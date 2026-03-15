@@ -1,2 +1,2 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
-SRC_URI += "file://ultra-stripped.cfg"
+SRC_URI += "file://defconfig"

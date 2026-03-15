@@ -1,28 +1,22 @@
-# tezsign-image.bb
 SUMMARY = "Tezsign Gadget Flashable SD Card Image"
 LICENSE = "MIT"
 
-# Change from 'image' to 'core-image' to get basic system directories
-inherit core-image
+inherit image
 
-# Put your actual OS packages here! 
-# Notice we added the kernel packages back in so the SD card can boot.
-IMAGE_INSTALL = " \
-    packagegroup-core-boot \
-    os-release \
-    tezsign-gadget \
-    kernel-image \
-    kernel-modules \
-    kernel-devicetree \
-"
+# Strip the dummy root filesystem completely empty
+IMAGE_INSTALL = ""
+IMAGE_LINGUAS = ""
+IMAGE_FEATURES = ""
+PACKAGE_INSTALL = ""
 
 # Assign the WIC configuration
 IMAGE_FSTYPES = "wic wic.bmap"
 WKS_FILE = "gadget.wks"
 
-# Remove the dependency on the RAM disk
-# do_image_wic[depends] += "virtual/kernel:do_deploy tezsign-ramdisk:do_image_complete" 
+# Tell WIC to wait for the real RAM OS to finish compiling
+do_image_wic[depends] += "virtual/kernel:do_deploy tezsign-ramdisk:do_image_complete"
 
+# Integrate your custom rename script directly into the recipe
 FINAL_IMAGE_NAME ?= "gadget-os.img"
 
 IMAGE_POSTPROCESS_COMMAND += "extract_final_image;"

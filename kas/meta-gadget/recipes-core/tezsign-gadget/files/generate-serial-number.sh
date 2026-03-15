@@ -6,6 +6,7 @@ set -eu
 readonly APP_ID_FILE="/app/tezsign_id"
 
 exec > /dev/console 2>&1 
+echo INITIALIZING TEZSIGN
 
 sanitize_serial() {
     # Extract only alphanumeric, convert to uppercase, pad to 12 if needed, truncate to 32
@@ -80,24 +81,10 @@ echo "========================================"
 echo "          FILESYSTEM DIAGNOSTICS        "
 echo "========================================"
 
-echo ">>> 1. CURRENT FSTAB:"
-cat /etc/fstab
-
-echo -e "\n>>> 2. KERNEL PARTITIONS:"
-cat /proc/partitions
-
-echo -e "\n>>> 3. BLKID (Checking for 'app' and 'data' labels):"
-blkid || echo "blkid command failed"
-
-echo -e "\n>>> 4. UDEV SYMLINKS:"
-ls -l /dev/disk/by-label/ || echo "WARNING: udev has not generated label symlinks!"
-
-echo -e "\n>>> 5. MANUAL MOUNT ATTEMPT:"
-# If systemd failed to mount it, let's try to do it manually with maximum verbosity
-mount -v -t ext4 LABEL=app /app || {
-    echo "MANUAL MOUNT FAILED! Dumping recent kernel logs:"
-    dmesg | tail -n 15
-}
+echo ">>> 1. Config:"
+ls -la /sys/kernel/config/
+echo ">>> 1. UDC:"
+ls -la /sys/class/udc/
 
 echo "========================================"
 sleep 10 # Pause for a moment so you can read it if it scrolls fast!
