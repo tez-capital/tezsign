@@ -23,7 +23,10 @@ SYSTEMD_AUTO_ENABLE = "enable"
 # Create the users and groups your script requires
 USERADD_PACKAGES = "${PN}"
 GROUPADD_PARAM:${PN} = "-r dev_manager; -r registrar; -r tezsign"
-USERADD_PARAM:${PN} = "-r -g registrar registrar; -r -g tezsign tezsign"
+USERADD_PARAM:${PN} = " \
+    -r -g registrar -G dev_manager registrar; \
+    -r -g tezsign -G dev_manager tezsign \
+"
 
 INHIBIT_PACKAGE_STRIP = "1"
 INHIBIT_PACKAGE_DEBUG_SPLIT = "1"
