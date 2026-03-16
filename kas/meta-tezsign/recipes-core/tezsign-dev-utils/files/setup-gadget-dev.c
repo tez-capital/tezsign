@@ -100,6 +100,31 @@ int main(int argc, char *argv[]) {
 
     if (setup_ecm_function() == 0) {
         printf("ECM setup completed successfully.\n");
+
+        // --- NEW: Safely generate Dropbear Host Keys ---
+        
+        // 1. Ensure the /etc/dropbear directory exists
+        struct stat st = {0};
+        if (stat("/etc/dropbear", &st) == -1) {
+            mkdir("/etc/dropbear", 0755);
+        }
+
+        // 2. Check for RSA key, generate if missing
+        if (access("/etc/dropbear/dropbear_rsa_host_key", F_OK) != 0) {
+            printf("Generating Dropbear RSA host key (this may take a moment)...\n");
+            // Redirecting output to /dev/null keeps your boot logs clean
+            system("dropbearkey -t rsa -f /etc/dropbear/dropbear_rsa_host_key > /dev/null 2>&1");
+        }
+
+        // 3. Check for Ed25519 key, generate if missing
+        if (access("/etc/dropbear/dropbear_ed25519_host_key", F_OK) != 0) {
+            printf("Generating Dropbear Ed25519 host key...\n");
+            system("dropbearkey -t ed25519 -f /etc/dropbear/dropbear_ed25519_host_key > /dev/null 2>&1");
+        }
+        
+        printf("Dropbear keys are ready.\n");
+        // -----------------------------------------------
+
         return EXIT_SUCCESS;
     }
 }

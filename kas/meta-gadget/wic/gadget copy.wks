@@ -1,9 +1,0 @@
-# gadget.wks
-# Partition 1: Boot (Contains firmware, kernel, and the cpio.gz RAM-disk)
-part /boot --source bootimg-partition --fstype=vfat --label boot --active --align 4096 --fixed-size 128M
-
-# Partition 2: App (Your 64MB request)
-part /app --fstype=ext4 --label app --align 4096 --fixed-size 64M
-
-# Partition 3: Data (Your 128MB request)
-part /data --fstype=ext4 --label data --align 4096 --fixed-size 128M --mkfs-extraopts="-O has_journal"

@@ -1,0 +1,14 @@
+header:
+  version: 14
+  includes:
+    - base.yml
+
+machine: raspberrypi4-tezsign
+
+local_conf_header:
+  release: |
+    TEZSIGN_RELEASE_NAME = "rpi4"
+
+  main: |
+    RPI_EXTRA_CONFIG:append = "\ndtoverlay=dwc2,dr_mode=peripheral"
+    CMDLINE:append = " modprobe.blacklist=brcmfmac,brcmutil,hci_uart,btbcm,bluetooth"

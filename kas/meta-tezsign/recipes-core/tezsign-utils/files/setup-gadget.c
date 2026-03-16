@@ -13,6 +13,7 @@
 
 #define GADGET_BASE "/sys/kernel/config/usb_gadget/g1"
 #define FFS_DIR     "/dev/ffs/tezsign"
+#define DATA_DIR    "/data/tezsign"
 
 // Utility to write to ConfigFS attributes
 int write_attr(const char *path, const char *fmt, ...) {
@@ -57,7 +58,7 @@ int main() {
     FILE *f;
 
     // Try to load existing serial
-    if ((f = fopen("/app/tezsign_id", "r")) || (f = fopen("/data/tezsign_id", "r"))) {
+    if (f = fopen("/app/tezsign_id", "r")) {
         if (fgets(serial, sizeof(serial), f)) {
             serial[strcspn(serial, "\n")] = 0;
         }
@@ -118,6 +119,25 @@ int main() {
     // chown registrar:registrar /dev/ffs/tezsign/ep0
     if (chown(FFS_DIR "/ep0", pwd_reg->pw_uid, grp_reg->gr_gid) != 0) {
         perror("Failed to set ownership on ep0");
+        return EXIT_FAILURE;
+    }
+
+    // Setup /data/tezsign directory
+    if (mkdir_p(DATA_DIR) != 0) {
+        fprintf(stderr, "Error: Failed to create %s\n", DATA_DIR);
+        return EXIT_FAILURE;
+    }
+
+    struct passwd *pwd_tezsign = getpwnam("tezsign");
+    struct group *grp_tezsign = getgrnam("tezsign");
+
+    if (!pwd_tezsign || !grp_tezsign) {
+        fprintf(stderr, "Error: Required user/group 'tezsign' missing from system.\n");
+        return EXIT_FAILURE;
+    }
+
+    if (chown(DATA_DIR, pwd_tezsign->pw_uid, grp_tezsign->gr_gid) != 0) {
+        perror("Failed to set ownership on " DATA_DIR);
         return EXIT_FAILURE;
     }
 

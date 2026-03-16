@@ -1,0 +1,19 @@
+[Unit]
+Description=Registers FFS gadget descriptors (writes to ep0)
+After=setup-gadget.service
+Requires=setup-gadget.service
+
+[Service]
+Type=simple
+User=registrar
+Group=registrar
+Environment="LOG_LEVEL=debug"
+ExecStart=/usr/bin/ffs_registrar
+RemainAfterExit=yes
+Restart=always
+RestartSec=1
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,5 @@
 SUMMARY = "Tezsign Dev"
-LICENSE = "MIT"
+LICENSE = "CLOSED"
 LIC_FILES_CHKSUM = "file://${COREBASE}/meta/files/common-licenses/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
 SRC_URI = " \
@@ -24,7 +24,7 @@ USERADD_PACKAGES = "${PN}"
 # 3. Define the user parameters. 
 # IMPORTANT: Yocto requires a hashed password, not plain text. 
 # See the instructions below on how to generate the hash for "tezsign".
-USERADD_PARAM:${PN} = "-m -d /home/dev -s /bin/sh -p '$6$NnguhG1R1YiWk3Ry$A0exAXlAp9PYALEKCSAEaQPIlxhorMjhNOMzhG/V9ceBov8aMArAQ1.zCTwk4XaAfArSWEImaOK4t04jG0YYH1' dev"
+USERADD_PARAM:${PN} = "-m -d /home/dev -s /bin/sh -p '\$6\$NnguhG1R1YiWk3Ry\$A0exAXlAp9PYALEKCSAEaQPIlxhorMjhNOMzhG/V9ceBov8aMArAQ1.zCTwk4XaAfArSWEImaOK4t04jG0YYH1' dev"
 
 do_install() {
      # Install your services

@@ -1,0 +1,12 @@
+header:
+  version: 14
+  includes:
+    - rpi4.yml
+
+local_conf_header:
+  release: |
+    TEZSIGN_RELEASE_NAME = "rpi4_dev"
+
+  settings: |
+    TEZSIGN_DEV = "1"
+    VOLATILE_LOG_DIR = "no"

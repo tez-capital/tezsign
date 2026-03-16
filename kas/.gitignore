@@ -8,6 +8,9 @@ release
 !release/.gitkeep
 
 meta-raspberrypi
-poky
 meta-openembedded
 meta-mainline
+poky
+
+meta-tezsign/recipes-core/images/files/tezsign
+meta-tezsign/recipes-core/tezsign-core/files/ffs_registrar

@@ -1,2 +1,0 @@
-# Force 'none' scheduler for the SD card to reduce kernel processing time
-ACTION=="add|change", KERNEL=="mmcblk*", ATTR{queue/scheduler}="none"
