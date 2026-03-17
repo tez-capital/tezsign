@@ -4,16 +4,41 @@ LICENSE = "CLOSED"
 inherit core-image
 
 IMAGE_INSTALL = " \
-    packagegroup-core-boot \
-    kernel-modules \
-    dash \
+    base-files \
+    base-passwd \
+    systemd \
+    toybox \
+    udev \
+    ${@bb.utils.contains('TEZSIGN_DEV', '1', 'netbase', '', d)} \
+    kernel-module-usb-f-fs \
+    kernel-module-libcomposite \
+    kernel-module-bcm2835-thermal \
+    ${@bb.utils.contains('TEZSIGN_DEV', '1', 'kernel-module-usb-f-ecm', '', d)} \
+    ${@bb.utils.contains('TEZSIGN_DEV', '1', 'kernel-module-u-ether', '', d)} \
     generate-serial-number \
     tezsign-core \
     tezsign-utils \
+    ${@bb.utils.contains('TEZSIGN_DEV', '1', 'dash', '', d)} \
     ${@bb.utils.contains('TEZSIGN_DEV', '1', 'tezsign-dev', '', d)} \
     ${@bb.utils.contains('TEZSIGN_DEV', '1', 'dropbear', '', d)} \
     ${CORE_IMAGE_EXTRA_INSTALL} \
 "
+
+# cleanup systemd
+PACKAGECONFIG:remove:pn-systemd = " \
+    ${@bb.utils.contains('TEZSIGN_DEV', '1', '', 'networkd', d)} \
+    ${@bb.utils.contains('TEZSIGN_DEV', '1', '', 'logind', d)} \
+    resolved \
+    timesyncd \
+    vconsole \
+    quotacheck \
+    hostnamed \
+    localed \
+    polkit \
+    manpages \
+"
+
+
 
 IMAGE_FEATURES = ""
 IMAGE_FEATURES += "${@'ssh-server-dropbear' if d.getVar('TEZSIGN_DEV') == '1' else ''}"
