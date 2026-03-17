@@ -102,22 +102,40 @@ int main() {
         }
     }
 
-    // Ownership & Permissions
-    struct passwd *pwd_reg = getpwnam("registrar");
-    struct group *grp_dm = getgrnam("dev_manager");
-    struct group *grp_reg = getgrnam("registrar");
+    uid_t reg_uid, tez_uid;
+    gid_t dm_gid, reg_gid, tez_gid;
 
-    if (!pwd_reg || !grp_dm || !grp_reg) {
-        fprintf(stderr, "Error: Required users/groups (registrar/dev_manager) missing from system.\n");
-        return EXIT_FAILURE;
-    }
+    struct passwd *pw;
+    struct group *gr;
+
+    // Get Registrar User & Group
+    if (!(pw = getpwnam("registrar"))) { fprintf(stderr, "Missing user: registrar\n"); return 1; }
+    reg_uid = pw->pw_uid;
+
+    if (!(gr = getgrnam("registrar"))) { fprintf(stderr, "Missing group: registrar\n"); return 1; }
+    reg_gid = gr->gr_gid;
+
+    // Get Dev Manager Group
+    if (!(gr = getgrnam("dev_manager"))) { fprintf(stderr, "Missing group: dev_manager\n"); return 1; }
+    dm_gid = gr->gr_gid;
+
+    // Get Tezsign User & Group
+    if (!(pw = getpwnam("tezsign"))) { fprintf(stderr, "Missing user: tezsign\n"); return 1; }
+    tez_uid = pw->pw_uid;
+
+    if (!(gr = getgrnam("tezsign"))) { fprintf(stderr, "Missing group: tezsign\n"); return 1; }
+    tez_gid = gr->gr_gid;
 
     // chmod 770 /dev/ffs/tezsign && chown :dev_manager
     chmod(FFS_DIR, 0770);
-    chown(FFS_DIR, -1, grp_dm->gr_gid);
+    if (chown(FFS_DIR, -1, dm_gid) != 0) {
+        fprintf(stderr, "Failed to set group on %s (GID: %u): %s\n", 
+                FFS_DIR, (unsigned int)dm_gid, strerror(errno));
+        return EXIT_FAILURE;
+    }
 
     // chown registrar:registrar /dev/ffs/tezsign/ep0
-    if (chown(FFS_DIR "/ep0", pwd_reg->pw_uid, grp_reg->gr_gid) != 0) {
+    if (chown(FFS_DIR "/ep0", reg_uid, reg_gid) != 0) {
         perror("Failed to set ownership on ep0");
         return EXIT_FAILURE;
     }
@@ -128,15 +146,7 @@ int main() {
         return EXIT_FAILURE;
     }
 
-    struct passwd *pwd_tezsign = getpwnam("tezsign");
-    struct group *grp_tezsign = getgrnam("tezsign");
-
-    if (!pwd_tezsign || !grp_tezsign) {
-        fprintf(stderr, "Error: Required user/group 'tezsign' missing from system.\n");
-        return EXIT_FAILURE;
-    }
-
-    if (chown(DATA_DIR, pwd_tezsign->pw_uid, grp_tezsign->gr_gid) != 0) {
+    if (chown(DATA_DIR, tez_uid, tez_gid) != 0) {
         perror("Failed to set ownership on " DATA_DIR);
         return EXIT_FAILURE;
     }
