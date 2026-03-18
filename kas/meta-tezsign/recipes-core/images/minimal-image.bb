@@ -24,22 +24,6 @@ IMAGE_INSTALL = " \
     ${CORE_IMAGE_EXTRA_INSTALL} \
 "
 
-# cleanup systemd
-PACKAGECONFIG:remove:pn-systemd = " \
-    ${@bb.utils.contains('TEZSIGN_DEV', '1', '', 'networkd', d)} \
-    ${@bb.utils.contains('TEZSIGN_DEV', '1', '', 'logind', d)} \
-    resolved \
-    timesyncd \
-    vconsole \
-    quotacheck \
-    hostnamed \
-    localed \
-    polkit \
-    manpages \
-"
-
-
-
 IMAGE_FEATURES = ""
 IMAGE_FEATURES += "${@'ssh-server-dropbear' if d.getVar('TEZSIGN_DEV') == '1' else ''}"
 
