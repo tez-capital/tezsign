@@ -619,6 +619,5 @@ func (fs *FileStore) writeKeyState(id string, dek []byte, tz4 string, ks *KeySta
 	copy(out[:12], nonce)
 	copy(out[12:], ct)
 
-	err = writeBytesAtomic(path, out, 0o600)
-	return err
+	return writeBytesAtomic(path, out, 0o600)
 }

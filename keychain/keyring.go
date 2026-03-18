@@ -435,14 +435,14 @@ func (kr *KeyRing) resolveKeyIDByTZ4(tz4 string) (string, error) {
 // SignAndUpdate validates key state + monotonic (level, round) and signs.
 // Monotonic rule: (level > lastLevel) OR (level == lastLevel && round > lastRound)
 func (kr *KeyRing) SignAndUpdate(tz4 string, raw []byte) (sig []byte, err error) {
-	knd, level, round, signBytes, err := DecodeAndValidateSignPayload(raw)
-	if err != nil {
-		return nil, ErrBadPayload
-	}
-
 	keyID, key := kr.getByTz4(tz4)
 	if key == nil {
 		return nil, ErrKeyNotFound
+	}
+
+	knd, level, round, signBytes, err := DecodeAndValidateSignPayload(raw)
+	if err != nil {
+		return nil, ErrBadPayload
 	}
 
 	key.mu.Lock()
@@ -461,7 +461,6 @@ func (kr *KeyRing) SignAndUpdate(tz4 string, raw []byte) (sig []byte, err error)
 	writeChan := make(chan error, 1)
 	go func() {
 		// Update in-memory
-
 		key.watermark[knd] = HighWatermark{level: level, round: round}
 		// Persist level.bin using DEK
 		if err := kr.store.writeKeyState(keyID, key.dek, key.tz4, key.GetKeyState()); err != nil {
@@ -482,7 +481,6 @@ func (kr *KeyRing) SignAndUpdate(tz4 string, raw []byte) (sig []byte, err error)
 
 	le, err := gcmDEK.Open(nil, key.dataNonce, key.encSecret, aad)
 	if err != nil {
-		key.mu.Unlock()
 		return nil, fmt.Errorf("corrupted key (secret)")
 	}
 	if len(le) != 32 {
