@@ -14,11 +14,11 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/tez-capital/tezsign/secure"
 	"golang.org/x/crypto/argon2"
-	"golang.org/x/sys/unix"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -852,7 +852,7 @@ func (fs *FileStore) prepareKeyStateFile(id string, dek []byte, tz4 string) (*os
 	}
 
 	path := fs.keyStatePath(id)
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|syscall.O_DSYNC, 0o600)
 	if err != nil {
 		return nil, nil, 0, missing, corrupted, err
 	}
@@ -914,14 +914,8 @@ func (fs *FileStore) writeKeyState(file *os.File, id string, dek []byte, tz4 str
 	if _, err := file.WriteAt(slot[:], 0); err != nil {
 		return err
 	}
-	if err := unix.Fdatasync(int(file.Fd())); err != nil {
-		return err
-	}
 
 	if _, err := file.WriteAt(slot[:], keyStateSlotSize); err != nil {
-		return err
-	}
-	if err := unix.Fdatasync(int(file.Fd())); err != nil {
 		return err
 	}
 	return nil
