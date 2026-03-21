@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -50,6 +51,8 @@ type gKey struct {
 	tz4      string
 
 	watermark map[SIGN_KIND]HighWatermark
+	stateFile *os.File
+	stateSeq  uint64
 
 	stateCorrupted bool
 }
@@ -246,8 +249,8 @@ func (kr *KeyRing) Unlock(id string, masterPassword []byte) error {
 		return fmt.Errorf("load state: bad DEK length %d", len(dek))
 	}
 
-	// 3) load level.bin (protobuf with map<int32, KindState>)
-	ks, missing, corrupted, err := kr.store.readKeyState(id, dek, tz4)
+	// 3) load + prepare the double-buffered level.bin for this unlocked key
+	stateFile, ks, stateSeq, missing, corrupted, err := kr.store.prepareKeyStateFile(id, dek, tz4)
 	if err != nil {
 		if errors.Is(err, ErrKeyStateCorrupted) {
 			key.stateCorrupted = true
@@ -262,11 +265,17 @@ func (kr *KeyRing) Unlock(id string, masterPassword []byte) error {
 	}
 
 	// 4) attach sensitive material only after successful state read
+	if key.stateFile != nil {
+		if err := key.stateFile.Close(); err != nil {
+			kr.log.Warn("close state file", "key", id, "err", err)
+		}
+	}
 	if key.dek != nil {
 		secure.MemoryWipe(key.dek)
 	}
 	key.dek, key.encSecret, key.dataNonce = dek, enc, nonce
 	key.blPubkey, key.tz4 = blPubkey, tz4
+	key.stateFile, key.stateSeq = stateFile, stateSeq
 
 	// 5) ensure watermark map exists and populate from disk (default zeros)
 	key.applyKeyStateLocked(ks)
@@ -292,6 +301,14 @@ func (kr *KeyRing) Lock(id string) error {
 	}
 	key.encSecret = nil
 	key.dataNonce = nil
+	if key.stateFile != nil {
+		if err := key.stateFile.Close(); err != nil {
+			key.mu.Unlock()
+			return err
+		}
+		key.stateFile = nil
+	}
+	key.stateSeq = 0
 	key.mu.Unlock()
 
 	kr.log.Info("key locked", "key", id)
@@ -317,6 +334,13 @@ func (kr *KeyRing) DeleteKey(wanted string) error {
 			}
 			key.encSecret = nil
 			key.dataNonce = nil
+			if key.stateFile != nil {
+				if err := key.stateFile.Close(); err != nil {
+					kr.log.Warn("close state file", "key", id, "err", err)
+				}
+				key.stateFile = nil
+			}
+			key.stateSeq = 0
 			key.mu.Unlock()
 		}
 	}
@@ -358,16 +382,17 @@ func (kr *KeyRing) Status() []*signerpb.KeyStatus {
 		// If key is present + unlocked, include watermarks
 		if key := kr.get(id); key != nil {
 			key.mu.Lock()
-			isUnlocked := (key.dek != nil && key.encSecret != nil && key.dataNonce != nil)
+			isUnlocked := (key.dek != nil && key.encSecret != nil && key.dataNonce != nil && key.stateFile != nil)
 
 			if isUnlocked {
-				if ksDisk, missingState, corrupted, err := kr.store.readKeyState(id, key.dek, key.tz4); err != nil {
+				if ksDisk, seqDisk, missingState, corrupted, err := kr.store.readKeyStateFromFile(key.stateFile, id, key.dek, key.tz4); err != nil {
 					if errors.Is(err, ErrKeyStateCorrupted) {
 						key.stateCorrupted = true
 					} else {
 						kr.log.Error("status: check state", "key", id, "err", err)
 					}
 				} else {
+					key.stateSeq = seqDisk
 					switch {
 					case corrupted:
 						key.stateCorrupted = true
@@ -375,6 +400,7 @@ func (kr *KeyRing) Status() []*signerpb.KeyStatus {
 					case missingState:
 						key.stateCorrupted = false
 						key.resetWatermarksLocked()
+						key.stateSeq = 0
 					default:
 						key.stateCorrupted = false
 						key.applyKeyStateLocked(ksDisk)
@@ -451,6 +477,9 @@ func (kr *KeyRing) SignAndUpdate(tz4 string, raw []byte) (sig []byte, err error)
 	if key.dek == nil || key.encSecret == nil || key.dataNonce == nil {
 		return nil, ErrKeyLocked
 	}
+	if key.stateFile == nil {
+		return nil, fmt.Errorf("state file is not open")
+	}
 
 	// Monotonicity
 	prev := key.watermark[knd]
@@ -458,28 +487,37 @@ func (kr *KeyRing) SignAndUpdate(tz4 string, raw []byte) (sig []byte, err error)
 		return nil, ErrStaleWatermark
 	}
 
+	nextState := key.GetKeyState()
+	nextState.ByKind[int32(knd)] = &KindState{
+		Level: level,
+		Round: round,
+	}
+	nextSeq := key.stateSeq + 1
+
+	stateFile := key.stateFile
+	dek := key.dek
+	stateTZ4 := key.tz4
+	blPubkey := key.blPubkey
+	dataNonce := key.dataNonce
+	encSecret := key.encSecret
+
 	writeChan := make(chan error, 1)
-	go func() {
-		// Update in-memory
-		key.watermark[knd] = HighWatermark{level: level, round: round}
-		// Persist level.bin using DEK
-		if err := kr.store.writeKeyState(keyID, key.dek, key.tz4, key.GetKeyState()); err != nil {
+	go func(snapshot *KeyState, seq uint64) {
+		if err := kr.store.writeKeyState(stateFile, keyID, dek, stateTZ4, snapshot, seq); err != nil {
 			writeChan <- fmt.Errorf("persist state: %w", err)
 			return
 		}
-
-		key.stateCorrupted = false
 		writeChan <- nil
-	}()
+	}(nextState, nextSeq)
 
 	// decrypt secret (32B LE) using in-memory DEK; authenticate with AAD
-	gcmDEK, err := newAESGCM(key.dek)
+	gcmDEK, err := newAESGCM(dek)
 	if err != nil {
 		return nil, err
 	}
-	aad := []byte("bl=" + key.blPubkey + "|tz4=" + key.tz4)
+	aad := []byte("bl=" + blPubkey + "|tz4=" + stateTZ4)
 
-	le, err := gcmDEK.Open(nil, key.dataNonce, key.encSecret, aad)
+	le, err := gcmDEK.Open(nil, dataNonce, encSecret, aad)
 	if err != nil {
 		return nil, fmt.Errorf("corrupted key (secret)")
 	}
@@ -503,6 +541,10 @@ func (kr *KeyRing) SignAndUpdate(tz4 string, raw []byte) (sig []byte, err error)
 		return nil, err
 	}
 
+	key.watermark[knd] = HighWatermark{level: level, round: round}
+	key.stateSeq = nextSeq
+	key.stateCorrupted = false
+
 	return sig, nil
 }
 
@@ -521,6 +563,9 @@ func (kr *KeyRing) SetLevel(id string, level uint64) error {
 	if key.dek == nil {
 		return fmt.Errorf("key locked")
 	}
+	if key.stateFile == nil {
+		return fmt.Errorf("state file is not open")
+	}
 
 	key.ensureWatermarksLocked()
 
@@ -531,14 +576,24 @@ func (kr *KeyRing) SetLevel(id string, level uint64) error {
 		}
 	}
 
+	nextState := key.GetKeyState()
+	for _, kind := range signKinds() {
+		nextState.ByKind[int32(kind)] = &KindState{
+			Level: level,
+			Round: 0,
+		}
+	}
+	nextSeq := key.stateSeq + 1
+
+	if err := kr.store.writeKeyState(key.stateFile, id, key.dek, key.tz4, nextState, nextSeq); err != nil {
+		return err
+	}
+
 	// Set level, reset round = 0
 	for _, k := range signKinds() {
 		key.watermark[k] = HighWatermark{level: level, round: 0}
 	}
-
-	if err := kr.store.writeKeyState(id, key.dek, key.tz4, key.GetKeyState()); err != nil {
-		return err
-	}
+	key.stateSeq = nextSeq
 	key.stateCorrupted = false
 	return nil
 }
