@@ -1,0 +1,12 @@
+header:
+  version: 14
+  includes:
+    - base.yml
+
+# Placeholder only. This needs a Radxa BSP repo/layer added to `base.yml`
+# before the machine can become active.
+machine: radxa-zero3-tezsign
+
+local_conf_header:
+  release: |
+    TEZSIGN_RELEASE_NAME = "radxa-zero3"

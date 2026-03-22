@@ -10,11 +10,6 @@ IMAGE_INSTALL = " \
     toybox \
     udev \
     ${@bb.utils.contains('TEZSIGN_DEV', '1', 'netbase', '', d)} \
-    kernel-module-usb-f-fs \
-    kernel-module-libcomposite \
-    kernel-module-bcm2835-thermal \
-    ${@bb.utils.contains('TEZSIGN_DEV', '1', 'kernel-module-usb-f-ecm', '', d)} \
-    ${@bb.utils.contains('TEZSIGN_DEV', '1', 'kernel-module-u-ether', '', d)} \
     generate-serial-number \
     tezsign-core \
     tezsign-utils \
