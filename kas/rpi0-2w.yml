@@ -10,5 +10,6 @@ local_conf_header:
     TEZSIGN_RELEASE_NAME = "rpi0-2w"
 
   main: |
-    RPI_EXTRA_CONFIG:append = "\ndtoverlay=dwc2,dr_mode=peripheral"
+    TEZSIGN_DWC2_DR_MODE = "peripheral"
+    RPI_EXTRA_CONFIG:append = "\ndtoverlay=dwc2,dr_mode=${TEZSIGN_DWC2_DR_MODE}"
     CMDLINE:append = " modprobe.blacklist=brcmfmac,brcmutil,hci_uart,btbcm,bluetooth"

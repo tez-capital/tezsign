@@ -4,12 +4,15 @@ SRC_URI = "git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git;bran
 SRCREV = "0ff41df1cb268fc69e703a08a57ee14ae967d0ca"
 
 # Keep the current Raspberry Pi family on a shared base defconfig, then layer
-# family and board-specific fragments on top. Radxa is scaffolded here but not
-# yet wired into the active KAS setup.
+# family and board-specific fragments on top. Dev builds append dedicated dev-only
+# fragments so production images can stay aggressively minimal.
 SRC_URI:append = " \
     file://rpi-common.cfg \
     file://rpi-zero2w.cfg \
     file://rpi4.cfg \
+    file://rpi-dev-common.cfg \
+    file://rpi-zero2w-dev.cfg \
+    file://rpi4-dev.cfg \
     file://radxa-zero3.cfg \
 "
 SRC_URI:append:raspberrypi0-2w-tezsign = " file://defconfig"
@@ -19,7 +22,9 @@ PV = "6.18"
 
 TEZSIGN_KERNEL_CONFIG_FRAGMENTS = ""
 TEZSIGN_KERNEL_CONFIG_FRAGMENTS:raspberrypi0-2w-tezsign = "rpi-common.cfg rpi-zero2w.cfg"
+TEZSIGN_KERNEL_CONFIG_FRAGMENTS:append:raspberrypi0-2w-tezsign = "${@' rpi-dev-common.cfg rpi-zero2w-dev.cfg' if d.getVar('TEZSIGN_DEV') == '1' else ''}"
 TEZSIGN_KERNEL_CONFIG_FRAGMENTS:raspberrypi4-tezsign = "rpi-common.cfg rpi4.cfg"
+TEZSIGN_KERNEL_CONFIG_FRAGMENTS:append:raspberrypi4-tezsign = "${@' rpi-dev-common.cfg rpi4-dev.cfg' if d.getVar('TEZSIGN_DEV') == '1' else ''}"
 TEZSIGN_KERNEL_CONFIG_FRAGMENTS:radxa-zero3-tezsign = "radxa-zero3.cfg"
 
 do_configure:append() {

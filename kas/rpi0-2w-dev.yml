@@ -9,4 +9,5 @@ local_conf_header:
 
   settings: |
     TEZSIGN_DEV = "1"
+    TEZSIGN_DWC2_DR_MODE = "otg"
     VOLATILE_LOG_DIR = "no"
