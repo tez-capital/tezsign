@@ -88,6 +88,12 @@ podman run --privileged --rm -it \
     shell -c "bitbake -c cleansstate rpi-config rpi-bootfiles minimal-image" rpi4-dev.yml
 ```
 
+If cleaning image does not work.... try deleting the cache. This will mean redownloading everything.
+```sh
+sudo rm -rf poky meta-raspberrypi meta-openembedded downloads build
+```
+
+
 Produced images are stored in `kas/release`.
 
 Expected release names:
