@@ -7,6 +7,7 @@ SRCREV = "0ff41df1cb268fc69e703a08a57ee14ae967d0ca"
 # family and board-specific fragments on top. Dev builds append dedicated dev-only
 # fragments so production images can stay aggressively minimal.
 SRC_URI:append = " \
+    file://0001-dwc2-gadget-skip-stop-xfr-on-active-dequeue.patch \
     file://tezsign-common.cfg \
     file://rpi-common.cfg \
     file://rpi-zero2w.cfg \
