@@ -11,6 +11,9 @@ ExecStart=/app/tezsign
 RemainAfterExit=yes
 Restart=on-failure
 RestartSec=2
+CPUSchedulingPolicy=fifo
+CPUSchedulingPriority=50
+LimitRTPRIO=99
 StandardOutput=null
 StandardError=null
 
