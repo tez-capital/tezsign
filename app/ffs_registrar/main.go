@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/tez-capital/tezsign/app/gadget/common"
+	"github.com/tez-capital/tezsign/logging"
 )
 
 func triggerSoftConnect(l *slog.Logger) error {
@@ -125,7 +126,7 @@ func drainEP0Events(ep0 *os.File, enabled chan<- bool, ready *atomic.Uint32, l *
 }
 
 func main() {
-	l := slog.Default()
+	l, _ := logging.NewFromEnv()
 
 	ep0, err := os.OpenFile(Ep0Path, os.O_RDWR, 0)
 	if err != nil {
