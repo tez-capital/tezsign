@@ -26,12 +26,21 @@ IMAGE_FSTYPES = "wic wic.bmap"
 
 # Post-process to move the image
 IMAGE_POSTPROCESS_COMMAND += "extract_final_image;"
+IMAGE_POSTPROCESS_COMMAND += "prune_prod_console_bits;"
 
 extract_final_image() {
     mkdir -p ${TOPDIR}/../release
     if [ -e ${IMGDEPLOYDIR}/${IMAGE_LINK_NAME}.wic ]; then
         cp ${IMGDEPLOYDIR}/${IMAGE_LINK_NAME}.wic ${TOPDIR}/../release/${TEZSIGN_RELEASE_NAME}.img
     fi
+}
+
+prune_prod_console_bits() {
+    if [ "${TEZSIGN_DEV}" = "1" ]; then
+        return
+    fi
+
+    rm -f ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/getty.target.wants/getty@tty1.service
 }
 
 do_image_wic[depends] += "app:do_deploy"
