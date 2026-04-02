@@ -7,7 +7,7 @@ export GOOS=linux
 export GOARCH=arm64
 export CGO_ENABLED=0
 
-go build -trimpath -ldflags="-s -w -buildid=" -o ./tools/builder/assets/ffs_registrar ./app/ffs_registrar
+go build -trimpath -buildvcs=false -ldflags="-s -w -buildid=" -o ./tools/builder/assets/ffs_registrar ./app/ffs_registrar
 ```
 
 For yocto you need it like this
@@ -17,5 +17,5 @@ export GOOS=linux
 export GOARCH=arm64
 export CGO_ENABLED=0
 
-go build -trimpath -ldflags="-s -w -buildid=" -o ./kas/meta-tezsign/recipes-core/tezsign-core/files/ffs_registrar ./app/ffs_registrar
+go build -trimpath -buildvcs=false -ldflags="-s -w -buildid=" -o ./kas/meta-tezsign/recipes-core/tezsign-core/files/ffs_registrar ./app/ffs_registrar
 ```

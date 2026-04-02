@@ -31,11 +31,14 @@ USERADD_PARAM:${PN} = " \
 
 INHIBIT_PACKAGE_STRIP = "1"
 INHIBIT_PACKAGE_DEBUG_SPLIT = "1"
+do_install[depends] += "virtual/${TARGET_PREFIX}binutils:do_populate_sysroot"
 
 do_install() {
     # Install the POSIX shell script
     install -d ${D}${bindir}
     install -m 0755 ${WORKDIR}/ffs_registrar ${D}${bindir}/ffs_registrar
+    # Normalize the prebuilt registrar binary before packaging.
+    ${STRIP} ${D}${bindir}/ffs_registrar
 
     # Install the systemd service file
     install -d ${D}${systemd_system_unitdir}
