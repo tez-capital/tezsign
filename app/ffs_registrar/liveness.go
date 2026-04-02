@@ -4,15 +4,16 @@ import (
 	"context"
 	"io"
 	"log/slog"
-	"net"
 	"os"
 	"sync/atomic"
 	"time"
+
+	"github.com/tez-capital/tezsign/app/gadget/common"
 )
 
 func watchLiveness(sockPath string, ready *atomic.Uint32, l *slog.Logger) {
 	for {
-		conn, err := net.Dial("unix", sockPath)
+		conn, err := common.DialUnix(sockPath)
 		if err != nil {
 			ready.Store(0)
 			l.Debug("gadget not ready (socket down), retrying", "err", err)
@@ -33,9 +34,7 @@ func serveEnabled(ctx context.Context, sockPath string, l *slog.Logger) <-chan s
 	closeCompletedChan := make(chan struct{})
 	go func() {
 		l.Info("starting liveness server", "socket", sockPath)
-		ln, err := net.Listen("unix", sockPath)
-		// world-readable is fine; it's just liveness
-		_ = os.Chmod(sockPath, 0666)
+		ln, err := common.ListenUnix(sockPath, 0o666)
 
 		if err != nil {
 			l.Error("failed to start liveness server", "err", err.Error())
@@ -62,9 +61,9 @@ func serveEnabled(ctx context.Context, sockPath string, l *slog.Logger) <-chan s
 				l.Error("failed to accept liveness connection", "err", err)
 				continue
 			}
-			go func(c net.Conn) {
+			go func(c *os.File) {
 				defer c.Close()
-				io.Copy(io.Discard, c)
+				_, _ = io.Copy(io.Discard, c)
 			}(conn)
 		}
 	}()

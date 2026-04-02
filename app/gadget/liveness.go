@@ -2,7 +2,6 @@ package main
 
 import (
 	"log/slog"
-	"net"
 	"os"
 
 	"github.com/tez-capital/tezsign/app/gadget/common"
@@ -11,14 +10,11 @@ import (
 // serveReadySocket holds the socket open while the process is healthy.
 // Registrar will connect and keep a single connection open.
 func serveReadySocket(l *slog.Logger) (cleanup func()) {
-	_ = os.Remove(common.ReadySock) // stale
-	ln, err := net.Listen("unix", common.ReadySock)
+	ln, err := common.ListenUnix(common.ReadySock, 0o666)
 	if err != nil {
 		l.Error("ready socket listen", "err", err, "path", common.ReadySock)
 		return func() {}
 	}
-	// world-readable is fine; it's just liveness
-	_ = os.Chmod(common.ReadySock, 0666)
 
 	quit := make(chan struct{})
 	go func() {
