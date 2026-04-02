@@ -27,6 +27,7 @@ IMAGE_FSTYPES = "wic wic.bmap"
 # Post-process to move the image
 IMAGE_POSTPROCESS_COMMAND += "extract_final_image;"
 IMAGE_POSTPROCESS_COMMAND += "prune_prod_console_bits;"
+IMAGE_POSTPROCESS_COMMAND += "prune_prod_systemd_userland;"
 
 extract_final_image() {
     mkdir -p ${TOPDIR}/../release
@@ -41,6 +42,28 @@ prune_prod_console_bits() {
     fi
 
     rm -f ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/getty.target.wants/getty@tty1.service
+}
+
+prune_prod_systemd_userland() {
+    if [ "${TEZSIGN_DEV}" = "1" ]; then
+        return
+    fi
+
+    rm -f \
+        ${IMAGE_ROOTFS}${bindir}/bootctl \
+        ${IMAGE_ROOTFS}${bindir}/busctl \
+        ${IMAGE_ROOTFS}${bindir}/journalctl \
+        ${IMAGE_ROOTFS}${bindir}/systemd-ac-power \
+        ${IMAGE_ROOTFS}${bindir}/systemd-ask-password \
+        ${IMAGE_ROOTFS}${bindir}/systemd-id128 \
+        ${IMAGE_ROOTFS}${bindir}/systemd-machine-id-setup \
+        ${IMAGE_ROOTFS}${bindir}/systemd-mount \
+        ${IMAGE_ROOTFS}${bindir}/systemd-notify \
+        ${IMAGE_ROOTFS}${bindir}/systemd-socket-activate \
+        ${IMAGE_ROOTFS}${bindir}/systemd-tty-ask-password-agent \
+        ${IMAGE_ROOTFS}${bindir}/varlinkctl
+
+    rm -rf ${IMAGE_ROOTFS}${nonarch_libdir}/systemd/catalog
 }
 
 do_image_wic[depends] += "app:do_deploy"
