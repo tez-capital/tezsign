@@ -8,7 +8,7 @@ export CXX="zig c++ -target aarch64-linux-musl"
 export GOOS="linux"
 export GOARCH="arm64"
 export CGO_ENABLED="1"
-go build -v -ldflags='-s -w -extldflags "-static"' -trimpath -o ./tools/builder/assets/tezsign ./app/gadget
+go build -v -trimpath -buildvcs=false -ldflags='-s -w -buildid= -extldflags "-static"' -o ./tools/builder/assets/tezsign ./app/gadget
 ```
 
 
@@ -20,5 +20,5 @@ export CXX="zig c++ -target aarch64-linux-musl"
 export GOOS="linux"
 export GOARCH="arm64"
 export CGO_ENABLED="1"
-go build -v -ldflags='-s -w -extldflags "-static"' -trimpath -o ./kas/meta-tezsign/recipes-core/images/files/tezsign ./app/gadget
+go build -v -trimpath -buildvcs=false -ldflags='-s -w -buildid= -extldflags "-static"' -o ./kas/meta-tezsign/recipes-core/images/files/tezsign ./app/gadget
 ```
