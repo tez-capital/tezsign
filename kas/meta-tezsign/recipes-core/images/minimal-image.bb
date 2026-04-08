@@ -68,3 +68,4 @@ prune_prod_systemd_userland() {
 
 do_image_wic[depends] += "app:do_deploy"
 WKS_FILE = "${THISDIR}/files/storage.wks.in"
+WKS_FILE:radxa-zero3-tezsign = "${THISDIR}/files/storage-rockchip.wks.in"

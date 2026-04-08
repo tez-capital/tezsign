@@ -6,7 +6,7 @@ target: minimal-image
 
 repos:
   poky:
-    url: git://git.yoctoproject.org/poky.git
+    url: https://git.yoctoproject.org/poky
     branch: "scarthgap"
     layers:
       meta:
@@ -14,6 +14,12 @@ repos:
   meta-raspberrypi:
     url: https://git.yoctoproject.org/meta-raspberrypi
     branch: "scarthgap"
+  meta-arm:
+    url: https://git.yoctoproject.org/meta-arm
+    branch: "scarthgap"
+    layers:
+      meta-arm:
+      meta-arm-toolchain:
   meta-tezsign:
     path: meta-tezsign
   meta-openembedded:
@@ -21,7 +27,12 @@ repos:
     branch: "scarthgap"
     layers:
       meta-oe: # This is where 'dash' lives
-
+      meta-python:
+      meta-networking:
+      meta-filesystems:
+  meta-rockchip:
+    url: https://github.com/radxa/meta-rockchip.git
+    branch: "scarthgap"
 
 local_conf_header:
   # initramfs_setup: |

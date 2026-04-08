@@ -1,7 +1,0 @@
-# Placeholder only. Do not rename to .conf until the Radxa BSP layer is added.
-#
-# Expected shape once the upstream machine exists:
-# include conf/machine/radxa-zero3.conf
-#
-# PREFERRED_PROVIDER_virtual/kernel = "linux-mainline"
-# PREFERRED_VERSION_linux-mainline ?= "6.18%"

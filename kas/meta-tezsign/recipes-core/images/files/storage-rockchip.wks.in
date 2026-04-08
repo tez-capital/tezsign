@@ -1,0 +1,18 @@
+# Rockchip SD-card image layout for TezSign.
+# Keep the upstream raw bootloader partitions, then preserve the TezSign
+# root/app/data partition scheme expected by the local updater and builder.
+
+part loader1   --offset 64s    --fixed-size 3552K --fstype=none --part-name loader1   --source rawcopy --sourceparams="file=${SPL_BINARY}"
+part v_storage --offset 7168s  --fixed-size 256K  --fstype=none --part-name v_storage
+part reserved  --offset 7680s  --fixed-size 192K  --fstype=none --part-name reserved
+part reserved1 --offset 8064s  --fixed-size 32K   --fstype=none --part-name reserved1
+part uboot_env --offset 8128s  --fixed-size 32K   --fstype=none --part-name uboot_env ${RK_UBOOT_ENV}
+part reserved2 --offset 8192s  --fixed-size 4096K --fstype=none --part-name reserved2
+part loader2   --offset 16384s --fixed-size 4096K --fstype=none --part-name loader2   --source rawcopy --sourceparams="file=u-boot.${UBOOT_SUFFIX}"
+part atf       --offset 24576s --fixed-size 4096K --fstype=none --part-name atf
+
+part /         --source rootfs --ondisk mmcblk0 --fstype=ext4 --label root --part-name root --align 4096 --part-type ${ROOT_DPS}
+part /app      --source rootfs --rootfs-dir=${DEPLOY_DIR_IMAGE}/appfs --ondisk mmcblk0 --fstype=ext4 --label app --part-name app --align 4096 --fixed-size 64M --fsoptions="ro,exec,noatime,nofail"
+part /data     --ondisk mmcblk0 --fstype=ext4 --label data --part-name data --align 4096 --fixed-size 128M --mkfs-extraopts="-O has_journal" --fsoptions="rw,noatime,nofail,data=journal"
+
+bootloader --ptable gpt

@@ -3,10 +3,12 @@ header:
   includes:
     - base.yml
 
-# Placeholder only. This needs a Radxa BSP repo/layer added to `base.yml`
-# before the machine can become active.
 machine: radxa-zero3-tezsign
 
 local_conf_header:
   release: |
     TEZSIGN_RELEASE_NAME = "radxa-zero3"
+
+  rockchip_qa: |
+    WARN_QA:remove = "patch-fuzz"
+    ERROR_QA:remove = "patch-status"
