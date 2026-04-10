@@ -1,9 +1,14 @@
-TEZSIGN_RPI_OVERLAY_BOOT_FILES = " \
+TEZSIGN_RPI_OVERLAY_BOOT_FILES = ""
+TEZSIGN_RPI_OVERLAY_BOOT_FILES:raspberrypi4-tezsign = " \
     overlay_map.dtb;overlays/overlay_map.dtb \
     dwc2.dtbo;overlays/dwc2.dtbo \
-    vc4-kms-v3d-pi4.dtbo;overlays/vc4-kms-v3d-pi4.dtbo \
-    vc4-fkms-v3d.dtbo;overlays/vc4-fkms-v3d.dtbo \
 "
+TEZSIGN_RPI_OVERLAY_BOOT_FILES:append:raspberrypi4-tezsign = "${@' vc4-kms-v3d-pi4.dtbo;overlays/vc4-kms-v3d-pi4.dtbo' if d.getVar('TEZSIGN_DEV') == '1' else ''}"
+TEZSIGN_RPI_OVERLAY_BOOT_FILES:raspberrypi0-2w-tezsign = " \
+    overlay_map.dtb;overlays/overlay_map.dtb \
+    dwc2.dtbo;overlays/dwc2.dtbo \
+"
+TEZSIGN_RPI_OVERLAY_BOOT_FILES:append:raspberrypi0-2w-tezsign = "${@' vc4-fkms-v3d.dtbo;overlays/vc4-fkms-v3d.dtbo' if d.getVar('TEZSIGN_DEV') == '1' else ''}"
 IMAGE_BOOT_FILES:append = " ${TEZSIGN_RPI_OVERLAY_BOOT_FILES}"
 
 do_deploy:append() {
