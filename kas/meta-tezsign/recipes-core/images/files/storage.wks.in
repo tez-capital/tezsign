@@ -4,4 +4,4 @@ part / --source rootfs --ondisk mmcblk0 --fstype=ext4 --label root --align 4096
 
 part /app  --source rootfs --rootfs-dir=${DEPLOY_DIR_IMAGE}/appfs --ondisk mmcblk0 --fstype=ext4 --label app --align 4096 --fixed-size 64M --fsoptions="ro,exec,noatime,nofail"
 
-part /data --ondisk mmcblk0 --fstype=ext4 --label data --align 4096 --fixed-size 128M --mkfs-extraopts="-O has_journal" --fsoptions="rw,noatime,nofail,data=journal"
+part /data --ondisk mmcblk0 --fstype=ext4 --label data --align 4096 --fixed-size 128M --mkfs-extraopts="-J size=8 -m 0 -I 1024 -O has_journal,inline_data,fast_commit" --fsoptions="rw,noatime,nofail,data=journal"
