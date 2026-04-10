@@ -3,7 +3,7 @@ LICENSE = "CLOSED"
 
 inherit core-image
 
-IMAGE_INSTALL = " \
+TEZSIGN_COMMON_IMAGE_INSTALL = " \
     base-files \
     base-passwd \
     systemd \
@@ -18,6 +18,8 @@ IMAGE_INSTALL = " \
     ${@bb.utils.contains('TEZSIGN_DEV', '1', 'dropbear', '', d)} \
     ${CORE_IMAGE_EXTRA_INSTALL} \
 "
+
+IMAGE_INSTALL = "${TEZSIGN_COMMON_IMAGE_INSTALL}"
 
 IMAGE_FEATURES = ""
 IMAGE_FEATURES += "${@'ssh-server-dropbear' if d.getVar('TEZSIGN_DEV') == '1' else ''}"

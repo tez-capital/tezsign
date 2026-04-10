@@ -1,0 +1,13 @@
+[Unit]
+Description=Mount Tezsign data partition
+After=systemd-udev-settle.service
+Wants=systemd-udev-settle.service
+
+[Mount]
+What=/dev/disk/by-label/data
+Where=/data
+Type=ext4
+Options=rw,noatime,nofail,data=journal
+
+[Install]
+WantedBy=local-fs.target

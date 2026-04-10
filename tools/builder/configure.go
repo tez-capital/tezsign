@@ -482,6 +482,9 @@ func ConfigureImage(workDir, imagePath string, flavour imageFlavour, logger *slo
 	if err != nil {
 		return errors.Join(common.ErrFailedToConfigureImage, err)
 	}
+	if rootfsPartition == nil {
+		return errors.Join(common.ErrFailedToConfigureImage, fmt.Errorf("image does not contain a rootfs partition"))
+	}
 
 	logger.Info("Found partitions",
 		// slog.Group("boot", slog.Int64("start", bootPartition.GetStart()), slog.Int64("size", bootPartition.GetSize())),

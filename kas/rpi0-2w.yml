@@ -11,5 +11,8 @@ local_conf_header:
 
   main: |
     TEZSIGN_DWC2_DR_MODE = "peripheral"
+    INITRAMFS_IMAGE = "tezsign-initramfs"
+    INITRAMFS_IMAGE_BUNDLE = "1"
+    CMDLINE_ROOTFS = "root=/dev/ram0 rw rootfstype=ramfs rdinit=/sbin/init"
     RPI_EXTRA_CONFIG:append = "\ndtoverlay=dwc2,dr_mode=${TEZSIGN_DWC2_DR_MODE}"
     CMDLINE:append = " modprobe.blacklist=brcmfmac,brcmutil,hci_uart,btbcm,bluetooth"

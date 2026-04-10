@@ -112,7 +112,7 @@ func (m selectionModel) View() string {
 			kind  UpdateKind
 			title string
 		}{
-			{UpdateKindFull, "Full (boot, rootfs and app)"},
+			{UpdateKindFull, "Full (boot, app, rootfs if present)"},
 			{UpdateKindAppOnly, "TezSign app only"},
 		}
 

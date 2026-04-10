@@ -3,6 +3,8 @@ LICENSE = "CLOSED"
 LIC_FILES_CHKSUM = "file://${COREBASE}/meta/files/common-licenses/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
 SRC_URI = " \
+    file://app.mount \
+    file://data.mount \
     file://setup-gadget.service \
     file://attach-gadget.service \
     file://generate-serial.service \
@@ -18,7 +20,7 @@ inherit systemd useradd
 
 # Systemd configuration
 SYSTEMD_PACKAGES = "${PN}"
-SYSTEMD_SERVICE:${PN} = "setup-gadget.service attach-gadget.service ffs_registrar.service tezsign.service generate-serial.service"
+SYSTEMD_SERVICE:${PN} = "app.mount data.mount setup-gadget.service attach-gadget.service ffs_registrar.service tezsign.service generate-serial.service"
 SYSTEMD_AUTO_ENABLE = "enable"
 
 # Create the users and groups your script requires
@@ -42,6 +44,8 @@ do_install() {
 
     # Install the systemd service file
     install -d ${D}${systemd_system_unitdir}
+    install -m 0644 ${WORKDIR}/app.mount ${D}${systemd_system_unitdir}/
+    install -m 0644 ${WORKDIR}/data.mount ${D}${systemd_system_unitdir}/
     install -m 0644 ${WORKDIR}/setup-gadget.service ${D}${systemd_system_unitdir}/
     install -m 0644 ${WORKDIR}/attach-gadget.service ${D}${systemd_system_unitdir}/
     install -m 0644 ${WORKDIR}/ffs_registrar.service ${D}${systemd_system_unitdir}/

@@ -209,7 +209,11 @@ func performUpdate(source, destination string, kind UpdateKind, logger *slog.Log
 			return errors.New("boot partition size mismatch between source image and destination device, cannot proceed with update")
 		}
 
-		if sourceRootfsPartition.GetSize() != destinationRootfsPartition.GetSize() {
+		if (sourceRootfsPartition == nil) != (destinationRootfsPartition == nil) {
+			return errors.New("rootfs partition presence mismatch between source image and destination device, cannot proceed with update")
+		}
+
+		if sourceRootfsPartition != nil && sourceRootfsPartition.GetSize() != destinationRootfsPartition.GetSize() {
 			return errors.New("rootfs partition size mismatch between source image and destination device, cannot proceed with update")
 		}
 
@@ -224,9 +228,11 @@ func performUpdate(source, destination string, kind UpdateKind, logger *slog.Log
 			}
 		}
 
-		logger.Info("Updating rootfs partition...")
-		if err = copyPartitionData(sourceImg, sourceRootfsPartition, dstImg, destinationRootfsPartition, "rootfs partition", logger); err != nil {
-			return fmt.Errorf("failed to update rootfs partition: %w", err)
+		if sourceRootfsPartition != nil {
+			logger.Info("Updating rootfs partition...")
+			if err = copyPartitionData(sourceImg, sourceRootfsPartition, dstImg, destinationRootfsPartition, "rootfs partition", logger); err != nil {
+				return fmt.Errorf("failed to update rootfs partition: %w", err)
+			}
 		}
 
 		logger.Info("Updating app partition...")

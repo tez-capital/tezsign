@@ -41,19 +41,31 @@ func GetTezsignPartitions(img *disk.Disk) (boot, rootfs, app, data part.Partitio
 		}
 	case *mbr.Table:
 		mbrTable := table
-		if len(mbrTable.Partitions) != 4 {
+		parts := make([]part.Partition, 0, len(mbrTable.Partitions))
+		for _, p := range mbrTable.Partitions {
+			if p == nil || p.Size == 0 {
+				continue
+			}
+			parts = append(parts, p)
+		}
+		switch len(parts) {
+		case 3:
+			bootPartition = parts[0]
+			appPartition = parts[1]
+			dataPartition = parts[2]
+		case 4:
+			bootPartition = parts[0]
+			rootfsPartition = parts[1]
+			appPartition = parts[2]
+			dataPartition = parts[3]
+		default:
 			return nil, nil, nil, nil, errors.Join(ErrFailedToConfigureImage, ErrUnexpectedPartitionCount)
 		}
-
-		bootPartition = mbrTable.Partitions[0]
-		rootfsPartition = mbrTable.Partitions[1]
-		appPartition = mbrTable.Partitions[2]
-		dataPartition = mbrTable.Partitions[3]
 	default:
 		return nil, nil, nil, nil, errors.Join(ErrFailedToPartitionImage, ErrPartitionTableNotGPT)
 	}
 
-	if rootfsPartition == nil || appPartition == nil || dataPartition == nil {
+	if appPartition == nil || dataPartition == nil {
 		return nil, nil, nil, nil, errors.Join(ErrFailedToConfigureImage, ErrUnexpectedPartitionCount)
 	}
 	return bootPartition, rootfsPartition, appPartition, dataPartition, nil
