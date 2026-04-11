@@ -102,14 +102,14 @@ runs:
         xz -T0 -9e -f "${image}"
         ls -lh "${image}.xz"
 
-    - uses: actions/upload-artifact@v5
+    - uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.release-name }}.img.xz
         path: ${{ github.workspace }}/kas/release/${{ inputs.release-name }}.img.xz
         retention-days: 1
         if-no-files-found: error
 
-    - uses: actions/upload-artifact@v5
+    - uses: actions/upload-artifact@v7
       if: ${{ inputs.upload-gadget-binary == 'true' }}
       with:
         name: tezsign_gadget_binary

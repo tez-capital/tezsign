@@ -42,7 +42,7 @@ runs:
 
   # we download images only after build not to spend time downloading if build fails
   - name: Download base image
-    uses: actions/download-artifact@v5
+    uses: actions/download-artifact@v7
     with:
       name: ${{ inputs.source_artifact }}
       path: ./imgs
@@ -67,14 +67,14 @@ runs:
     run: |
       sudo docker run -e $IMAGE_ID -e CGO_ENABLED=0 --rm --privileged -v ${{ github.workspace }}/:/work tezsign/builder:latest ./tools/bin/builder ./imgs/${{ inputs.source_artifact }}.img ./imgs/${{ inputs.image_id }}.img.xz prod
 
-  - uses: actions/upload-artifact@v5
+  - uses: actions/upload-artifact@v7
     if: ${{ inputs.tezsign_flavour == 'prod' }}
     with:
       name: ${{ inputs.image_id }}.img.xz
       path: ${{ github.workspace }}/imgs/${{ inputs.image_id }}.img.xz
       retention-days: 1
 
-  - uses: actions/upload-artifact@v5  
+  - uses: actions/upload-artifact@v7
     if: ${{ inputs.tezsign_flavour == 'dev' }}
     with:
       name: ${{ inputs.image_id }}.dev.img.xz
@@ -85,7 +85,7 @@ runs:
     shell: bash
     run: |
       cp ./tools/builder/assets/tezsign ./tezsign-gadget-binary
-  - uses: actions/upload-artifact@v5
+  - uses: actions/upload-artifact@v7
     if: ${{ inputs.create_binary_artifact == 'true' }}
     with:
       name: tezsign_gadget_binary

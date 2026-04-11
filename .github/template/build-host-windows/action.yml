@@ -22,7 +22,7 @@ runs:
   using: "composite"
   steps:
   - name: Set up Go
-    uses: actions/setup-go@v5
+    uses: actions/setup-go@v6
     with:
       go-version-file: go.mod
 
@@ -63,7 +63,7 @@ runs:
       ls ${LIB_PATH}
       go build -ldflags="-s -w -extldflags \"-I${INCLUDE_PATH} ${LIB_PATH}/libusb-1.0.a -static\"" -trimpath -o ./build/tezsign-host-${{ inputs.goos }}-${{ inputs.goarch }}.exe ./app/host
 
-  - uses: actions/upload-artifact@v5
+  - uses: actions/upload-artifact@v7
     with:
       name: ${{ inputs.artifact-id }}
       path: ./build/tezsign-host-${{ inputs.goos }}-${{ inputs.goarch }}.exe

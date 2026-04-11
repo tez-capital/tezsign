@@ -49,7 +49,7 @@ jobs:
                   fetch-depth: 0
 
             - name: Set up Go
-              uses: actions/setup-go@v5
+              uses: actions/setup-go@v6
               with:
                 go-version-file: go.mod
 
@@ -78,7 +78,7 @@ jobs:
                   go build -ldflags='-s -w -extldflags "-static"' -trimpath -o ./build/tezsign_updater_macos_arm64 ./tools/updater
 
             - name: Upload tezsign_updater artifact
-              uses: actions/upload-artifact@v5
+              uses: actions/upload-artifact@v7
               with:
                 name: tezsign_updater
                 path: ./build/*
@@ -192,7 +192,7 @@ jobs:
           - name: create release dir
             run: mkdir ./release
 
-          - uses: actions/download-artifact@v5
+          - uses: actions/download-artifact@v7
             with:
               path: ./release
               merge-multiple: true
