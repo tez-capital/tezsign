@@ -4,9 +4,6 @@ on:
   push:
   pull_request:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
     build-gadget:
         runs-on: ubuntu-24.04
@@ -16,16 +13,22 @@ jobs:
                 include:
                     - kas_file: "rpi4.yml"
                       release_name: "rpi4"
+                      upload_gadget_binary: "true"
                     - kas_file: "rpi4-dev.yml"
                       release_name: "rpi4_dev"
+                      upload_gadget_binary: "false"
                     - kas_file: "rpi0-2w.yml"
                       release_name: "rpi0-2w"
+                      upload_gadget_binary: "false"
                     - kas_file: "rpi0-2w-dev.yml"
                       release_name: "rpi0-2w_dev"
+                      upload_gadget_binary: "false"
                     - kas_file: "radxa-zero3.yml"
                       release_name: "radxa-zero3"
+                      upload_gadget_binary: "false"
                     - kas_file: "radxa-zero3-dev.yml"
                       release_name: "radxa-zero3_dev"
+                      upload_gadget_binary: "false"
         steps:
             - uses: actions/checkout@v5
               with:
@@ -36,6 +39,7 @@ jobs:
               with:
                 kas-file: ${{ matrix.kas_file }}
                 release-name: ${{ matrix.release_name }}
+                upload-gadget-binary: ${{ matrix.upload_gadget_binary }}
 
     build-updater:
         runs-on: ubuntu-latest

@@ -8,6 +8,10 @@ inputs:
   release-name:
     description: 'Expected TEZSIGN_RELEASE_NAME output'
     required: true
+  upload-gadget-binary:
+    description: 'Upload the standalone tezsign gadget binary artifact'
+    required: false
+    default: 'false'
 
 runs:
   using: "composite"
@@ -102,5 +106,13 @@ runs:
       with:
         name: ${{ inputs.release-name }}.img.xz
         path: ${{ github.workspace }}/kas/release/${{ inputs.release-name }}.img.xz
+        retention-days: 1
+        if-no-files-found: error
+
+    - uses: actions/upload-artifact@v5
+      if: ${{ inputs.upload-gadget-binary == 'true' }}
+      with:
+        name: tezsign_gadget_binary
+        path: ${{ github.workspace }}/kas/meta-tezsign/recipes-core/images/files/tezsign
         retention-days: 1
         if-no-files-found: error
