@@ -72,6 +72,17 @@ runs:
             -o ./kas/meta-tezsign/recipes-core/tezsign-core/files/ffs_registrar \
             ./app/ffs_registrar
 
+    - name: Restore Yocto cache
+      uses: actions/cache@v5
+      with:
+        path: |
+          ${{ github.workspace }}/kas/downloads
+          ${{ github.workspace }}/kas/sstate-cache
+        key: yocto-${{ runner.os }}-${{ inputs.release-name }}-${{ hashFiles('kas/*.yml', 'kas/meta-tezsign/**/*.bb', 'kas/meta-tezsign/**/*.bbappend', 'kas/meta-tezsign/**/*.conf', 'kas/meta-tezsign/**/*.cfg', 'kas/meta-tezsign/**/*.patch', 'go.mod', 'go.sum') }}
+        restore-keys: |
+          yocto-${{ runner.os }}-${{ inputs.release-name }}-
+          yocto-${{ runner.os }}-
+
     - name: Build Yocto image
       shell: bash
       working-directory: ${{ github.workspace }}/kas
@@ -82,7 +93,7 @@ runs:
           fi
         done
 
-        mkdir -p build downloads release
+        mkdir -p build downloads release sstate-cache
         docker run --privileged --rm \
           --user "$(id -u):$(id -g)" \
           -e HOME=/tmp \
