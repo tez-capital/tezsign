@@ -69,5 +69,29 @@ prune_prod_systemd_userland() {
 }
 
 do_image_wic[depends] += "app:do_deploy"
+do_image_wic[depends] += "linux-mainline:do_deploy"
 WKS_FILE = "${THISDIR}/files/storage.wks.in"
 WKS_FILE:radxa-zero3-tezsign = "${THISDIR}/files/storage-rockchip.wks.in"
+
+# The Radxa boots from rootfs (no separate boot partition). Since we override
+# IMAGE_INSTALL (bypassing packagegroup-core-boot / MACHINE_ESSENTIAL_EXTRA_RDEPENDS),
+# we must explicitly install the kernel, DTB, and U-Boot extlinux config.
+IMAGE_INSTALL:append:radxa-zero3-tezsign = " kernel-image kernel-devicetree u-boot-extlinux"
+
+# Write Rockchip bootloader binaries to raw sectors (like Armbian does).
+# idbloader.img → sector 64, u-boot.itb → sector 16384.
+# This must run before extract_final_image copies the .wic to release/.
+IMAGE_POSTPROCESS_COMMAND:prepend:radxa-zero3-tezsign = "rockchip_dd_bootloader; "
+
+rockchip_dd_bootloader() {
+    IMG="${IMGDEPLOYDIR}/${IMAGE_LINK_NAME}.wic"
+    if [ ! -f "$IMG" ]; then
+        bbwarn "WIC image not found, skipping bootloader dd"
+        return
+    fi
+    bbnote "Writing idbloader.img to sector 64"
+    dd if=${DEPLOY_DIR_IMAGE}/idbloader.img of=$IMG seek=64 conv=notrunc bs=512
+    bbnote "Writing u-boot.itb to sector 16384"
+    dd if=${DEPLOY_DIR_IMAGE}/u-boot.${UBOOT_SUFFIX} of=$IMG seek=16384 conv=notrunc bs=512
+}
+

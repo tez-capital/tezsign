@@ -9,6 +9,9 @@ local_conf_header:
   release: |
     TEZSIGN_RELEASE_NAME = "radxa-zero3"
 
+  main: |
+
+
   rockchip_qa: |
     WARN_QA:remove = "patch-fuzz"
     ERROR_QA:remove = "patch-status"

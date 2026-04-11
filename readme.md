@@ -8,17 +8,17 @@
 | **Supported Devices** | 🥧 RPi Zero 2W, RPi4, Radxa Zero 3 | 🥧 RPi Zero 2W w/ PaperInk | 🥧 RPi Zero 2W w/ PaperInk |
 | **Hardware Start Cost** | **< $20 USD** * | **~$50 USD** * | **~$50 USD** * |
 | **Tezbake Integration** | Full | Partial | Partial |
-| **Avg Signature Time** | ~10ms | ~6ms | ~30ms |
-| **Security** | 🔒 **High** (Custom Wire Proto) | 🔒 **High** (Custom Image) | 🛡️ Medium |
+| **Avg Signature Time** | ~8ms | ~6ms | ~30ms |
+| **Security** | 🔒 **Highest** (Custom Image and Wire Proto) | 🔒 **High** (Custom Image) | 🛡️ Medium |
 | **Power Loss Safe** | ✅ **Yes** | ✅ **Yes** | ⚠️ No |
-| **Boot Time** | ⏱️ 15s | 🚀 **1s** | ~1.5m |
+| **Boot Time** | 🚀 **3s** | 🚀 **3s** | ~1.5m |
 | **Multi-Device Support**| ✅ **Yes** | ❌ No | ❌ No |
 | **Multi-Baker Support** | ✅ **Yes** | ❌ No | ❌ No |
 | **Companion App** | Required | Optional | No |
 | **Physical Pinlock** | ❌ No (App-based) | 👆 Yes (Touch Screen) | 👆 Yes (Touch Screen) |
 | **Auto Unlock on Boot**| ✅ **Yes** (Optional) | ❌ No | ❌ No |
-| **Compressed Image Size** | 💾 ~140MB | 📦 7MB | 🐘 1.95GB |
-| **License** | 📜 SSPL | 📜 MIT | 📜 MIT |
+| **Compressed Image Size** | 📦 ~14MB | 📦 7MB | 🐘 1.95GB |
+| **License** | 📜 SSPL | 📜 MIT* (partial) | 📜 MIT |
 
 > **Note:** The comparison table above is accurate as of December 2, 2025.
 

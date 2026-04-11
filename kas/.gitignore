@@ -10,6 +10,8 @@ release
 meta-raspberrypi
 meta-openembedded
 meta-mainline
+meta-arm
+meta-rockchip
 poky
 
 meta-tezsign/recipes-core/images/files/tezsign

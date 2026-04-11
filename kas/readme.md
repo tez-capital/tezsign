@@ -22,12 +22,14 @@ Available Raspberry Pi KAS files:
 - `rpi4-dev.yml`: Raspberry Pi 4 dev image. Adds dev packages, HDMI debug overlay, and `console=tty1` for local monitor and keyboard debugging.
 - `rpi0-2w.yml`: Raspberry Pi Zero 2 W production image. Aggressively minimal and headless.
 - `rpi0-2w-dev.yml`: Raspberry Pi Zero 2 W dev image. Adds dev packages, local console, OTG mode, and display overlay for debugging.
-- `radxa-zero3.yml`: Radxa Zero 3 production image. Headless production target mapped to the upstream `radxa-zero-3w` BSP machine.
+- `radxa-zero3.yml`: Radxa Zero 3 production image. Headless production target mapped to the upstream `radxa-zero-3w` BSP machine and booting a bundled initramfs from a VFAT boot partition.
+- `radxa-zero3-dev.yml`: Radxa Zero 3 dev image. Adds dev packages, persistent logs, and a local HDMI/TTY console path for debugging.
 
 Resolution chain:
 
 - `rpi4-dev.yml` -> `rpi4.yml` -> `machine: raspberrypi4-tezsign`
 - `rpi0-2w-dev.yml` -> `rpi0-2w.yml` -> `machine: raspberrypi0-2w-tezsign`
+- `radxa-zero3-dev.yml` -> `radxa-zero3.yml` -> `machine: radxa-zero3-tezsign` -> upstream `radxa-zero-3w`
 - `radxa-zero3.yml` -> `machine: radxa-zero3-tezsign` -> upstream `radxa-zero-3w`
 
 Typical commands:
@@ -82,6 +84,16 @@ podman run --privileged --rm -it \
     build radxa-zero3.yml
 ```
 
+```sh
+podman run --privileged --rm -it \
+    -v .:/work:Z \
+    --userns=keep-id \
+    --user "$(id -u):$(id -g)" \
+    --workdir /work \
+    ghcr.io/siemens/kas/kas:latest \
+    build radxa-zero3-dev.yml
+```
+
 If you previously ran KAS with a different container user and now see errors like `detected dubious ownership` or `Cannot write to /work/build`, your `kas/` tree has mixed ownership. Clean the generated directories and rebuild:
 
 ```sh
@@ -115,3 +127,4 @@ Expected release names:
 - `rpi0-2w.yml` -> `rpi0-2w.img`
 - `rpi0-2w-dev.yml` -> `rpi0-2w_dev.img`
 - `radxa-zero3.yml` -> `radxa-zero3.img`
+- `radxa-zero3-dev.yml` -> `radxa-zero3_dev.img`
