@@ -36,7 +36,15 @@ runs:
   - name: Install dev tools
     shell: bash
     run: |
-      brew install autoconf automake gperf libtool pkg-config
+      missing=()
+      for formula in autoconf automake gperf libtool pkg-config; do
+        if ! brew list --formula "${formula}" >/dev/null 2>&1; then
+          missing+=("${formula}")
+        fi
+      done
+      if [ "${#missing[@]}" -gt 0 ]; then
+        brew install "${missing[@]}"
+      fi
 
   - name: autogen libusb (macos)
     shell: bash
