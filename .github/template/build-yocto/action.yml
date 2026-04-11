@@ -1,0 +1,54 @@
+name: build-yocto
+description: Build a TezSign Yocto image with KAS
+
+inputs:
+  kas-file:
+    description: 'KAS file to build'
+    required: true
+  release-name:
+    description: 'Expected TEZSIGN_RELEASE_NAME output'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Free runner disk space
+      shell: bash
+      run: |
+        df -h
+        sudo rm -rf \
+          /opt/az \
+          /opt/ghc \
+          /opt/hostedtoolcache/CodeQL \
+          /usr/local/.ghcup \
+          /usr/local/lib/android \
+          /usr/share/dotnet
+        docker system prune -af || true
+        df -h
+
+    - name: Build Yocto image
+      shell: bash
+      working-directory: ${{ github.workspace }}/kas
+      run: |
+        mkdir -p release
+        docker run --privileged --rm \
+          -v "${PWD}:/work" \
+          --workdir /work \
+          ghcr.io/siemens/kas/kas:latest \
+          build "${{ inputs.kas-file }}"
+
+    - name: Compress image
+      shell: bash
+      working-directory: ${{ github.workspace }}/kas
+      run: |
+        image="release/${{ inputs.release-name }}.img"
+        test -f "${image}"
+        xz -T0 -9e -f "${image}"
+        ls -lh "${image}.xz"
+
+    - uses: actions/upload-artifact@v5
+      with:
+        name: ${{ inputs.release-name }}.img.xz
+        path: ${{ github.workspace }}/kas/release/${{ inputs.release-name }}.img.xz
+        retention-days: 1
+        if-no-files-found: error

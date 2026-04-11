@@ -5,6 +5,9 @@ inputs:
   artifact-id:
     description: 'The ID of the artifact to build'
     required: true
+  toolchain:
+    description: 'The zig target triple for the toolchain to use'
+    required: true
   goos:
     description: 'The GOOS value for the build'
     required: true
@@ -19,9 +22,9 @@ runs:
   using: "composite"
   steps:
   - name: Set up Go
-    uses: actions/setup-go@v4
+    uses: actions/setup-go@v5
     with:
-      go-version: '>=1.26.0'
+      go-version-file: go.mod
 
   - uses: mlugg/setup-zig@v2
     with:
@@ -60,7 +63,7 @@ runs:
       ls ${LIB_PATH}
       go build -ldflags="-s -w -extldflags \"-I${INCLUDE_PATH} ${LIB_PATH}/libusb-1.0.a -static\"" -trimpath -o ./build/tezsign-host-${{ inputs.goos }}-${{ inputs.goarch }}.exe ./app/host
 
-  - uses: actions/upload-artifact@v4
+  - uses: actions/upload-artifact@v5
     with:
       name: ${{ inputs.artifact-id }}
       path: ./build/tezsign-host-${{ inputs.goos }}-${{ inputs.goarch }}.exe
