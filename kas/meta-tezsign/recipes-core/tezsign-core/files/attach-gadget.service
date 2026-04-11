@@ -12,8 +12,8 @@ Restart=always
 RestartSec=1
 StartLimitIntervalSec=0
 
-StandardOutput=journal+console
-StandardError=journal+console
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

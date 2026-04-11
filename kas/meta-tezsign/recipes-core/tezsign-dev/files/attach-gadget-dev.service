@@ -7,8 +7,8 @@ After=setup-gadget-dev.service
 Type=oneshot
 ExecStart=/usr/bin/attach-gadget-dev
 RemainAfterExit=yes
-StandardOutput=journal+console
-StandardError=journal+console
+StandardOutput=journal
+StandardError=journal
 
 Restart=on-failure
 RestartSec=5s

@@ -7,8 +7,8 @@ After=local-fs.target
 Type=oneshot
 ExecStart=/usr/bin/generate-serial-number
 RemainAfterExit=yes
-StandardOutput=journal+console
-StandardError=journal+console
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

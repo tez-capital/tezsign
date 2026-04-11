@@ -1,0 +1,14 @@
+header:
+  version: 14
+  includes:
+    - radxa-zero3.yml
+
+local_conf_header:
+  release: |
+    TEZSIGN_RELEASE_NAME = "radxa-zero3_dev"
+
+  settings: |
+    TEZSIGN_DEV = "1"
+    UBOOT_EXTLINUX_CONSOLE = "earlycon console=tty1 console=${RK_CONSOLE_DEVICE},${RK_CONSOLE_BAUD}n8"
+    UBOOT_EXTLINUX_KERNEL_ARGS:append = " quiet loglevel=3"
+    VOLATILE_LOG_DIR = "no"

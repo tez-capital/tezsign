@@ -6,6 +6,8 @@ SRC_URI = " \
     file://setup-gadget-dev.service \
     file://attach-gadget-dev.service \
     file://10-persistent.conf \
+    file://dev-prompt.sh \
+    file://tty1-getty.conf \
 "
 
 inherit systemd useradd
@@ -49,7 +51,20 @@ do_install:append() {
     # Install the journald override
     install -d ${D}${sysconfdir}/systemd/journald.conf.d/
     install -m 0644 ${WORKDIR}/10-persistent.conf ${D}${sysconfdir}/systemd/journald.conf.d/
+
+    # Dash does not expand the Bash-style prompt escapes from base-files.
+    install -d ${D}${sysconfdir}/profile.d/
+    install -m 0644 ${WORKDIR}/dev-prompt.sh ${D}${sysconfdir}/profile.d/
+    install -d ${D}/home/dev
+    install -m 0644 ${WORKDIR}/dev-prompt.sh ${D}/home/dev/.profile
+    install -m 0644 ${WORKDIR}/dev-prompt.sh ${D}/home/dev/.bashrc
+
+    install -d ${D}${sysconfdir}/systemd/system/getty@tty1.service.d/
+    install -m 0644 ${WORKDIR}/tty1-getty.conf ${D}${sysconfdir}/systemd/system/getty@tty1.service.d/10-visible-login.conf
 }
 
 # Ensure the directory gets packaged
 FILES:${PN} += "${sysconfdir}/systemd/journald.conf.d/10-persistent.conf"
+FILES:${PN} += "${sysconfdir}/profile.d/dev-prompt.sh"
+FILES:${PN} += "/home/dev /home/dev/.profile /home/dev/.bashrc"
+FILES:${PN} += "${sysconfdir}/systemd/system/getty@tty1.service.d/10-visible-login.conf"

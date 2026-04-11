@@ -13,6 +13,7 @@ PACKAGE_EXCLUDE += "kernel-image-* kernel-devicetree"
 
 # This recipe only exists to produce the bundled initramfs payload.
 IMAGE_POSTPROCESS_COMMAND = ""
+ROOTFS_POSTPROCESS_COMMAND:append = " enable_dev_local_getty;"
 ROOTFS_POSTPROCESS_COMMAND:append = " tezsign_initramfs_make_init_link;"
 WKS_FILE = ""
 

@@ -16,6 +16,7 @@ SRC_URI:append = " \
     file://rpi-zero2w-dev.cfg \
     file://rpi4-dev.cfg \
     file://radxa-zero3.cfg \
+    file://radxa-zero3-dev.cfg \
 "
 SRC_URI:append:raspberrypi0-2w-tezsign = " file://defconfig"
 SRC_URI:append:raspberrypi4-tezsign = " file://defconfig"
@@ -28,6 +29,7 @@ TEZSIGN_KERNEL_CONFIG_FRAGMENTS:append:raspberrypi0-2w-tezsign = "${@' rpi-dev-c
 TEZSIGN_KERNEL_CONFIG_FRAGMENTS:raspberrypi4-tezsign = "tezsign-common.cfg rpi-common.cfg rpi4.cfg"
 TEZSIGN_KERNEL_CONFIG_FRAGMENTS:append:raspberrypi4-tezsign = "${@' rpi-dev-common.cfg rpi4-dev.cfg' if d.getVar('TEZSIGN_DEV') == '1' else ''}"
 TEZSIGN_KERNEL_CONFIG_FRAGMENTS:radxa-zero3-tezsign = "tezsign-common.cfg radxa-zero3.cfg"
+TEZSIGN_KERNEL_CONFIG_FRAGMENTS:append:radxa-zero3-tezsign = "${@' radxa-zero3-dev.cfg' if d.getVar('TEZSIGN_DEV') == '1' else ''}"
 
 do_configure:append() {
     fragments=""

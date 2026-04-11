@@ -10,7 +10,7 @@ local_conf_header:
   settings: |
     TEZSIGN_DEV = "1"
     TEZSIGN_DWC2_DR_MODE = "otg"
-    IMAGE_BOOT_FILES:append = " vc4-fkms-v3d.dtbo;overlays/vc4-fkms-v3d.dtbo"
-    RPI_EXTRA_CONFIG:append = "\ndtoverlay=vc4-fkms-v3d"
-    CMDLINE:append = " console=tty1"
+    IMAGE_BOOT_FILES:append = " vc4-kms-v3d.dtbo;overlays/vc4-kms-v3d.dtbo"
+    RPI_EXTRA_CONFIG:append = "\ndtoverlay=vc4-kms-v3d"
+    CMDLINE:append = " console=tty1 quiet loglevel=3"
     VOLATILE_LOG_DIR = "no"
