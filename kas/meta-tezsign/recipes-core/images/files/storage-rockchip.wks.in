@@ -1,8 +1,7 @@
 # Rockchip SD-card image layout for TezSign.
+# The rootfs is bundled as initramfs inside the kernel Image (lives in RAM).
 # Bootloader binaries (idbloader, u-boot) are written to raw sectors
-# via post-processing (dd), NOT as GPT partitions. This matches the
-# Armbian approach for maximum Rockchip BootROM compatibility.
-# See: https://opensource.rock-chips.com/wiki_Partitions
+# via post-processing (dd), matching the Armbian approach.
 #
 # Raw layout (no GPT entries):
 #   sector 64    -> idbloader.img  (SPL)
@@ -10,8 +9,10 @@
 #
 # GPT partitions start at sector 32768 (16 MiB):
 
-part / --offset 32768s --label rootfsA --active --fstype=ext4 --part-name rootfsA --source rootfs --part-type ${ROOT_DPS} --size 512M
+part / --offset 32768s --label rootfs --active --fstype=ext4 --part-name rootfs --source rootfs --part-type ${ROOT_DPS} --size 512M
+# part /boot --offset 32768s --source bootimg-partition --sourceparams="loader=u-boot" --ondisk mmcblk0 --fstype=ext4 --label boot --part-name boot --active --size 64M
 part /app --source rootfs --rootfs-dir=${DEPLOY_DIR_IMAGE}/appfs --ondisk mmcblk0 --fstype=ext4 --label app --part-name app --align 4096 --fixed-size 64M --fsoptions="ro,exec,noatime,nofail"
 part /data --ondisk mmcblk0 --fstype=ext4 --label data --part-name data --align 4096 --fixed-size 128M --mkfs-extraopts="-J size=8 -m 0 -I 1024 -O has_journal,inline_data,fast_commit" --fsoptions="rw,noatime,nofail,data=journal"
 
 bootloader --ptable gpt
+# bootloader --ptable gpt --configfile="${@'tezsign-radxa-extlinux-dev.conf' if d.getVar('TEZSIGN_DEV') == '1' else 'tezsign-radxa-extlinux.conf'}"

@@ -73,9 +73,6 @@ do_image_wic[depends] += "linux-mainline:do_deploy"
 WKS_FILE = "${THISDIR}/files/storage.wks.in"
 WKS_FILE:radxa-zero3-tezsign = "${THISDIR}/files/storage-rockchip.wks.in"
 
-# The Radxa boots from rootfs (no separate boot partition). Since we override
-# IMAGE_INSTALL (bypassing packagegroup-core-boot / MACHINE_ESSENTIAL_EXTRA_RDEPENDS),
-# we must explicitly install the kernel, DTB, and U-Boot extlinux config.
 IMAGE_INSTALL:append:radxa-zero3-tezsign = " kernel-image kernel-devicetree u-boot-extlinux"
 
 # Write Rockchip bootloader binaries to raw sectors (like Armbian does).
