@@ -20,3 +20,6 @@ imgs
 # go cache
 .gocache
 .gomodcache
+
+# codex settings
+.codex
