@@ -30,8 +30,12 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kas
       run: |
-        mkdir -p release
+        mkdir -p build downloads release
         docker run --privileged --rm \
+          --user "$(id -u):$(id -g)" \
+          -e HOME=/tmp \
+          -e USER="$(id -un)" \
+          -e LOGNAME="$(id -un)" \
           -v "${PWD}:/work" \
           --workdir /work \
           ghcr.io/siemens/kas/kas:latest \
