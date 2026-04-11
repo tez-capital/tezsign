@@ -83,7 +83,6 @@ jobs:
           - uses: actions/checkout@v5
             with:
                 fetch-depth: 0
-                submodules: true
 
           - uses: ./.github/template/build-host-linux
             with:
@@ -99,7 +98,6 @@ jobs:
           - uses: actions/checkout@v5
             with:
                 fetch-depth: 0
-                submodules: true
 
           - uses: ./.github/template/build-host-linux
             with:
@@ -115,7 +113,6 @@ jobs:
           - uses: actions/checkout@v5
             with:
                 fetch-depth: 0
-                submodules: true
 
           - uses: ./.github/template/build-host-macos
             with:
@@ -130,7 +127,6 @@ jobs:
           - uses: actions/checkout@v5
             with:
                 fetch-depth: 0
-                submodules: true
 
           - uses: ./.github/template/build-host-macos
             with:
@@ -145,7 +141,6 @@ jobs:
     #       - uses: actions/checkout@v5
     #         with:
     #             fetch-depth: 0
-    #             submodules: true
 
     #       - uses: ./.github/template/build-host-windows
     #         with:
@@ -161,7 +156,6 @@ jobs:
     #       - uses: actions/checkout@v5
     #         with:
     #             fetch-depth: 0
-    #             submodules: true
 
     #       - uses: ./.github/template/build-host-windows
     #         with:
@@ -197,12 +191,13 @@ jobs:
               merge-multiple: true
 
           - name: Set date
-            run: echo "DATE=$(date +'%Y%m%d%H%M')" >> $GITHUB_ENV
+            id: release_date
+            run: echo "date=$(date +'%Y%m%d%H%M')" >> "$GITHUB_OUTPUT"
             
           - name: publish
             uses: ncipollo/release-action@v1
             with:
               artifacts: ./release/*
-              tag: ${{ format('release-{0}', env.DATE) }}
+              tag: release-${{ steps.release_date.outputs.date }}
               commit: ${{ github.sha }}
               prerelease: true

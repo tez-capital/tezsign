@@ -27,6 +27,12 @@ runs:
     shell: bash
     run: mkdir -p build
 
+  - name: Checkout libusb submodule
+    shell: bash
+    run: |
+      git submodule sync libs/libusb
+      git submodule update --init --force libs/libusb
+
   - name: Install dev tools
     shell: bash
     run: |

@@ -5,6 +5,18 @@ tmp/*
 imgs
 !imgs/.gitkeep
 
+# KAS/Yocto checkouts and build state
+/kas/build
+/kas/downloads
+/kas/meta-arm
+/kas/meta-openembedded
+/kas/meta-raspberrypi
+/kas/meta-rockchip
+/kas/meta-virtualization
+/kas/poky
+/kas/release
+/kas/sstate-cache
+
 # go cache
 .gocache
 .gomodcache
