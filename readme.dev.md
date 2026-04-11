@@ -69,49 +69,6 @@ sudo reboot
 ```
 
 
-### local_build_check.sh
+### Yocto Builds
 
-Run the same matrix used by the GitHub `build-gadget` job against local source images:
-
-```sh
-tools/builder/local_build_check.sh
-```
-
-The script expects source images in `./imgs` and produces:
-
-- `./imgs/archives/raspberry_pi.img.xz`
-- `./imgs/archives/raspberry_pi.dev.img.xz`
-- `./imgs/archives/radxa_zero3.img.xz`
-- `./imgs/archives/radxa_zero3.dev.img.xz`
-
-Temporary builder workspace is created in `./imgs/.tezsign_image_builder`.
-
-If `raspberry_pi_dev.img` or `radxa_zero3_dev.img` are missing, it falls back to
-`raspberry_pi.img` / `radxa_zero3.img` for those dev rows.
-
-#### usage help
-```sh
-tools/builder/local_build_check.sh --help
-```
-
-#### board only
-```sh
-tools/builder/local_build_check.sh --raspberry_pi
-```
-```sh
-tools/builder/local_build_check.sh --radxa_zero
-```
-
-#### board + flavour
-```sh
-tools/builder/local_build_check.sh --raspberry_pi --prod
-```
-```sh
-tools/builder/local_build_check.sh --raspberry_pi --dev
-```
-```sh
-tools/builder/local_build_check.sh --radxa_zero --prod
-```
-```sh
-tools/builder/local_build_check.sh --radxa_zero --dev
-```
+Local image builds now use KAS and Yocto directly. See `kas/readme.md` for the production and dev build commands for Raspberry Pi 4, Raspberry Pi Zero 2 W, and Radxa Zero 3.
