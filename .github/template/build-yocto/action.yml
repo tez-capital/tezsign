@@ -30,6 +30,12 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kas
       run: |
+        for repo in poky meta-raspberrypi meta-openembedded meta-arm meta-rockchip meta-virtualization; do
+          if [ -e "${repo}" ] && [ ! -d "${repo}/.git" ]; then
+            rm -rf "${repo}"
+          fi
+        done
+
         mkdir -p build downloads release
         docker run --privileged --rm \
           --user "$(id -u):$(id -g)" \
