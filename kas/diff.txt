@@ -1,0 +1,996 @@
+diff --git a/kas/defconfig b/kas/defconfig
+deleted file mode 100644
+index 59c92d3..0000000
+--- a/kas/defconfig
++++ /dev/null
+@@ -1,194 +0,0 @@
+-# CONFIG_LOCALVERSION_AUTO is not set
+-CONFIG_SYSVIPC=y
+-# CONFIG_CROSS_MEMORY_ATTACH is not set
+-CONFIG_NO_HZ_FULL=y
+-CONFIG_HIGH_RES_TIMERS=y
+-CONFIG_PREEMPT_RT=y
+-CONFIG_CGROUPS=y
+-CONFIG_MEMCG=y
+-CONFIG_CGROUP_PIDS=y
+-CONFIG_CPUSETS=y
+-CONFIG_CGROUP_DEVICE=y
+-CONFIG_EXPERT=y
+-CONFIG_ARCH_ROCKCHIP=y
+-# CONFIG_AMPERE_ERRATUM_AC03_CPU_38 is not set
+-# CONFIG_AMPERE_ERRATUM_AC04_CPU_23 is not set
+-# CONFIG_ARM64_ERRATUM_826319 is not set
+-# CONFIG_ARM64_ERRATUM_827319 is not set
+-# CONFIG_ARM64_ERRATUM_824069 is not set
+-# CONFIG_ARM64_ERRATUM_819472 is not set
+-# CONFIG_ARM64_ERRATUM_832075 is not set
+-# CONFIG_ARM64_ERRATUM_843419 is not set
+-# CONFIG_ARM64_ERRATUM_1024718 is not set
+-# CONFIG_ARM64_ERRATUM_1165522 is not set
+-# CONFIG_ARM64_ERRATUM_1319367 is not set
+-# CONFIG_ARM64_ERRATUM_1530923 is not set
+-# CONFIG_ARM64_ERRATUM_1463225 is not set
+-# CONFIG_ARM64_ERRATUM_1508412 is not set
+-# CONFIG_ARM64_ERRATUM_2051678 is not set
+-# CONFIG_ARM64_ERRATUM_2077057 is not set
+-# CONFIG_ARM64_ERRATUM_2658417 is not set
+-# CONFIG_ARM64_ERRATUM_2054223 is not set
+-# CONFIG_ARM64_ERRATUM_2067961 is not set
+-# CONFIG_ARM64_ERRATUM_2645198 is not set
+-# CONFIG_ARM64_ERRATUM_2966298 is not set
+-# CONFIG_ARM64_ERRATUM_3117295 is not set
+-# CONFIG_ARM64_ERRATUM_3194386 is not set
+-# CONFIG_CAVIUM_ERRATUM_22375 is not set
+-# CONFIG_CAVIUM_ERRATUM_23154 is not set
+-# CONFIG_CAVIUM_ERRATUM_27456 is not set
+-# CONFIG_CAVIUM_ERRATUM_30115 is not set
+-# CONFIG_CAVIUM_TX2_ERRATUM_219 is not set
+-# CONFIG_FUJITSU_ERRATUM_010001 is not set
+-# CONFIG_HISILICON_ERRATUM_161600802 is not set
+-# CONFIG_HISILICON_ERRATUM_162100801 is not set
+-# CONFIG_QCOM_FALKOR_ERRATUM_1003 is not set
+-# CONFIG_QCOM_FALKOR_ERRATUM_1009 is not set
+-# CONFIG_QCOM_QDF2400_ERRATUM_0065 is not set
+-# CONFIG_QCOM_FALKOR_ERRATUM_E1041 is not set
+-# CONFIG_NVIDIA_CARMEL_CNP_ERRATUM is not set
+-# CONFIG_ROCKCHIP_ERRATUM_3568002 is not set
+-# CONFIG_ROCKCHIP_ERRATUM_3588001 is not set
+-# CONFIG_SOCIONEXT_SYNQUACER_PREITS is not set
+-CONFIG_NR_CPUS=4
+-CONFIG_HZ_1000=y
+-# CONFIG_ARM64_TAGGED_ADDR_ABI is not set
+-# CONFIG_ARM64_RAS_EXTN is not set
+-# CONFIG_ARM64_PTR_AUTH is not set
+-# CONFIG_ARM64_AMU_EXTN is not set
+-# CONFIG_ARM64_BTI is not set
+-# CONFIG_ARM64_E0PD is not set
+-# CONFIG_ARM64_POE is not set
+-# CONFIG_ARM64_GCS is not set
+-# CONFIG_ARM64_SVE is not set
+-CONFIG_RANDOMIZE_BASE=y
+-# CONFIG_EFI is not set
+-# CONFIG_SUSPEND is not set
+-CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
+-CONFIG_ENERGY_MODEL=y
+-CONFIG_CPU_FREQ=y
+-CONFIG_CPUFREQ_DT=y
+-# CONFIG_SCHED_SMT is not set
+-# CONFIG_SCHED_CLUSTER is not set
+-# CONFIG_STACKPROTECTOR is not set
+-# CONFIG_GCC_PLUGINS is not set
+-# CONFIG_BLOCK_LEGACY_AUTOLOAD is not set
+-# CONFIG_BLK_DEV_WRITE_MOUNTED is not set
+-CONFIG_BLK_WBT=y
+-# CONFIG_MQ_IOSCHED_KYBER is not set
+-# CONFIG_IOSCHED_BFQ is not set
+-# CONFIG_SWAP is not set
+-# CONFIG_SLAB_MERGE_DEFAULT is not set
+-# CONFIG_COMPAT_BRK is not set
+-CONFIG_CMA=y
+-CONFIG_NET=y
+-CONFIG_PACKET=y
+-CONFIG_UNIX=y
+-CONFIG_INET=y
+-CONFIG_DEVTMPFS=y
+-CONFIG_DEVTMPFS_MOUNT=y
+-# CONFIG_STANDALONE is not set
+-# CONFIG_PREVENT_FIRMWARE_BUILD is not set
+-CONFIG_FW_LOADER_USER_HELPER=y
+-# CONFIG_ARM_SMCCC_SOC_ID is not set
+-# CONFIG_BLK_DEV is not set
+-CONFIG_SRAM=y
+-CONFIG_NETDEVICES=y
+-# CONFIG_INPUT_KEYBOARD is not set
+-# CONFIG_INPUT_MOUSE is not set
+-# CONFIG_LEGACY_PTYS is not set
+-# CONFIG_LEGACY_TIOCSTI is not set
+-# CONFIG_LDISC_AUTOLOAD is not set
+-CONFIG_SERIAL_8250=y
+-CONFIG_SERIAL_8250_CONSOLE=y
+-CONFIG_SERIAL_8250_EXTENDED=y
+-CONFIG_SERIAL_8250_SHARE_IRQ=y
+-CONFIG_SERIAL_8250_DW=y
+-CONFIG_SERIAL_OF_PLATFORM=y
+-# CONFIG_HW_RANDOM_ARM_SMCCC_TRNG is not set
+-# CONFIG_DEVMEM is not set
+-# CONFIG_DEVPORT is not set
+-CONFIG_I2C_RK3X=y
+-# CONFIG_PTP_1588_CLOCK is not set
+-CONFIG_POWER_RESET_SYSCON=y
+-CONFIG_POWER_RESET_SYSCON_POWEROFF=y
+-CONFIG_SYSCON_REBOOT_MODE=y
+-# CONFIG_HWMON is not set
+-CONFIG_THERMAL=y
+-CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
+-CONFIG_CPU_THERMAL=y
+-CONFIG_ROCKCHIP_THERMAL=y
+-CONFIG_MFD_RK8XX_I2C=y
+-CONFIG_REGULATOR=y
+-CONFIG_REGULATOR_FIXED_VOLTAGE=y
+-CONFIG_REGULATOR_FAN53555=y
+-CONFIG_REGULATOR_RK808=y
+-CONFIG_DRM=y
+-CONFIG_DRM_ROCKCHIP=y
+-CONFIG_ROCKCHIP_VOP2=y
+-CONFIG_ROCKCHIP_DW_HDMI=y
+-CONFIG_FB=y
+-CONFIG_LOGO=y
+-CONFIG_SOUND=y
+-CONFIG_SND=y
+-CONFIG_SND_SOC=y
+-CONFIG_SND_SOC_ROCKCHIP_I2S=y
+-# CONFIG_HID_SUPPORT is not set
+-CONFIG_USB=y
+-CONFIG_USB_DWC3=y
+-CONFIG_USB_GADGET=y
+-CONFIG_USB_CONFIGFS=y
+-CONFIG_USB_CONFIGFS_ECM=y
+-CONFIG_USB_CONFIGFS_F_FS=y
+-CONFIG_MMC=y
+-CONFIG_MMC_SDHCI=y
+-CONFIG_MMC_SDHCI_PLTFM=y
+-CONFIG_MMC_SDHCI_OF_DWCMSHC=y
+-CONFIG_MMC_DW=y
+-CONFIG_MMC_DW_ROCKCHIP=y
+-CONFIG_NEW_LEDS=y
+-CONFIG_LEDS_CLASS=y
+-CONFIG_LEDS_GPIO=y
+-CONFIG_DMADEVICES=y
+-CONFIG_PL330_DMA=y
+-# CONFIG_VIRTIO_MENU is not set
+-# CONFIG_VHOST_MENU is not set
+-# CONFIG_SURFACE_PLATFORMS is not set
+-# CONFIG_ARM64_PLATFORM_DEVICES is not set
+-# CONFIG_ARM_ARCH_TIMER_EVTSTREAM is not set
+-# CONFIG_FSL_ERRATUM_A008585 is not set
+-# CONFIG_HISILICON_ERRATUM_161010101 is not set
+-# CONFIG_ARM64_ERRATUM_858921 is not set
+-CONFIG_ROCKCHIP_IOMMU=y
+-CONFIG_ROCKCHIP_IODOMAIN=y
+-CONFIG_EXTCON=y
+-CONFIG_PWM=y
+-CONFIG_PWM_ROCKCHIP=y
+-CONFIG_PHY_ROCKCHIP_INNO_HDMI=y
+-CONFIG_PHY_ROCKCHIP_INNO_USB2=y
+-CONFIG_PHY_ROCKCHIP_NANENG_COMBO_PHY=y
+-CONFIG_NVMEM=y
+-CONFIG_NVMEM_ROCKCHIP_OTP=y
+-CONFIG_EXT4_FS=y
+-CONFIG_EXT4_FS_POSIX_ACL=y
+-# CONFIG_DNOTIFY is not set
+-CONFIG_AUTOFS_FS=y
+-CONFIG_VFAT_FS=y
+-CONFIG_TMPFS=y
+-CONFIG_TMPFS_POSIX_ACL=y
+-# CONFIG_MISC_FILESYSTEMS is not set
+-CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_ISO8859_1=y
+-CONFIG_CRYPTO=y
+-CONFIG_CRYPTO_GHASH_ARM64_CE=y
+-CONFIG_CRYPTO_AES_ARM64_CE_CCM=y
+-CONFIG_CRYPTO_DEV_ROCKCHIP=y
+-CONFIG_DMA_CMA=y
+-CONFIG_PRINTK_TIME=y
+-# CONFIG_SYMBOLIC_ERRNAME is not set
+-# CONFIG_SECTION_MISMATCH_WARN_ONLY is not set
+-# CONFIG_SLUB_DEBUG is not set
+-CONFIG_STACKTRACE=y
+-# CONFIG_FTRACE is not set
+-# CONFIG_RUNTIME_TESTING_MENU is not set
+-# CONFIG_DEBUG_KERNEL is not set
+\ No newline at end of file
+diff --git a/kas/meta-tezsign/recipes-core/tezsign-utils/files/attach-gadget.c b/kas/meta-tezsign/recipes-core/tezsign-utils/files/attach-gadget.c
+index b5e43a6..1f1e5e5 100644
+--- a/kas/meta-tezsign/recipes-core/tezsign-utils/files/attach-gadget.c
++++ b/kas/meta-tezsign/recipes-core/tezsign-utils/files/attach-gadget.c
+@@ -1,3 +1,5 @@
++#define _DEFAULT_SOURCE
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -10,6 +12,7 @@
+ 
+ #define GADGET_UDC_FILE "/sys/kernel/config/usb_gadget/g1/UDC"
+ #define UDC_CLASS_PATH  "/sys/class/udc"
++#define FFS_EP1         "/dev/ffs/tezsign/ep1"
+ 
+ // Function to find the first available UDC
+ char* find_udc() {
+@@ -50,32 +53,61 @@ int main() {
+         return EXIT_FAILURE;
+     }
+ 
+-    // 2. Check if already attached
++    // 2. Wait for FFS descriptors to be written.
++    //    ep1 appears only after ffs_registrar writes both descriptors and
++    //    strings to ep0 (FFS transitions to FFS_ACTIVE).  Without this the
++    //    UDC bind races with ffs_registrar on warm reboots and fails with
++    //    -ENODEV because the FFS function has no descriptors yet.
++    printf("Waiting for FFS descriptors...\n");
++    while (access(FFS_EP1, F_OK) != 0) {
++        usleep(50000); // 50 ms
++    }
++    printf("FFS descriptors ready.\n");
++
++    // 3. Check if already attached
+     char current_udc[256] = {0};
+     FILE *fp = fopen(GADGET_UDC_FILE, "r");
+     if (fp) {
+         if (fgets(current_udc, sizeof(current_udc), fp)) {
+-            current_udc[strcspn(current_udc, "\n")] = 0; // trim newline
++            current_udc[strcspn(current_udc, "\n")] = 0;
+         }
+         fclose(fp);
+     }
+ 
+-    if (strcmp(current_udc, udc) == 0) {
++    if (strlen(current_udc) > 0 && strcmp(current_udc, udc) == 0) {
+         printf("UDC is already set to %s.\n", udc);
+     } else {
+-        // 3. Attach Gadget
+-        FILE *wfp = fopen(GADGET_UDC_FILE, "w");
+-        if (!wfp) {
+-            perror("Failed to open UDC attribute");
++        // 4. Bind gadget to UDC (with retry — DWC3 PHY may still be settling)
++        int bound = 0;
++        for (int attempt = 0; attempt < 40; attempt++) { // 40 × 250 ms = 10 s
++            int fd = open(GADGET_UDC_FILE, O_WRONLY | O_TRUNC);
++            if (fd < 0) {
++                perror("Failed to open UDC attribute");
++                free(udc);
++                return EXIT_FAILURE;
++            }
++            ssize_t n = write(fd, udc, strlen(udc));
++            int err = errno;
++            close(fd);
++
++            if (n == (ssize_t)strlen(udc)) {
++                printf("Attached gadget to UDC: %s\n", udc);
++                bound = 1;
++                break;
++            }
++            fprintf(stderr, "UDC bind attempt %d failed: %s\n",
++                    attempt + 1, strerror(err));
++            usleep(250000); // 250 ms
++        }
++
++        if (!bound) {
++            fprintf(stderr, "Failed to bind gadget to UDC after retries.\n");
+             free(udc);
+             return EXIT_FAILURE;
+         }
+-        fprintf(wfp, "%s", udc);
+-        fclose(wfp);
+-        printf("Attached gadget to UDC: %s\n", udc);
+     }
+ 
+-    // 4. Handle soft_connect symlink and ownership
++    // 5. Handle soft_connect symlink and ownership
+     char target[512], link_path[] = "/tmp/soft_connect";
+     snprintf(target, sizeof(target), "/sys/class/udc/%s/soft_connect", udc);
+     unlink(link_path);
+@@ -83,7 +115,7 @@ int main() {
+         change_owner(link_path, "registrar");
+     }
+ 
+-    // 5. Wait for Endpoints and fix ownership
++    // 6. Fix endpoint ownership (ep1-ep4 already exist from step 2)
+     const char *endpoints[] = {
+         "/dev/ffs/tezsign/ep1", "/dev/ffs/tezsign/ep2",
+         "/dev/ffs/tezsign/ep3", "/dev/ffs/tezsign/ep4"
+diff --git a/kas/meta-tezsign/recipes-kernel/linux-mainline/files/defconfig b/kas/meta-tezsign/recipes-kernel/linux-mainline/files/defconfig
+index 1de6bf9..08ab4b6 100644
+--- a/kas/meta-tezsign/recipes-kernel/linux-mainline/files/defconfig
++++ b/kas/meta-tezsign/recipes-kernel/linux-mainline/files/defconfig
+@@ -59,6 +59,16 @@ CONFIG_PWM=y
+ # ── MMC ──────────────────────────────────────────────────────────────────────
+ # Platform host driver enabled by platform/board fragment.
+ CONFIG_MMC=y
++CONFIG_PL330_DMA=y
++CONFIG_RESET_CONTROLLER=y
++CONFIG_IOSCHED_BFQ=y
++CONFIG_IOSCHED_KYBER=n
++CONFIG_MMC_BLOCK_MINORS=8
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_MMC_SDHCI_OF_DWCMSHC=y
++CONFIG_MMC_SDHCI_CQE=y
++CONFIG_CRYPTO_MANAGER_DISABLE_TESTS=y
+ 
+ # ── LED subsystem ────────────────────────────────────────────────────────────
+ CONFIG_NEW_LEDS=y
+@@ -91,7 +101,6 @@ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_TMPFS=y
+ CONFIG_TMPFS_POSIX_ACL=y
+-CONFIG_AUTOFS_FS=y
+ 
+ # ── Power ────────────────────────────────────────────────────────────────────
+ CONFIG_POWER_RESET_SYSCON=y
+@@ -99,7 +108,7 @@ CONFIG_POWER_RESET_SYSCON_POWEROFF=y
+ CONFIG_SYSCON_REBOOT_MODE=y
+ CONFIG_PRINTK_TIME=y
+ 
+-# ── defaults ────────────────────────────────────────────────────────────────────
++# ── other ────────────────────────────────────────────────────────────────────
+ # CONFIG_LOCALVERSION_AUTO is not set
+ # CONFIG_CROSS_MEMORY_ATTACH is not set
+ # CONFIG_CPU_ISOLATION is not set
+@@ -210,3 +219,14 @@ CONFIG_EPOLL=y
+ # CONFIG_SYMBOLIC_ERRNAME is not set
+ # CONFIG_SECTION_MISMATCH_WARN_ONLY is not set
+ # CONFIG_RUNTIME_TESTING_MENU is not set
++# CONFIG_SERIAL_OF_PLATFORM is not set
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_SERIAL_AMBA_PL011 is not set
++# CONFIG_SERIAL_XILINX_PS_UART is not set
++# CONFIG_SERIAL_FSL_LPUART is not set
++# CONFIG_SERIAL_FSL_LINFLEXUART is not set
++# CONFIG_SERIAL_DEV_BUS is not set
++# CONFIG_IPMI_HANDLER is not set
++# CONFIG_TCG_TPM is not set
++# CONFIG_EEPROM_AT24 is not set
++# CONFIG_RESET_CONTROLLER is not set
+\ No newline at end of file
+diff --git a/kas/meta-tezsign/recipes-kernel/linux-mainline/files/defconfig.backup b/kas/meta-tezsign/recipes-kernel/linux-mainline/files/defconfig.backup
+deleted file mode 100644
+index 27a237f..0000000
+--- a/kas/meta-tezsign/recipes-kernel/linux-mainline/files/defconfig.backup
++++ /dev/null
+@@ -1,461 +0,0 @@
+-# Tezsign appliance — shared ARM64 base defconfig.
+-# No SoC sub-architecture is enabled here; platform fragments add
+-# ARCH_BCM2835 (RPi) or ARCH_ROCKCHIP (Radxa) respectively.
+-#
+-# Fragment chain: defconfig → tezsign-common → platform-common → board → [dev]
+-
+-CONFIG_EXPERT=y
+-CONFIG_SECCOMP=y
+-CONFIG_CRYPTO_HW=y
+-
+-# ── Core system ──────────────────────────────────────────────────────────────
+-CONFIG_SYSVIPC=y
+-CONFIG_PM=y
+-CONFIG_NO_HZ_IDLE=y
+-CONFIG_HIGH_RES_TIMERS=y
+-CONFIG_PREEMPT=y
+-CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
+-# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+-# CONFIG_COMPAT_BRK is not set
+-CONFIG_CMA=y
+-CONFIG_DMA_CMA=y
+-CONFIG_RANDOMIZE_BASE=y
+-CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
+-CONFIG_JUMP_LABEL=y
+-
+-# ── ARM64 platforms: all off ──────────────────────────────────────────────────
+-# Every ARCH_* defaults to y in Kconfig.platforms.  Disable all here;
+-# platform fragments enable the one they need (ARCH_BCM / ARCH_ROCKCHIP).
+-# CONFIG_ARCH_ACTIONS is not set
+-# CONFIG_ARCH_SUNXI is not set
+-# CONFIG_ARCH_ALPINE is not set
+-# CONFIG_ARCH_APPLE is not set
+-# CONFIG_ARCH_BCM is not set
+-# CONFIG_ARCH_BERLIN is not set
+-# CONFIG_ARCH_BRCMSTB is not set
+-# CONFIG_ARCH_EXYNOS is not set
+-# CONFIG_ARCH_K3 is not set
+-# CONFIG_ARCH_LAYERSCAPE is not set
+-# CONFIG_ARCH_LG1K is not set
+-# CONFIG_ARCH_HISI is not set
+-# CONFIG_ARCH_KEEMBAY is not set
+-# CONFIG_ARCH_MEDIATEK is not set
+-# CONFIG_ARCH_MESON is not set
+-# CONFIG_ARCH_MVEBU is not set
+-# CONFIG_ARCH_NXP is not set
+-# CONFIG_ARCH_MA35 is not set
+-# CONFIG_ARCH_NPCM is not set
+-# CONFIG_ARCH_QCOM is not set
+-# CONFIG_ARCH_REALTEK is not set
+-# CONFIG_ARCH_RENESAS is not set
+-# CONFIG_ARCH_ROCKCHIP is not set
+-# CONFIG_ARCH_S32 is not set
+-# CONFIG_ARCH_SEATTLE is not set
+-# CONFIG_ARCH_INTEL_SOCFPGA is not set
+-# CONFIG_ARCH_STM32 is not set
+-# CONFIG_ARCH_SYNQUACER is not set
+-# CONFIG_ARCH_TEGRA is not set
+-# CONFIG_ARCH_SPRD is not set
+-# CONFIG_ARCH_THUNDER is not set
+-# CONFIG_ARCH_THUNDER2 is not set
+-# CONFIG_ARCH_UNIPHIER is not set
+-# CONFIG_ARCH_VEXPRESS is not set
+-# CONFIG_ARCH_VISCONTI is not set
+-# CONFIG_ARCH_XGENE is not set
+-# CONFIG_ARCH_ZYNQMP is not set
+-# CONFIG_ARCH_AIROHA is not set
+-
+-# ── Explicitly off: major features ───────────────────────────────────────────
+-# CONFIG_PCI is not set
+-# CONFIG_ACPI is not set
+-# CONFIG_VIRTUALIZATION is not set
+-# CONFIG_HIBERNATION is not set
+-# CONFIG_SUSPEND is not set
+-# CONFIG_BLK_DEV_INITRD is not set
+-# CONFIG_AUDIT is not set
+-# CONFIG_PROFILING is not set
+-# CONFIG_KEXEC is not set
+-# CONFIG_COMPAT is not set
+-# CONFIG_NUMA is not set
+-# CONFIG_IKCONFIG is not set
+-# CONFIG_XEN is not set
+-# CONFIG_KSM is not set
+-# CONFIG_TRANSPARENT_HUGEPAGE is not set
+-# CONFIG_BSD_PROCESS_ACCT is not set
+-# CONFIG_TASKSTATS is not set
+-# CONFIG_POSIX_MQUEUE is not set
+-# CONFIG_IRQ_TIME_ACCOUNTING is not set
+-# CONFIG_SCHED_SMT is not set
+-# CONFIG_SCHED_AUTOGROUP is not set
+-# CONFIG_USER_NS is not set
+-# CONFIG_MEMORY_HOTPLUG is not set
+-# CONFIG_MEMORY_FAILURE is not set
+-# CONFIG_HUGETLBFS is not set
+-# CONFIG_BPF_SYSCALL is not set
+-# CONFIG_IO_URING is not set
+-# CONFIG_SWAP is not set
+-# CONFIG_COREDUMP is not set
+-# CONFIG_PERF_EVENTS is not set
+-# CONFIG_AIO is not set
+-# CONFIG_USELIB is not set
+-# CONFIG_RELAY is not set
+-# CONFIG_KPROBES is not set
+-# CONFIG_CHECKPOINT_RESTORE is not set
+-# CONFIG_USERFAULTFD is not set
+-# CONFIG_SLUB_DEBUG is not set
+-# CONFIG_DNOTIFY is not set
+-# CONFIG_PROC_KCORE is not set
+-
+-# ── Cgroups (systemd essentials only) ────────────────────────────────────────
+-CONFIG_CGROUPS=y
+-CONFIG_MEMCG=y
+-CONFIG_CGROUP_PIDS=y
+-CONFIG_CPUSETS=y
+-CONFIG_CGROUP_DEVICE=y
+-# CONFIG_BLK_CGROUP is not set
+-# CONFIG_CGROUP_FREEZER is not set
+-# CONFIG_CGROUP_HUGETLB is not set
+-# CONFIG_CGROUP_CPUACCT is not set
+-# CONFIG_CGROUP_PERF is not set
+-
+-# ── CPU frequency ────────────────────────────────────────────────────────────
+-CONFIG_CPU_FREQ=y
+-CONFIG_CPUFREQ_DT=y
+-CONFIG_ENERGY_MODEL=y
+-# CONFIG_CPU_FREQ_STAT is not set
+-# CONFIG_CPU_FREQ_GOV_POWERSAVE is not set
+-# CONFIG_CPU_FREQ_GOV_USERSPACE is not set
+-# CONFIG_ARM_SCPI_CPUFREQ is not set
+-# CONFIG_ARM_SCMI_CPUFREQ is not set
+-
+-# ── Networking ───────────────────────────────────────────────────────────────
+-CONFIG_NET=y
+-CONFIG_UNIX=y
+-CONFIG_PACKET=y
+-CONFIG_INET=y
+-CONFIG_NETDEVICES=y
+-# CONFIG_IP_PNP is not set
+-# CONFIG_IP_MULTICAST is not set
+-# CONFIG_IPV6 is not set
+-# CONFIG_NETFILTER is not set
+-# CONFIG_BRIDGE is not set
+-# CONFIG_VLAN_8021Q is not set
+-# CONFIG_NET_SCHED is not set
+-# CONFIG_NET_DSA is not set
+-# CONFIG_NET_9P is not set
+-# CONFIG_HSR is not set
+-# CONFIG_WWAN is not set
+-# CONFIG_BT is not set
+-# CONFIG_CFG80211 is not set
+-# CONFIG_RFKILL is not set
+-# CONFIG_CAN is not set
+-# CONFIG_NFC is not set
+-# CONFIG_TUN is not set
+-# CONFIG_MACVLAN is not set
+-# CONFIG_VETH is not set
+-# CONFIG_ETHERNET is not set
+-# CONFIG_WLAN is not set
+-# CONFIG_MAC80211 is not set
+-# CONFIG_WIRELESS is not set
+-# CONFIG_HAMRADIO is not set
+-# CONFIG_QRTR is not set
+-
+-# ── Device infrastructure ────────────────────────────────────────────────────
+-CONFIG_DEVTMPFS=y
+-CONFIG_DEVTMPFS_MOUNT=y
+-CONFIG_FW_LOADER_USER_HELPER=y
+-CONFIG_SRAM=y
+-# CONFIG_ARM_SCMI_PROTOCOL is not set
+-# CONFIG_ARM_SCPI_PROTOCOL is not set
+-# CONFIG_EFI_CAPSULE_LOADER is not set
+-# CONFIG_VEXPRESS_CONFIG is not set
+-# CONFIG_CONNECTOR is not set
+-# CONFIG_GNSS is not set
+-# CONFIG_MHI_BUS is not set
+-# CONFIG_RPMSG is not set
+-# CONFIG_RPMSG_VIRTIO is not set
+-
+-# ── I2C ──────────────────────────────────────────────────────────────────────
+-CONFIG_I2C=y
+-# CONFIG_I2C_CHARDEV is not set
+-# CONFIG_I2C_MUX is not set
+-# CONFIG_I2C_DESIGNWARE_CORE is not set
+-# CONFIG_I2C_GPIO is not set
+-# CONFIG_I2C_CADENCE is not set
+-# CONFIG_I2C_CROS_EC_TUNNEL is not set
+-
+-# ── Regulators ───────────────────────────────────────────────────────────────
+-CONFIG_REGULATOR=y
+-CONFIG_REGULATOR_FIXED_VOLTAGE=y
+-CONFIG_REGULATOR_GPIO=y
+-# CONFIG_REGULATOR_ARM_SCMI is not set
+-# CONFIG_REGULATOR_PWM is not set
+-
+-# ── Serial ───────────────────────────────────────────────────────────────────
+-CONFIG_SERIAL_8250=y
+-CONFIG_SERIAL_8250_CONSOLE=y
+-CONFIG_SERIAL_8250_NR_UARTS=4
+-CONFIG_SERIAL_8250_EXTENDED=y
+-CONFIG_SERIAL_8250_SHARE_IRQ=y
+-CONFIG_SERIAL_OF_PLATFORM=y
+-# CONFIG_LEGACY_PTYS is not set
+-# CONFIG_SERIAL_AMBA_PL011 is not set
+-# CONFIG_SERIAL_XILINX_PS_UART is not set
+-# CONFIG_SERIAL_FSL_LPUART is not set
+-# CONFIG_SERIAL_FSL_LINFLEXUART is not set
+-# CONFIG_SERIAL_DEV_BUS is not set
+-# CONFIG_IPMI_HANDLER is not set
+-# CONFIG_TCG_TPM is not set
+-# CONFIG_EEPROM_AT24 is not set
+-
+-# ── GPIO / Pinctrl ──────────────────────────────────────────────────────────
+-CONFIG_GPIO_SYSCON=y
+-CONFIG_PINCTRL_SINGLE=y
+-# CONFIG_GPIO_DWAPB is not set
+-# CONFIG_GPIO_PL061 is not set
+-# CONFIG_GPIO_XGENE is not set
+-# CONFIG_GPIO_ALTERA is not set
+-# CONFIG_GPIO_AGGREGATOR is not set
+-
+-# ── DMA ──────────────────────────────────────────────────────────────────────
+-CONFIG_DMADEVICES=y
+-# CONFIG_FSL_EDMA is not set
+-# CONFIG_MV_XOR_V2 is not set
+-# CONFIG_DW_EDMA is not set
+-
+-# ── PWM ──────────────────────────────────────────────────────────────────────
+-CONFIG_PWM=y
+-
+-# ── SPI: not used ────────────────────────────────────────────────────────────
+-# CONFIG_SPI is not set
+-# CONFIG_SPMI is not set
+-
+-# ── USB gadget path ──────────────────────────────────────────────────────────
+-# Platform controller (DWC2 or DWC3) enabled by platform fragment.
+-CONFIG_USB=y
+-CONFIG_USB_GADGET=y
+-CONFIG_USB_CONFIGFS=y
+-CONFIG_USB_CONFIGFS_ECM=y
+-CONFIG_USB_CONFIGFS_F_FS=y
+-CONFIG_USB_F_ECM=y
+-CONFIG_USB_F_FS=y
+-# CONFIG_USB_XHCI_HCD is not set
+-# CONFIG_USB_EHCI_HCD is not set
+-# CONFIG_USB_OHCI_HCD is not set
+-# CONFIG_USB_STORAGE is not set
+-# CONFIG_USB_OTG is not set
+-# CONFIG_USB_MUSB_HDRC is not set
+-# CONFIG_USB_CDNS_SUPPORT is not set
+-# CONFIG_TYPEC is not set
+-# CONFIG_USB_ISP1760 is not set
+-# CONFIG_USB_HSIC_USB3503 is not set
+-# CONFIG_USB_ONBOARD_DEV is not set
+-# CONFIG_USB_CONN_GPIO is not set
+-# CONFIG_NOP_USB_XCEIV is not set
+-# CONFIG_USB_ULPI is not set
+-# CONFIG_USB_ACM is not set
+-# CONFIG_USB_NET_DRIVERS is not set
+-# CONFIG_USB_SERIAL is not set
+-# CONFIG_USB_CONFIGFS_SERIAL is not set
+-# CONFIG_USB_CONFIGFS_ACM is not set
+-# CONFIG_USB_CONFIGFS_OBEX is not set
+-# CONFIG_USB_CONFIGFS_NCM is not set
+-# CONFIG_USB_CONFIGFS_ECM_SUBSET is not set
+-# CONFIG_USB_CONFIGFS_RNDIS is not set
+-# CONFIG_USB_CONFIGFS_EEM is not set
+-# CONFIG_USB_CONFIGFS_MASS_STORAGE is not set
+-# CONFIG_USB_F_ACM is not set
+-# CONFIG_USB_F_SERIAL is not set
+-# CONFIG_USB_F_OBEX is not set
+-# CONFIG_USB_F_NCM is not set
+-# CONFIG_USB_F_EEM is not set
+-# CONFIG_USB_F_SUBSET is not set
+-# CONFIG_USB_F_RNDIS is not set
+-# CONFIG_USB_F_MASS_STORAGE is not set
+-# CONFIG_USB_CHIPIDEA is not set
+-# CONFIG_USB_USBNET is not set
+-# CONFIG_USB_NET_CDCETHER is not set
+-# CONFIG_USB_UAS is not set
+-
+-# ── MMC ──────────────────────────────────────────────────────────────────────
+-# Platform host driver enabled by platform/board fragment.
+-CONFIG_MMC=y
+-# CONFIG_MMC_ARMMMCI is not set
+-# CONFIG_MMC_STM32_SDMMC is not set
+-# CONFIG_MMC_SDHCI_ACPI is not set
+-# CONFIG_MMC_SDHCI_OF_DWCMSHC is not set
+-# CONFIG_MMC_SDHCI_CADENCE is not set
+-# CONFIG_MMC_SDHCI_F_SDH30 is not set
+-# CONFIG_MMC_SPI is not set
+-# CONFIG_MMC_DW_EXYNOS is not set
+-# CONFIG_MMC_DW_HI3798CV200 is not set
+-# CONFIG_MMC_DW_K3 is not set
+-# CONFIG_MMC_MTK is not set
+-# CONFIG_MMC_SDHCI_XENON is not set
+-
+-# ── LED subsystem ────────────────────────────────────────────────────────────
+-CONFIG_NEW_LEDS=y
+-CONFIG_LEDS_CLASS=y
+-CONFIG_LEDS_TRIGGER_TIMER=y
+-CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+-CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+-CONFIG_LEDS_TRIGGER_PANIC=y
+-# CONFIG_LEDS_PWM is not set
+-# CONFIG_LEDS_SYSCON is not set
+-
+-# ── Thermal ──────────────────────────────────────────────────────────────────
+-# Platform thermal driver enabled by board fragment.
+-CONFIG_CPU_THERMAL=y
+-CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
+-# CONFIG_DEVFREQ_THERMAL is not set
+-# CONFIG_THERMAL_EMULATION is not set
+-
+-# ── HWMON: off (thermal framework still works) ──────────────────────────────
+-# CONFIG_HWMON is not set
+-
+-# ── Crypto / HW RNG ─────────────────────────────────────────────────────────
+-# Platform HW RNG enabled by platform fragment.
+-CONFIG_HW_RANDOM=y
+-CONFIG_CRYPTO_GHASH_ARM64_CE=y
+-CONFIG_CRYPTO_SHA1_ARM64_CE=y
+-CONFIG_CRYPTO_SHA2_ARM64_CE=y
+-CONFIG_CRYPTO_AES_ARM64_CE_CCM=y
+-# CONFIG_CRYPTO_USER is not set
+-# CONFIG_CRYPTO_TEST is not set
+-# CONFIG_CRYPTO_DES is not set
+-# CONFIG_CRYPTO_ANSI_CPRNG is not set
+-# CONFIG_CRYPTO_USER_API_RNG is not set
+-
+-# ── Filesystems ──────────────────────────────────────────────────────────────
+-CONFIG_EXT4_FS=y
+-CONFIG_EXT4_FS_POSIX_ACL=y
+-CONFIG_VFAT_FS=y
+-CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_ISO8859_1=y
+-CONFIG_TMPFS=y
+-CONFIG_TMPFS_POSIX_ACL=y
+-# CONFIG_EXT4_FS_SECURITY is not set
+-# CONFIG_BTRFS_FS is not set
+-# CONFIG_FUSE_FS is not set
+-# CONFIG_CUSE is not set
+-# CONFIG_OVERLAY_FS is not set
+-# CONFIG_SQUASHFS is not set
+-# CONFIG_NFS_FS is not set
+-# CONFIG_ROOT_NFS is not set
+-# CONFIG_9P_FS is not set
+-# CONFIG_UBIFS_FS is not set
+-# CONFIG_EROFS_FS is not set
+-# CONFIG_JFFS2_FS is not set
+-# CONFIG_CRAMFS is not set
+-# CONFIG_ROMFS_FS is not set
+-# CONFIG_ECRYPT_FS is not set
+-# CONFIG_HFS_FS is not set
+-# CONFIG_HFSPLUS_FS is not set
+-# CONFIG_UFS_FS is not set
+-# CONFIG_F2FS_FS is not set
+-# CONFIG_NTFS3_FS is not set
+-# CONFIG_EXFAT_FS is not set
+-# CONFIG_XFS_FS is not set
+-# CONFIG_GFS2_FS is not set
+-# CONFIG_OCFS2_FS is not set
+-# CONFIG_NILFS2_FS is not set
+-# CONFIG_NETWORK_FILESYSTEMS is not set
+-# CONFIG_FANOTIFY is not set
+-# CONFIG_QUOTA is not set
+-CONFIG_AUTOFS_FS=y
+-# CONFIG_EFIVAR_FS is not set
+-# CONFIG_PSTORE_RAM is not set
+-# CONFIG_SECURITY is not set
+-
+-# ── Power ────────────────────────────────────────────────────────────────────
+-CONFIG_POWER_RESET_SYSCON=y
+-CONFIG_POWER_RESET_SYSCON_POWEROFF=y
+-CONFIG_SYSCON_REBOOT_MODE=y
+-# CONFIG_POWER_RESET_XGENE is not set
+-# CONFIG_POWER_SEQUENCING is not set
+-# CONFIG_POWER_SUPPLY is not set
+-# CONFIG_BATTERY_SBS is not set
+-# CONFIG_BATTERY_BQ27XXX is not set
+-
+-# ── Headless production defaults ─────────────────────────────────────────────
+-# Dev fragments override these with =y for HDMI console rescue.
+-# CONFIG_DRM is not set
+-# CONFIG_SOUND is not set
+-# CONFIG_SND is not set
+-# CONFIG_FB is not set
+-# CONFIG_FRAMEBUFFER_CONSOLE is not set
+-# CONFIG_VT is not set
+-# CONFIG_INPUT is not set
+-# CONFIG_SERIO is not set
+-# CONFIG_HID is not set
+-# CONFIG_BACKLIGHT_CLASS_DEVICE is not set
+-# CONFIG_MEDIA_SUPPORT is not set
+-# CONFIG_ACCESSIBILITY is not set
+-# CONFIG_AUXDISPLAY is not set
+-
+-# ── Storage: MMC only ────────────────────────────────────────────────────────
+-# CONFIG_ATA is not set
+-# CONFIG_SCSI is not set
+-# CONFIG_BLK_DEV_SD is not set
+-# CONFIG_MD is not set
+-# CONFIG_MTD is not set
+-# CONFIG_BLK_DEV_BSG is not set
+-# CONFIG_BLK_DEV_LOOP is not set
+-# CONFIG_BLK_DEV_NVME is not set
+-
+-# ── Appliance: off ───────────────────────────────────────────────────────────
+-# CONFIG_WATCHDOG is not set
+-# CONFIG_RTC_CLASS is not set
+-# CONFIG_MAGIC_SYSRQ is not set
+-# CONFIG_EDAC is not set
+-# CONFIG_VFIO is not set
+-# CONFIG_STAGING is not set
+-# CONFIG_IIO is not set
+-# CONFIG_HWSPINLOCK is not set
+-# CONFIG_ARM_MHU is not set
+-# CONFIG_PLATFORM_MHU is not set
+-# CONFIG_FPGA is not set
+-# CONFIG_REMOTEPROC is not set
+-# CONFIG_OPTEE is not set
+-# CONFIG_CHROME_PLATFORMS is not set
+-# CONFIG_GOOGLE_FIRMWARE is not set
+-# CONFIG_GNSS is not set
+-# CONFIG_RC_CORE is not set
+-# CONFIG_GREYBUS is not set
+-# CONFIG_SOUNDWIRE is not set
+-# CONFIG_INTERCONNECT is not set
+-# CONFIG_TEE is not set
+-# CONFIG_COUNTER is not set
+-# CONFIG_PM_DEVFREQ is not set
+-# CONFIG_ANDROID is not set
+-# CONFIG_HTE is not set
+-# CONFIG_SYNC_FILE is not set
+-# CONFIG_VIRTIO is not set
+-# CONFIG_VIRTIO_BLK is not set
+-# CONFIG_VIRTIO_NET is not set
+-# CONFIG_VIRTIO_CONSOLE is not set
+-# CONFIG_VIRTIO_BALLOON is not set
+-# CONFIG_VIRTIO_PCI is not set
+-# CONFIG_VIRTIO_MMIO is not set
+-# CONFIG_HW_RANDOM_VIRTIO is not set
+-# CONFIG_PCI_IOV is not set
+-# CONFIG_PCI_HOST_GENERIC is not set
+-# CONFIG_ARM_SMMU is not set
+-# CONFIG_ARM_SMMU_V3 is not set
+-# CONFIG_ARM_CCI_PMU is not set
+-# CONFIG_ARM_CCN is not set
+-# CONFIG_ARM_CMN is not set
+-# CONFIG_ARM_DSU_PMU is not set
+-# CONFIG_ARM_SPE_PMU is not set
+-# CONFIG_HISI_PMU is not set
+-# CONFIG_DMA_RESTRICTED_POOL is not set
+-# CONFIG_INDIRECT_PIO is not set
+-
+-# ── Debug: off in production ─────────────────────────────────────────────────
+-# CONFIG_DEBUG_FS is not set
+-# CONFIG_FTRACE is not set
+-# CONFIG_KALLSYMS_ALL is not set
+-# CONFIG_CORESIGHT is not set
+-# CONFIG_MEMTEST is not set
+-CONFIG_PRINTK_TIME=y
+diff --git a/kas/meta-tezsign/recipes-kernel/linux-mainline/files/radxa-common.cfg b/kas/meta-tezsign/recipes-kernel/linux-mainline/files/radxa-common.cfg
+index d3c82be..9e4ee58 100644
+--- a/kas/meta-tezsign/recipes-kernel/linux-mainline/files/radxa-common.cfg
++++ b/kas/meta-tezsign/recipes-kernel/linux-mainline/files/radxa-common.cfg
+@@ -1,7 +1,6 @@
+ # Rockchip platform — SoC and family-wide drivers.
+ # Enables ARCH_ROCKCHIP and the RK35xx peripherals needed to boot.
+ CONFIG_ARCH_ROCKCHIP=y
+-CONFIG_RESET_CONTROLLER=y
+ CONFIG_ROCKCHIP_PM_DOMAINS=y
+ CONFIG_COMMON_CLK_ROCKCHIP=y
+ CONFIG_IOMMU_DMA=y
+@@ -9,9 +8,6 @@ CONFIG_ROCKCHIP_IOMMU=y
+ CONFIG_ROCKCHIP_THERMAL=y
+ CONFIG_PINCTRL_ROCKCHIP=y
+ 
+-# EXTCON needed for PHY_ROCKCHIP_INNO_USB2 (depends on EXTCON in 6.18).
+-CONFIG_EXTCON=y
+-
+ # USB: DWC3 dual-role (respects per-port dr_mode from device tree).
+ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC3_HOST=n
+@@ -22,24 +18,9 @@ CONFIG_USB_DWC3_GADGET=n
+ CONFIG_PHY_ROCKCHIP_INNO_USB2=y
+ CONFIG_PHY_ROCKCHIP_NANENG_COMBO_PHY=y
+ 
+-# I2C bus
+-CONFIG_I2C_RK3X=y
+-
+-# PMIC
+-CONFIG_MFD_RK8XX_I2C=y
+-CONFIG_REGULATOR_RK808=y
+-CONFIG_REGULATOR_FAN53555=y
+-
+ # Serial: Synopsys DesignWare
+ CONFIG_SERIAL_8250_DW=y
+ 
+-# DMA engine
+-CONFIG_PL330_DMA=y
+-
+-# DRAM/bus frequency scaling
+-CONFIG_PM_DEVFREQ=y
+-CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND=y
+-
+ # PWM
+ CONFIG_PWM_ROCKCHIP=y
+ 
+@@ -47,31 +28,19 @@ CONFIG_PWM_ROCKCHIP=y
+ CONFIG_CRYPTO_DEV_ROCKCHIP=y
+ CONFIG_HW_RANDOM_ROCKCHIP=y
+ 
+-# NVMEM: OTP stores cpu-leakage / speed-bin data used by cpufreq-dt.
+-CONFIG_NVMEM=y
+-CONFIG_NVMEM_ROCKCHIP_OTP=y
+-
+-# IO domain controller: sets VCCIO voltage levels for pin groups.
+-CONFIG_ROCKCHIP_IODOMAIN=y
+-
+ # LED driver: Radxa boards use GPIO-connected status LEDs.
+ CONFIG_LEDS_GPIO=y
+ 
+ # MMC infrastructure.
+ # RK3568/RK3566 eMMC uses the DWCMSHC SDHCI variant.
+ # SD card uses Synopsys DesignWare Mobile Storage (DW-MMC).
+-CONFIG_MMC_SDHCI=y
+-CONFIG_MMC_SDHCI_PLTFM=y
+-CONFIG_MMC_SDHCI_OF_DWCMSHC=y
+ CONFIG_MMC_DW=y
+-CONFIG_MMC_DW_PLTFM=y
+ CONFIG_MMC_DW_ROCKCHIP=y
+ # CONFIG_CMA_SIZE_MBYTES=128
+ 
+-# Audio Stack (HDMI Audio)
+-CONFIG_SOUND=n
+-CONFIG_SND=n
+-CONFIG_SND_SOC=n
+-CONFIG_SND_SOC_ROCKCHIP=n
+-CONFIG_SND_SOC_ROCKCHIP_I2S=n
+-CONFIG_SND_SOC_HDMI_CODEC=n
++# Power and Bus
++CONFIG_I2C_RK3X=y
++CONFIG_MFD_RK8XX_I2C=y
++CONFIG_REGULATOR_RK808=y
++CONFIG_REGULATOR_FAN53555=y
++CONFIG_ROCKCHIP_IODOMAIN=y
+\ No newline at end of file
+diff --git a/kas/meta-tezsign/recipes-kernel/linux-mainline/files/radxa-dev-common.cfg b/kas/meta-tezsign/recipes-kernel/linux-mainline/files/radxa-dev-common.cfg
+index 43f0abe..f2ba63f 100644
+--- a/kas/meta-tezsign/recipes-kernel/linux-mainline/files/radxa-dev-common.cfg
++++ b/kas/meta-tezsign/recipes-kernel/linux-mainline/files/radxa-dev-common.cfg
+@@ -3,9 +3,8 @@
+ # Rockchip Display/Graphics Stack
+ CONFIG_DRM=y
+ CONFIG_DRM_ROCKCHIP=y
+-CONFIG_ROCKCHIP_VOP2=y
+ CONFIG_ROCKCHIP_DW_HDMI=y
+-CONFIG_ROCKCHIP_INNO_HDMI=n
++CONFIG_ROCKCHIP_INNO_HDMI=y
+ CONFIG_ROCKCHIP_DW_MIPI_DSI=n
+ 
+ # HDMI PHY for RK3566
+@@ -24,9 +23,3 @@ CONFIG_FB=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
+ CONFIG_LOGO=y
+-
+-CONFIG_NET=y
+-CONFIG_UNIX=y
+-CONFIG_PACKET=y
+-CONFIG_INET=y
+-CONFIG_NETDEVICES=y
+\ No newline at end of file
+diff --git a/kas/meta-tezsign/recipes-kernel/linux-mainline/files/tezsign-common-dev.cfg b/kas/meta-tezsign/recipes-kernel/linux-mainline/files/tezsign-common-dev.cfg
+index 8e1643a..5f96313 100644
+--- a/kas/meta-tezsign/recipes-kernel/linux-mainline/files/tezsign-common-dev.cfg
++++ b/kas/meta-tezsign/recipes-kernel/linux-mainline/files/tezsign-common-dev.cfg
+@@ -3,15 +3,13 @@
+ CONFIG_USB_CONFIGFS_ECM=y
+ CONFIG_USB_F_ECM=y
+ 
+-# ── Serial ───────────────────────────────────────────────────────────────────
+-CONFIG_SERIAL_8250=y
+-CONFIG_SERIAL_8250_CONSOLE=y
+-CONFIG_SERIAL_8250_NR_UARTS=4
+-CONFIG_SERIAL_8250_EXTENDED=y
+-CONFIG_SERIAL_8250_SHARE_IRQ=y
+-CONFIG_SERIAL_OF_PLATFORM=y
+-
+ # ── Networking ───────────────────────────────────────────────────────────────
+ CONFIG_PACKET=y
+ CONFIG_INET=y
+-CONFIG_NETDEVICES=y
+\ No newline at end of file
++CONFIG_NETDEVICES=y
++
++# ── Serial / console ───────────────────────────────────────────────────────────────
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_PM_DEVFREQ=y
+\ No newline at end of file
+diff --git a/kas/meta-tezsign/recipes-kernel/linux-mainline/files/tezsign-common.cfg b/kas/meta-tezsign/recipes-kernel/linux-mainline/files/tezsign-common.cfg
+index 4d59559..bf4c0f6 100644
+--- a/kas/meta-tezsign/recipes-kernel/linux-mainline/files/tezsign-common.cfg
++++ b/kas/meta-tezsign/recipes-kernel/linux-mainline/files/tezsign-common.cfg
+@@ -24,15 +24,6 @@ CONFIG_ENERGY_MODEL=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_CPU_IDLE=n
+ 
+-# ── MMC / block I/O performance ─────────────────────────────────────────────
+-CONFIG_MMC_CQHCI=y
+-CONFIG_MMC_SDHCI_CQE=y
+-CONFIG_IOSCHED_BFQ=n
+-CONFIG_IOSCHED_KYBER=n
+-CONFIG_MMC_BLOCK_MINORS=8
+-CONFIG_CRYPTO_MANAGER_DISABLE_TESTS=y
+-CONFIG_BLK_WBT=y
+-
+ # ── MFD / PMIC: only platform PMIC needed (RK8XX / BCM firmware) ────────────
+ CONFIG_MFD_BD9571MWV=n
+ CONFIG_MFD_AXP20X_I2C=n
+@@ -159,7 +150,7 @@ CONFIG_BRCMSTB_THERMAL=n
+ CONFIG_GENERIC_ADC_THERMAL=n
+ CONFIG_SENSORS_RASPBERRYPI_HWMON=n
+ 
+-# ── Debug ────────────────────────────────────
+-# CONFIG_FTRACE is not set
++# ── Debug / tracing ──────────────────────────────────
+ # CONFIG_DEBUG_KERNEL is not set
+-# CONFIG_SLUB_DEBUG is not set
+\ No newline at end of file
++# CONFIG_FTRACE is not set
++# CONFIG_KALLSYMS is not set
+\ No newline at end of file

@@ -43,7 +43,12 @@ do_configure:append() {
     done
 
     if [ -n "${fragments}" ]; then
-        ${S}/scripts/kconfig/merge_config.sh -m -O ${B} ${B}/.config ${fragments}
+        # Start from allnoconfig so only options explicitly listed in
+        # defconfig + fragments are enabled.  The default kernel class
+        # expands defconfig via olddefconfig filling thousands of
+        # unspecified options with kernel defaults (often =y).
+        oe_runmake -C ${S} O=${B} allnoconfig
+        ${S}/scripts/kconfig/merge_config.sh -m -O ${B} ${B}/.config ${WORKDIR}/defconfig ${fragments}
         oe_runmake -C ${S} O=${B} olddefconfig
     fi
 }
