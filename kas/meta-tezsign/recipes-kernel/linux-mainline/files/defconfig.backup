@@ -453,7 +453,6 @@ CONFIG_SYSCON_REBOOT_MODE=y
 # CONFIG_INDIRECT_PIO is not set
 
 # ── Debug: off in production ─────────────────────────────────────────────────
-# CONFIG_DEBUG_KERNEL is not set
 # CONFIG_DEBUG_FS is not set
 # CONFIG_FTRACE is not set
 # CONFIG_KALLSYMS_ALL is not set
