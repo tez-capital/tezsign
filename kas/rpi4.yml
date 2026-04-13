@@ -1,7 +1,7 @@
 header:
   version: 14
   includes:
-    - base.yml
+    - rpi-base.yml
 
 machine: raspberrypi4-tezsign
 

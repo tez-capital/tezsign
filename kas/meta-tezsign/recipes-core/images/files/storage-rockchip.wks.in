@@ -12,7 +12,7 @@
 part / --offset 32768s --label rootfs --active --fstype=ext4 --part-name rootfs --source rootfs --part-type ${ROOT_DPS} --size 512M --no-fstab-update
 # part /boot --offset 32768s --source bootimg-partition --sourceparams="loader=u-boot" --ondisk mmcblk0 --fstype=ext4 --label boot --part-name boot --active --size 64M
 part /app --source rootfs --rootfs-dir=${DEPLOY_DIR_IMAGE}/appfs --ondisk mmcblk0 --fstype=ext4 --label app --part-name app --align 4096 --fixed-size 64M --fsoptions="ro,exec,noatime,nofail" --no-fstab-update
-part /data --ondisk mmcblk0 --fstype=ext4 --label data --part-name data --align 4096 --fixed-size 128M --mkfs-extraopts="-J size=8 -m 0 -I 1024 -O has_journal,inline_data,fast_commit" --fsoptions="rw,noatime,nofail,data=journal" --no-fstab-update
+part /data --ondisk mmcblk0 --fstype=ext4 --label data --part-name data --align 4096 --fixed-size 128M --mkfs-extraopts="-J size=8 -m 0 -I 1024 -O has_journal,inline_data,fast_commit" --fsoptions="rw,noatime,nodiratime,data=journal,barrier=1,commit=60,nofail" --no-fstab-update
 
 bootloader --ptable gpt
 # bootloader --ptable gpt --configfile="${@'tezsign-radxa-extlinux-dev.conf' if d.getVar('TEZSIGN_DEV') == '1' else 'tezsign-radxa-extlinux.conf'}"

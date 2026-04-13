@@ -10,18 +10,12 @@ repos:
     branch: "scarthgap"
     layers:
       meta:
-      meta-poky:
-  meta-raspberrypi:
-    url: https://git.yoctoproject.org/meta-raspberrypi
-    branch: "scarthgap"
   meta-arm:
     url: https://git.yoctoproject.org/meta-arm
     branch: "scarthgap"
     layers:
       meta-arm:
       meta-arm-toolchain:
-  meta-tezsign:
-    path: meta-tezsign
   meta-openembedded:
     url: https://github.com/openembedded/meta-openembedded.git
     branch: "scarthgap"
@@ -30,9 +24,8 @@ repos:
       meta-python:
       meta-networking:
       meta-filesystems:
-  meta-rockchip:
-    url: https://github.com/radxa/meta-rockchip.git
-    branch: "scarthgap"
+  meta-tezsign:
+    path: meta-tezsign
 
 local_conf_header:
   speed_and_cache: |

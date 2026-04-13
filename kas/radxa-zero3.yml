@@ -1,7 +1,7 @@
 header:
   version: 14
   includes:
-    - base.yml
+    - rockchip-base.yml
 
 machine: radxa-zero3-tezsign
 
