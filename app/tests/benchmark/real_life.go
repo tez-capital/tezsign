@@ -1,0 +1,260 @@
+package main
+
+import (
+	"fmt"
+	"log/slog"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/tez-capital/tezsign/broker"
+	"github.com/tez-capital/tezsign/common"
+)
+
+type realLifeResult struct {
+	target    benchmarkTarget
+	pairs     int
+	successes int
+	failures  int
+	total     time.Duration
+	signs     durationStats
+	pairsStat durationStats
+}
+
+type durationStats struct {
+	min time.Duration
+	max time.Duration
+	avg time.Duration
+	p50 time.Duration
+	p95 time.Duration
+	p99 time.Duration
+}
+
+func runRealLifeMode(mgmtBroker, signBroker *broker.Broker, masterPass []byte, cfg benchmarkConfig, l *slog.Logger) error {
+	target, err := resolveRealLifeTarget(cfg.kind)
+	if err != nil {
+		return fmt.Errorf("benchmark config: %w", err)
+	}
+	if cfg.realLifePairs <= 0 {
+		return fmt.Errorf("real-life pairs must be > 0")
+	}
+	if cfg.realLifeInterval < 0 {
+		return fmt.Errorf("real-life interval must be >= 0")
+	}
+
+	key1, err := resolveBenchmarkKeyByID(mgmtBroker, masterPass, cfg.keyID, "bench-real-life-a", l)
+	if err != nil {
+		return fmt.Errorf("resolve real-life key1: %w", err)
+	}
+	key2, err := resolveBenchmarkKeyByID(mgmtBroker, masterPass, cfg.keyID2, "bench-real-life-b", l)
+	if err != nil {
+		if key1.created && cfg.cleanup {
+			cleanupBenchmarkKeys(mgmtBroker, []benchmarkKey{key1}, masterPass, cfg.cleanup, l)
+		}
+		return fmt.Errorf("resolve real-life key2: %w", err)
+	}
+	if key1.id == key2.id || key1.tz4 == key2.tz4 {
+		return fmt.Errorf("real-life benchmark needs two different keys")
+	}
+
+	keys := []benchmarkKey{key1, key2}
+	unlocked := false
+	defer func() {
+		if !unlocked {
+			return
+		}
+		cleanupBenchmarkKeys(mgmtBroker, keys, masterPass, cfg.cleanup, l)
+	}()
+
+	if err := unlockBenchmarkKeys(mgmtBroker, keys, masterPass, cfg); err != nil {
+		return err
+	}
+	unlocked = true
+
+	fmt.Println("== Real-Life")
+	fmt.Printf(
+		"real-life key1=%s tz4=%s key2=%s tz4=%s kind=%s cycles=%d sign_requests=%d interval=%s\n",
+		key1.id,
+		key1.tz4,
+		key2.id,
+		key2.tz4,
+		target.name,
+		cfg.realLifePairs,
+		cfg.realLifePairs*2,
+		cfg.realLifeInterval,
+	)
+
+	result, err := runRealLifeBenchmark(signBroker, key1, key2, target, cfg.realLifePairs, cfg.realLifeInterval, l)
+	if err != nil {
+		return err
+	}
+	printRealLifeResult(result)
+
+	return nil
+}
+
+func resolveRealLifeTarget(kind string) (benchmarkTarget, error) {
+	if strings.TrimSpace(kind) == "" || strings.EqualFold(strings.TrimSpace(kind), "all") {
+		return benchmarkTarget{name: "attestation", kind: 0x13}, nil
+	}
+
+	targets, err := resolveTargets(kind)
+	if err != nil {
+		return benchmarkTarget{}, err
+	}
+	if len(targets) != 1 {
+		return benchmarkTarget{}, fmt.Errorf("real-life mode needs one kind; use block, preattestation, or attestation")
+	}
+	return targets[0], nil
+}
+
+func runRealLifeBenchmark(
+	b *broker.Broker,
+	key1 benchmarkKey,
+	key2 benchmarkKey,
+	target benchmarkTarget,
+	pairs int,
+	interval time.Duration,
+	l *slog.Logger,
+) (realLifeResult, error) {
+	durations := make([]time.Duration, 0, pairs*2)
+	pairDurations := make([]time.Duration, 0, pairs)
+	failures := 0
+	level := uint64(1)
+	benchStart := time.Now()
+	runSeed := benchStart.UTC().UnixNano()
+
+	for i := 0; i < pairs; i++ {
+		payload := buildRealLifePayload(target, level, i, runSeed)
+		if len(payload) == 0 {
+			return realLifeResult{}, fmt.Errorf("could not build payload for %s", target.name)
+		}
+
+		pairStart := time.Now()
+		for keyIndex, key := range []benchmarkKey{key1, key2} {
+			t0 := time.Now()
+			_, err := common.ReqSign(b, key.tz4, payload)
+			dt := time.Since(t0)
+
+			if err != nil {
+				failures++
+				l.Error("real-life sign failed",
+					slog.String("kind", target.name),
+					slog.Int("pair", i),
+					slog.Int("key_index", keyIndex+1),
+					slog.String("key", key.id),
+					slog.Uint64("level", level),
+					slog.Any("err", err),
+				)
+				continue
+			}
+
+			durations = append(durations, dt)
+			l.Info("real-life sign",
+				slog.String("kind", target.name),
+				slog.Int("pair", i),
+				slog.Int("key_index", keyIndex+1),
+				slog.String("key", key.id),
+				slog.Uint64("level", level),
+				slog.Duration("duration", dt),
+			)
+		}
+		pairDurations = append(pairDurations, time.Since(pairStart))
+
+		level++
+		if i+1 < pairs && interval > 0 {
+			time.Sleep(interval)
+		}
+	}
+
+	if len(durations) == 0 {
+		return realLifeResult{}, fmt.Errorf("no successful real-life samples for %s", target.name)
+	}
+
+	return realLifeResult{
+		target:    target,
+		pairs:     pairs,
+		successes: len(durations),
+		failures:  failures,
+		total:     time.Since(benchStart),
+		signs:     summarizeDurations(durations),
+		pairsStat: summarizeDurations(pairDurations),
+	}, nil
+}
+
+func buildRealLifePayload(target benchmarkTarget, level uint64, pair int, runSeed int64) []byte {
+	payload := buildTenderbakePayload(target.kind, level, 0, nil)
+	seed := []byte(fmt.Sprintf("tezsign-real-life:%d:%s:%d:%d", runSeed, target.name, level, pair))
+	fillTenderbakePayloadData(target.kind, payload, seed)
+	return payload
+}
+
+func fillTenderbakePayloadData(kind byte, payload, seed []byte) {
+	switch kind {
+	case 0x11:
+		fillPayloadSegments(payload, seed, [][2]int{{1, 5}, {10, 42}, {42, 50}, {51, 83}})
+	case 0x12, 0x13:
+		fillPayloadSegments(payload, seed, [][2]int{{1, 37}})
+	}
+}
+
+func fillPayloadSegments(payload, seed []byte, segments [][2]int) {
+	if len(seed) == 0 {
+		return
+	}
+	offset := 0
+	for _, segment := range segments {
+		start, end := segment[0], segment[1]
+		if start < 0 || end > len(payload) || start >= end {
+			continue
+		}
+		for i := start; i < end; i++ {
+			payload[i] = seed[offset%len(seed)]
+			offset++
+		}
+	}
+}
+
+func summarizeDurations(durations []time.Duration) durationStats {
+	if len(durations) == 0 {
+		return durationStats{}
+	}
+
+	sort.Slice(durations, func(i, j int) bool { return durations[i] < durations[j] })
+
+	var sum time.Duration
+	for _, d := range durations {
+		sum += d
+	}
+
+	return durationStats{
+		min: durations[0],
+		max: durations[len(durations)-1],
+		avg: sum / time.Duration(len(durations)),
+		p50: percentileDuration(durations, 50),
+		p95: percentileDuration(durations, 95),
+		p99: percentileDuration(durations, 99),
+	}
+}
+
+func printRealLifeResult(result realLifeResult) {
+	signsPerSec := float64(result.successes) / result.total.Seconds()
+	fmt.Printf(
+		"%s real-life: pairs=%d sign_ok=%d sign_fail=%d total=%s signs/s=%.2f sign_min=%s sign_avg=%s sign_p50=%s sign_p95=%s sign_p99=%s sign_max=%s pair_avg=%s pair_p95=%s pair_max=%s\n",
+		result.target.name,
+		result.pairs,
+		result.successes,
+		result.failures,
+		result.total.Round(time.Millisecond),
+		signsPerSec,
+		result.signs.min,
+		result.signs.avg,
+		result.signs.p50,
+		result.signs.p95,
+		result.signs.p99,
+		result.signs.max,
+		result.pairsStat.avg,
+		result.pairsStat.p95,
+		result.pairsStat.max,
+	)
+}

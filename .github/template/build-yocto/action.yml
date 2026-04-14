@@ -87,6 +87,8 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kas
       run: |
+        echo "Yocto runner CPUs: $(nproc)"
+
         for repo in poky meta-raspberrypi meta-openembedded meta-arm meta-rockchip meta-virtualization; do
           if [ -e "${repo}" ] && [ ! -d "${repo}/.git" ]; then
             rm -rf "${repo}"

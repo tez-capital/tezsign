@@ -20,12 +20,16 @@ import (
 )
 
 type benchmarkConfig struct {
-	samples int
-	warmup  int
-	kind    string
-	pass    string
-	keyID   string
-	cleanup bool
+	samples          int
+	warmup           int
+	kind             string
+	pass             string
+	keyID            string
+	keyID2           string
+	mode             string
+	realLifePairs    int
+	realLifeInterval time.Duration
+	cleanup          bool
 }
 
 type benchmarkTarget struct {
@@ -47,6 +51,12 @@ type benchmarkResult struct {
 	opsPerSec float64
 }
 
+type benchmarkKey struct {
+	id      string
+	tz4     string
+	created bool
+}
+
 func main() {
 	cfg := parseConfig()
 
@@ -66,6 +76,10 @@ func main() {
 		"warmup", cfg.warmup,
 		"kind", cfg.kind,
 		"key_id", cfg.keyID,
+		"key_id_2", cfg.keyID2,
+		"mode", cfg.mode,
+		"real_life_pairs", cfg.realLifePairs,
+		"real_life_interval", cfg.realLifeInterval,
 		"cleanup", cfg.cleanup,
 	)
 
@@ -109,11 +123,29 @@ func main() {
 		l.Info("master already initialized", slog.Bool("deterministic", info.GetDeterministicEnabled()))
 	}
 
-	keyID, keyTz4, created, err := resolveBenchmarkKey(mgmtBroker, masterPass, cfg, l)
-	if err != nil {
-		l.Error("resolve benchmark key", slog.Any("err", err))
+	switch normalizeBenchmarkMode(cfg.mode) {
+	case "latency":
+		if err := runLatencyMode(mgmtBroker, signBroker, masterPass, cfg, l); err != nil {
+			l.Error("benchmark failed", slog.Any("err", err))
+			os.Exit(1)
+		}
+	case "real-life":
+		if err := runRealLifeMode(mgmtBroker, signBroker, masterPass, cfg, l); err != nil {
+			l.Error("real-life benchmark failed", slog.Any("err", err))
+			os.Exit(1)
+		}
+	default:
+		l.Error("benchmark config", slog.String("err", fmt.Sprintf("unknown mode %q", cfg.mode)))
 		os.Exit(1)
 	}
+}
+
+func runLatencyMode(mgmtBroker, signBroker *broker.Broker, masterPass []byte, cfg benchmarkConfig, l *slog.Logger) error {
+	keyID, keyTz4, created, err := resolveBenchmarkKey(mgmtBroker, masterPass, cfg, l)
+	if err != nil {
+		return fmt.Errorf("resolve benchmark key: %w", err)
+	}
+	key := benchmarkKey{id: keyID, tz4: keyTz4, created: created}
 
 	unlocked := false
 	defer func() {
@@ -121,44 +153,17 @@ func main() {
 			return
 		}
 
-		if rs, err := common.ReqLockKeys(mgmtBroker, []string{keyID}); err != nil {
-			l.Warn("lock benchmark key", slog.String("key", keyID), slog.Any("err", err))
-		} else if len(rs) > 0 && !rs[0].GetOk() {
-			l.Warn("lock benchmark key", slog.String("key", keyID), slog.String("err", rs[0].GetError()))
-		}
-
-		if created && cfg.cleanup {
-			if rs, err := common.ReqDeleteKeys(mgmtBroker, []string{keyID}, masterPass); err != nil {
-				l.Warn("delete benchmark key", slog.String("key", keyID), slog.Any("err", err))
-			} else if len(rs) > 0 && !rs[0].GetOk() {
-				l.Warn("delete benchmark key", slog.String("key", keyID), slog.String("err", rs[0].GetError()))
-			}
-		}
+		cleanupBenchmarkKeys(mgmtBroker, []benchmarkKey{key}, masterPass, cfg.cleanup, l)
 	}()
 
-	rs, err := common.ReqUnlockKeys(mgmtBroker, []string{keyID}, masterPass)
-	if err != nil {
-		l.Error("unlock", slog.Any("err", err))
-		os.Exit(1)
-	}
-	if len(rs) == 0 {
-		l.Error("unlock", slog.String("key", keyID), slog.String("err", "empty response"))
-		os.Exit(1)
-	}
-	if !rs[0].GetOk() {
-		errMsg := rs[0].GetError()
-		if cfg.keyID != "" {
-			errMsg += " (check -pass or TEZSIGN_BENCH_PASS for the existing key)"
-		}
-		l.Error("unlock", slog.String("key", keyID), slog.String("err", errMsg))
-		os.Exit(1)
+	if err := unlockBenchmarkKeys(mgmtBroker, []benchmarkKey{key}, masterPass, cfg); err != nil {
+		return err
 	}
 	unlocked = true
 
 	targets, err := resolveTargets(cfg.kind)
 	if err != nil {
-		l.Error("benchmark config", slog.Any("err", err))
-		os.Exit(1)
+		return fmt.Errorf("benchmark config: %w", err)
 	}
 
 	fmt.Println("== End-to-End")
@@ -166,8 +171,7 @@ func main() {
 	for _, target := range targets {
 		result, err := runBenchmark(signBroker, keyTz4, target, cfg.samples, cfg.warmup, l)
 		if err != nil {
-			l.Error("benchmark failed", "kind", target.name, "err", err)
-			os.Exit(1)
+			return fmt.Errorf("%s: %w", target.name, err)
 		}
 		printBenchmarkResult(result)
 	}
@@ -175,9 +179,10 @@ func main() {
 	fmt.Println()
 	fmt.Println("== Local Keychain Comparison")
 	if err := runLocalKeychainComparison(cfg, targets); err != nil {
-		l.Error("local keychain comparison", slog.Any("err", err))
-		os.Exit(1)
+		return fmt.Errorf("local keychain comparison: %w", err)
 	}
+
+	return nil
 }
 
 func parseConfig() benchmarkConfig {
@@ -188,10 +193,25 @@ func parseConfig() benchmarkConfig {
 	flag.StringVar(&cfg.kind, "kind", "all", "kind to benchmark: block, preattestation, attestation, or all")
 	flag.StringVar(&cfg.pass, "pass", "", "master password used for init/unlock; falls back to TEZSIGN_BENCH_PASS or an interactive prompt")
 	flag.StringVar(&cfg.keyID, "key", "", "existing key id to reuse; if empty a fresh benchmark key is created")
+	flag.StringVar(&cfg.keyID2, "key2", "", "second existing key id for -mode real-life; if empty a fresh key is created")
+	flag.StringVar(&cfg.mode, "mode", "latency", "benchmark mode: latency or real-life")
+	flag.IntVar(&cfg.realLifePairs, "real-life-pairs", 10, "number of cycles for -mode real-life; each cycle signs once with the same two keys")
+	flag.DurationVar(&cfg.realLifeInterval, "real-life-interval", 3*time.Second, "sleep between generated payloads for -mode real-life")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete the auto-created benchmark key after the run")
 	flag.Parse()
 
 	return cfg
+}
+
+func normalizeBenchmarkMode(mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "", "latency", "end-to-end", "e2e":
+		return "latency"
+	case "real-life", "reallife", "real":
+		return "real-life"
+	default:
+		return mode
+	}
 }
 
 func resolveMasterPass(cfg benchmarkConfig) ([]byte, error) {
@@ -239,29 +259,37 @@ func resolveTargets(kind string) ([]benchmarkTarget, error) {
 }
 
 func resolveBenchmarkKey(mgmtBroker *broker.Broker, masterPass []byte, cfg benchmarkConfig, l *slog.Logger) (string, string, bool, error) {
-	if cfg.keyID != "" {
-		status, err := common.ReqStatus(mgmtBroker)
-		if err != nil {
-			return "", "", false, err
-		}
-		for _, key := range status.GetKeys() {
-			if key.GetKeyId() == cfg.keyID {
-				return key.GetKeyId(), key.GetTz4(), false, nil
-			}
-		}
-		return "", "", false, fmt.Errorf("key %q not found", cfg.keyID)
-	}
-
-	keyID := fmt.Sprintf("bench-%d", time.Now().UTC().UnixNano())
-	results, err := common.ReqNewKeys(mgmtBroker, []string{keyID}, masterPass)
+	key, err := resolveBenchmarkKeyByID(mgmtBroker, masterPass, cfg.keyID, "bench", l)
 	if err != nil {
 		return "", "", false, err
 	}
+	return key.id, key.tz4, key.created, nil
+}
+
+func resolveBenchmarkKeyByID(mgmtBroker *broker.Broker, masterPass []byte, requestedKeyID, prefix string, l *slog.Logger) (benchmarkKey, error) {
+	if requestedKeyID != "" {
+		status, err := common.ReqStatus(mgmtBroker)
+		if err != nil {
+			return benchmarkKey{}, err
+		}
+		for _, key := range status.GetKeys() {
+			if key.GetKeyId() == requestedKeyID {
+				return benchmarkKey{id: key.GetKeyId(), tz4: key.GetTz4()}, nil
+			}
+		}
+		return benchmarkKey{}, fmt.Errorf("key %q not found", requestedKeyID)
+	}
+
+	keyID := fmt.Sprintf("%s-%d", prefix, time.Now().UTC().UnixNano())
+	results, err := common.ReqNewKeys(mgmtBroker, []string{keyID}, masterPass)
+	if err != nil {
+		return benchmarkKey{}, err
+	}
 	if len(results) == 0 {
-		return "", "", false, fmt.Errorf("new key returned no result")
+		return benchmarkKey{}, fmt.Errorf("new key returned no result")
 	}
 	if !results[0].GetOk() {
-		return "", "", false, fmt.Errorf("new key failed: %s", results[0].GetError())
+		return benchmarkKey{}, fmt.Errorf("new key failed: %s", results[0].GetError())
 	}
 
 	l.Info("created benchmark key",
@@ -269,7 +297,95 @@ func resolveBenchmarkKey(mgmtBroker *broker.Broker, masterPass []byte, cfg bench
 		"tz4", results[0].GetTz4(),
 	)
 
-	return results[0].GetKeyId(), results[0].GetTz4(), true, nil
+	return benchmarkKey{id: results[0].GetKeyId(), tz4: results[0].GetTz4(), created: true}, nil
+}
+
+func unlockBenchmarkKeys(mgmtBroker *broker.Broker, keys []benchmarkKey, masterPass []byte, cfg benchmarkConfig) error {
+	keyIDs := benchmarkKeyIDs(keys)
+	results, err := common.ReqUnlockKeys(mgmtBroker, keyIDs, masterPass)
+	if err != nil {
+		return fmt.Errorf("unlock: %w", err)
+	}
+	if len(results) == 0 {
+		return fmt.Errorf("unlock: empty response")
+	}
+
+	for i, result := range results {
+		keyID := fmt.Sprintf("index %d", i)
+		if i < len(keyIDs) {
+			keyID = keyIDs[i]
+		}
+		if result.GetOk() {
+			continue
+		}
+
+		errMsg := result.GetError()
+		if cfg.keyID != "" || cfg.keyID2 != "" {
+			errMsg += " (check -pass or TEZSIGN_BENCH_PASS for existing keys)"
+		}
+		return fmt.Errorf("unlock key %q: %s", keyID, errMsg)
+	}
+
+	return nil
+}
+
+func cleanupBenchmarkKeys(mgmtBroker *broker.Broker, keys []benchmarkKey, masterPass []byte, cleanup bool, l *slog.Logger) {
+	keyIDs := benchmarkKeyIDs(keys)
+	if len(keyIDs) > 0 {
+		results, err := common.ReqLockKeys(mgmtBroker, keyIDs)
+		if err != nil {
+			l.Warn("lock benchmark keys", slog.Any("err", err))
+		} else {
+			for i, result := range results {
+				if result.GetOk() {
+					continue
+				}
+				keyID := fmt.Sprintf("index %d", i)
+				if i < len(keyIDs) {
+					keyID = keyIDs[i]
+				}
+				l.Warn("lock benchmark key", slog.String("key", keyID), slog.String("err", result.GetError()))
+			}
+		}
+	}
+
+	if !cleanup {
+		return
+	}
+
+	createdIDs := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if key.created {
+			createdIDs = append(createdIDs, key.id)
+		}
+	}
+	if len(createdIDs) == 0 {
+		return
+	}
+
+	results, err := common.ReqDeleteKeys(mgmtBroker, createdIDs, masterPass)
+	if err != nil {
+		l.Warn("delete benchmark keys", slog.Any("err", err))
+		return
+	}
+	for i, result := range results {
+		if result.GetOk() {
+			continue
+		}
+		keyID := fmt.Sprintf("index %d", i)
+		if i < len(createdIDs) {
+			keyID = createdIDs[i]
+		}
+		l.Warn("delete benchmark key", slog.String("key", keyID), slog.String("err", result.GetError()))
+	}
+}
+
+func benchmarkKeyIDs(keys []benchmarkKey) []string {
+	keyIDs := make([]string, 0, len(keys))
+	for _, key := range keys {
+		keyIDs = append(keyIDs, key.id)
+	}
+	return keyIDs
 }
 
 func runBenchmark(b *broker.Broker, tz4 string, target benchmarkTarget, samples, warmup int, l *slog.Logger) (benchmarkResult, error) {
