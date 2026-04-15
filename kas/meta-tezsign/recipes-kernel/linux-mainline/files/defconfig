@@ -1,271 +1,120 @@
-CONFIG_EXPERT=y
-CONFIG_CRYPTO=y
-CONFIG_CRYPTO_HW=y
+# ══════════════════════════════════════════════════════════════════════════════
+# tezsign kernel defconfig — ARM64
+# ══════════════════════════════════════════════════════════════════════════════
 
-# ── RT tuning ────────────────────────────────────────────────────────────────
+# ── General ──────────────────────────────────────────────────────────────────
 CONFIG_EXPERT=y
+CONFIG_MODULES=n
+CONFIG_PRINTK_TIME=y
+# CONFIG_LOCALVERSION_AUTO is not set
+
+# ── RT / preemption / timers ────────────────────────────────────────────────
 CONFIG_PREEMPT_RT=y
-CONFIG_HZ_250=n
 CONFIG_HZ_1000=y
-CONFIG_NO_HZ_IDLE=n
+CONFIG_HZ_250=n
 CONFIG_NO_HZ_FULL=y
+CONFIG_NO_HZ_IDLE=n
+CONFIG_HIGH_RES_TIMERS=y
+CONFIG_IRQ_TIME_ACCOUNTING=y
+# CONFIG_ARM_ARCH_TIMER_EVTSTREAM is not set
+
+# ── Scheduler ───────────────────────────────────────────────────────────────
+CONFIG_SCHED_MC=y
+CONFIG_SCHED_THERMAL_PRESSURE=y
+CONFIG_CGROUP_SCHED=y
+CONFIG_FAIR_GROUP_SCHED=y
+# CONFIG_SCHED_SMT is not set
+# CONFIG_SCHED_CLUSTER is not set
+
+# ── RCU ─────────────────────────────────────────────────────────────────────
 CONFIG_RCU_NOCB_CPU=y
+CONFIG_RCU_NOCB_CPU_CB_BOOST=y
+
+# ── CPU frequency ───────────────────────────────────────────────────────────
+CONFIG_CPU_FREQ=y
+CONFIG_CPU_FREQ_STAT=y
+CONFIG_CPU_FREQ_TIMES=y
+CONFIG_ENERGY_MODEL=y
+CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
+CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y
 CONFIG_CPU_FREQ_GOV_ONDEMAND=n
 CONFIG_CPU_FREQ_GOV_SCHEDUTIL=n
-CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
 CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=n
 CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=n
-CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y
-CONFIG_ENERGY_MODEL=y
-CONFIG_HIGH_RES_TIMERS=y
-CONFIG_CPU_IDLE=n
 
-# ── Core system ──────────────────────────────────────────────────────────────
-CONFIG_SYSVIPC=y
-CONFIG_PM=y
-CONFIG_PM_OPP=y
-CONFIG_NO_HZ_IDLE=y
-CONFIG_HIGH_RES_TIMERS=y
-CONFIG_PREEMPT=y
-CONFIG_MODULES=n
-CONFIG_CMA=y
-CONFIG_DMA_CMA=y
-CONFIG_RANDOMIZE_BASE=y
-CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
-CONFIG_JUMP_LABEL=y
-CONFIG_ARM_SCMI_PROTOCOL=y
+# ── CPU idle ────────────────────────────────────────────────────────────────
 CONFIG_CPU_IDLE=y
 CONFIG_ARM_PSCI_CPUIDLE=y
 CONFIG_CPU_IDLE_GOV_MENU=y
-CONFIG_IOMMU_DEFAULT_DMA_LAZY=y
-CONFIG_RCU_NOCB_CPU=y
-CONFIG_RCU_NOCB_CPU_CB_BOOST=y
-CONFIG_STRIP_ASM_SYMS=y
-CONFIG_ARM_GIC_V3=y
-CONFIG_ARM_GIC_V3_ITS=y
-CONFIG_ARM64_4K_PAGES=y
 
-# ── Cgroups (systemd essentials) ────────────────────────────────────────
+# ── Cgroups (systemd essentials) ────────────────────────────────────────────
 CONFIG_CGROUPS=y
 CONFIG_MEMCG=y
 CONFIG_CGROUP_PIDS=y
 CONFIG_CPUSETS=y
 CONFIG_CGROUP_DEVICE=y
 
-# ── CPU frequency ────────────────────────────────────────────────────────────
-CONFIG_CPU_FREQ=y
-CONFIG_CPU_FREQ_STAT=y
-CONFIG_CPU_FREQ_TIMES=y
-CONFIG_ENERGY_MODEL=y
+# ── Memory management ──────────────────────────────────────────────────────
+CONFIG_CMA=y
+CONFIG_DMA_CMA=y
+CONFIG_COMPACTION=y
+CONFIG_MIGRATION=y
+CONFIG_SLUB_CPU_PARTIAL=y
+# CONFIG_SWAP is not set
+# CONFIG_SLAB_MERGE_DEFAULT is not set
+# CONFIG_COMPAT_BRK is not set
 
-# ── Networking ───────────────────────────────────────────────────────────────
-CONFIG_NET=y
-CONFIG_UNIX=y
+# ── Binary formats / syscall interface ──────────────────────────────────────
+CONFIG_SYSVIPC=y
+CONFIG_BINFMT_ELF=y
+CONFIG_BINFMT_SCRIPT=y
+CONFIG_FHANDLE=y
+CONFIG_SIGNALFD=y
+CONFIG_TIMERFD=y
+CONFIG_EPOLL=y
+CONFIG_INOTIFY_USER=y
+CONFIG_SECCOMP=y
+# CONFIG_DNOTIFY is not set
+# CONFIG_BINFMT_MISC is not set
+# CONFIG_AIO is not set
 
-# ── Device infrastructure ────────────────────────────────────────────────────
-CONFIG_DEVTMPFS=y
-CONFIG_DEVTMPFS_MOUNT=y
-CONFIG_FW_LOADER_USER_HELPER=y
-CONFIG_SRAM=y
-
-# ── I2C ──────────────────────────────────────────────────────────────────────
-CONFIG_I2C=y
-
-# ── Regulators ───────────────────────────────────────────────────────────────
-CONFIG_REGULATOR=y
-CONFIG_REGULATOR_FIXED_VOLTAGE=y
-CONFIG_REGULATOR_GPIO=y
-
-# ── GPIO / Pinctrl ──────────────────────────────────────────────────────────
-CONFIG_PINCTRL_SINGLE=y
-
-# ── DMA ──────────────────────────────────────────────────────────────────────
-CONFIG_DMADEVICES=y
-
-# ── PWM ──────────────────────────────────────────────────────────────────────
-CONFIG_PWM=y
-
-# ── MMC ──────────────────────────────────────────────────────────────────────
-# Platform host driver enabled by platform/board fragment.
-CONFIG_MMC=y
-CONFIG_PL330_DMA=y
-CONFIG_RESET_CONTROLLER=y
-CONFIG_IOSCHED_BFQ=y
-CONFIG_MMC_BLOCK_MINORS=8
-CONFIG_MMC_SDHCI=y
-CONFIG_MMC_SDHCI_PLTFM=y
-CONFIG_MMC_SDHCI_OF_DWCMSHC=y
-CONFIG_MMC_SDHCI_CQE=y
-CONFIG_SCSI_MQ_DEFAULT=y
-CONFIG_EXT4_FS_FAST_COMMIT=y
-CONFIG_CRYPTO_MANAGER_DISABLE_TESTS=y
-
-# ── LED subsystem ────────────────────────────────────────────────────────────
-CONFIG_NEW_LEDS=y
-CONFIG_LEDS_CLASS=y
-CONFIG_LEDS_TRIGGER_TIMER=y
-CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
-CONFIG_LEDS_TRIGGER_PANIC=y
-
-# ── Thermal ──────────────────────────────────────────────────────────────────
-# Platform thermal driver enabled by board fragment.
-CONFIG_THERMAL=y
-CONFIG_CPU_THERMAL=y
-CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
-CONFIG_THERMAL_DEFAULT_GOV_POWER_ALLOCATOR=y
-
-# ── Crypto / HW RNG ─────────────────────────────────────────────────────────
-# Platform HW RNG enabled by platform fragment.
-CONFIG_HW_RANDOM=y
-CONFIG_CRYPTO_GHASH_ARM64_CE=y
-CONFIG_CRYPTO_LIB_SHA1_ARCH=y
-CONFIG_CRYPTO_LIB_SHA256_ARCH=y
-CONFIG_CRYPTO_AES_ARM64_CE_CCM=y
-
-# ── Filesystems ──────────────────────────────────────────────────────────────
-CONFIG_EXT4_FS=y
-CONFIG_EXT4_FS_POSIX_ACL=y
-CONFIG_VFAT_FS=y
-CONFIG_NLS_CODEPAGE_437=y
-CONFIG_NLS_ISO8859_1=y
-CONFIG_TMPFS=y
-CONFIG_TMPFS_POSIX_ACL=y
-
-# ── Power ────────────────────────────────────────────────────────────────────
-CONFIG_POWER_RESET_SYSCON=y
-CONFIG_POWER_RESET_SYSCON_POWEROFF=y
-CONFIG_SYSCON_REBOOT_MODE=y
-CONFIG_PRINTK_TIME=y
-
-# ── other ────────────────────────────────────────────────────────────────────
-# CONFIG_LOCALVERSION_AUTO is not set
-# CONFIG_CROSS_MEMORY_ATTACH is not set
+# ── Namespaces (disabled) ──────────────────────────────────────────────────
 # CONFIG_CPU_ISOLATION is not set
 # CONFIG_UTS_NS is not set
 # CONFIG_TIME_NS is not set
 # CONFIG_PID_NS is not set
-# CONFIG_AMPERE_ERRATUM_AC03_CPU_38 is not set
-# CONFIG_AMPERE_ERRATUM_AC04_CPU_23 is not set
-# CONFIG_ARM64_ERRATUM_826319 is not set
-# CONFIG_ARM64_ERRATUM_827319 is not set
-# CONFIG_ARM64_ERRATUM_824069 is not set
-# CONFIG_ARM64_ERRATUM_819472 is not set
-# CONFIG_ARM64_ERRATUM_832075 is not set
-# CONFIG_ARM64_ERRATUM_843419 is not set
-# CONFIG_ARM64_ERRATUM_1024718 is not set
-# CONFIG_ARM64_ERRATUM_1165522 is not set
-# CONFIG_ARM64_ERRATUM_1319367 is not set
-# CONFIG_ARM64_ERRATUM_1530923 is not set
-# CONFIG_ARM64_ERRATUM_1463225 is not set
-# CONFIG_ARM64_ERRATUM_1508412 is not set
-# CONFIG_ARM64_ERRATUM_2051678 is not set
-# CONFIG_ARM64_ERRATUM_2077057 is not set
-# CONFIG_ARM64_ERRATUM_2658417 is not set
-# CONFIG_ARM64_ERRATUM_2054223 is not set
-# CONFIG_ARM64_ERRATUM_2067961 is not set
-# CONFIG_ARM64_ERRATUM_2645198 is not set
-# CONFIG_ARM64_ERRATUM_2966298 is not set
-# CONFIG_ARM64_ERRATUM_3117295 is not set
-# CONFIG_ARM64_ERRATUM_3194386 is not set
-# CONFIG_CAVIUM_ERRATUM_22375 is not set
-# CONFIG_CAVIUM_ERRATUM_23154 is not set
-# CONFIG_CAVIUM_ERRATUM_27456 is not set
-# CONFIG_CAVIUM_ERRATUM_30115 is not set
-# CONFIG_CAVIUM_TX2_ERRATUM_219 is not set
-# CONFIG_FUJITSU_ERRATUM_010001 is not set
-# CONFIG_HISILICON_ERRATUM_161600802 is not set
-# CONFIG_HISILICON_ERRATUM_162100801 is not set
-# CONFIG_QCOM_FALKOR_ERRATUM_1003 is not set
-# CONFIG_QCOM_FALKOR_ERRATUM_1009 is not set
-# CONFIG_QCOM_QDF2400_ERRATUM_0065 is not set
-# CONFIG_QCOM_FALKOR_ERRATUM_E1041 is not set
-# CONFIG_NVIDIA_CARMEL_CNP_ERRATUM is not set
-# CONFIG_ROCKCHIP_ERRATUM_3568002 is not set
-# CONFIG_ROCKCHIP_ERRATUM_3588001 is not set
-# CONFIG_SOCIONEXT_SYNQUACER_PREITS is not set
-# CONFIG_ARM64_TAGGED_ADDR_ABI is not set
+
+# ── ARM64 architecture ─────────────────────────────────────────────────────
+CONFIG_ARM64_4K_PAGES=y
 CONFIG_ARM64_PAN=y
 CONFIG_ARM64_USE_LSE_ATOMICS=y
+CONFIG_ARM64_CNP=y
+CONFIG_ARM64_HW_AFDBM=y
+CONFIG_ARM64_TLB_RANGE=y
+CONFIG_ARM_GIC_V3=y
+CONFIG_ARM_GIC_V3_ITS=y
+CONFIG_RANDOMIZE_BASE=y
+# CONFIG_ARM64_SVE is not set
 # CONFIG_ARM64_RAS_EXTN is not set
 # CONFIG_ARM64_AMU_EXTN is not set
-# CONFIG_ARM64_BTI is not set
-# CONFIG_ARM64_E0PD is not set
 # CONFIG_ARM64_POE is not set
 # CONFIG_ARM64_GCS is not set
-# CONFIG_ARM64_SVE is not set
+# CONFIG_ARM64_TAGGED_ADDR_ABI is not set
 # CONFIG_EFI is not set
-# CONFIG_SUSPEND is not set
-# CONFIG_SCHED_SMT is not set
-# CONFIG_SCHED_CLUSTER is not set
-CONFIG_SCHED_MC=y
-CONFIG_SCHED_THERMAL_PRESSURE=y
-CONFIG_SECCOMP=y
-# CONFIG_STACKPROTECTOR is not set
-# CONFIG_GCC_PLUGINS is not set
-# CONFIG_BLOCK_LEGACY_AUTOLOAD is not set
-# CONFIG_BLK_DEV_WRITE_MOUNTED is not set
-CONFIG_MQ_IOSCHED_DEADLINE=y
-# CONFIG_MQ_IOSCHED_KYBER is not set
-CONFIG_BINFMT_ELF=y
-CONFIG_BINFMT_SCRIPT=y
-CONFIG_FHANDLE=y
-# CONFIG_SWAP is not set
-# CONFIG_SLAB_MERGE_DEFAULT is not set
-CONFIG_SLUB_CPU_PARTIAL=y
-# CONFIG_COMPAT_BRK is not set
-CONFIG_COMPACTION=y
-CONFIG_MIGRATION=y
-# CONFIG_STANDALONE is not set
-# CONFIG_PREVENT_FIRMWARE_BUILD is not set
-# CONFIG_ARM_SMCCC_SOC_ID is not set
-# CONFIG_BLK_DEV is not set
-# CONFIG_INPUT_KEYBOARD is not set
-# CONFIG_INPUT_MOUSE is not set
-# CONFIG_SERIO is not set
-# CONFIG_LEGACY_PTYS is not set
-# CONFIG_LEGACY_TIOCSTI is not set
-# CONFIG_LDISC_AUTOLOAD is not set
-# CONFIG_DEVMEM is not set
-# CONFIG_DEVPORT is not set
-# CONFIG_HWMON is not set
-# CONFIG_HID_SUPPORT is not set
-# CONFIG_USB_SUPPORT is not set
-# CONFIG_VIRTIO_MENU is not set
-# CONFIG_VHOST_MENU is not set
-# CONFIG_SURFACE_PLATFORMS is not set
-# CONFIG_ARM64_PLATFORM_DEVICES is not set
-# CONFIG_ARM_ARCH_TIMER_EVTSTREAM is not set
-# CONFIG_FSL_ERRATUM_A008585 is not set
-# CONFIG_HISILICON_ERRATUM_161010101 is not set
-# CONFIG_ARM64_ERRATUM_858921 is not set
-CONFIG_IOMMU_SUPPORT=y
-# CONFIG_DNOTIFY is not set
-CONFIG_INOTIFY_USER=y
-CONFIG_SIGNALFD=y
-CONFIG_TIMERFD=y
-CONFIG_EPOLL=y
-# CONFIG_MISC_FILESYSTEMS is not set
-# CONFIG_SYMBOLIC_ERRNAME is not set
-# CONFIG_SECTION_MISMATCH_WARN_ONLY is not set
-# CONFIG_RUNTIME_TESTING_MENU is not set
-# CONFIG_SERIAL_OF_PLATFORM is not set
-# CONFIG_LEGACY_PTYS is not set
-# CONFIG_SERIAL_AMBA_PL011 is not set
-# CONFIG_SERIAL_XILINX_PS_UART is not set
-# CONFIG_SERIAL_FSL_LPUART is not set
-# CONFIG_SERIAL_FSL_LINFLEXUART is not set
-# CONFIG_SERIAL_DEV_BUS is not set
-# CONFIG_IPMI_HANDLER is not set
-# CONFIG_TCG_TPM is not set
-# CONFIG_EEPROM_AT24 is not set
 
-# ── ARM64 self-protection (available on ARMv8.2-A) ─────────────────────────
+# ── ARM64 self-protection ──────────────────────────────────────────────────
 CONFIG_UNMAP_KERNEL_AT_EL0=y
 CONFIG_ARM64_SW_TTBR0_PAN=y
 CONFIG_SHADOW_CALL_STACK=y
 CONFIG_UNWIND_PATCH_PAC_INTO_SCS=y
 CONFIG_MITIGATE_SPECTRE_BRANCH_HISTORY=y
+CONFIG_ARM64_PTR_AUTH=y
+CONFIG_ARM64_PTR_AUTH_KERNEL=y
+CONFIG_ARM64_BTI=y
+CONFIG_ARM64_BTI_KERNEL=y
+CONFIG_ARM64_MTE=y
+CONFIG_ARM64_E0PD=y
+CONFIG_ARM64_EPAN=y
 
 # ── Memory allocator hardening ──────────────────────────────────────────────
 CONFIG_SLAB_FREELIST_HARDENED=y
@@ -273,9 +122,9 @@ CONFIG_SLAB_FREELIST_RANDOM=y
 CONFIG_RANDOM_KMALLOC_CACHES=y
 CONFIG_SHUFFLE_PAGE_ALLOCATOR=y
 CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y
-# CONFIG_INIT_ON_FREE_DEFAULT_ON is not set
 CONFIG_INIT_STACK_ALL_ZERO=y
 CONFIG_RANDOMIZE_KSTACK_OFFSET_DEFAULT=y
+# CONFIG_INIT_ON_FREE_DEFAULT_ON is not set
 
 # ── Kernel code / data integrity ────────────────────────────────────────────
 CONFIG_BUG=y
@@ -286,14 +135,7 @@ CONFIG_LIST_HARDENED=y
 CONFIG_ZERO_CALL_USED_REGS=y
 CONFIG_DEBUG_WX=y
 CONFIG_STRICT_KERNEL_RWX=y
-CONFIG_ARM64_PTR_AUTH=y
-CONFIG_ARM64_PTR_AUTH_KERNEL=y
-CONFIG_ARM64_BTI=y
-CONFIG_ARM64_BTI_KERNEL=y
-CONFIG_ARM64_MTE=y
 CONFIG_KASAN_HW_TAGS=y
-CONFIG_ARM64_E0PD=y
-CONFIG_ARM64_EPAN=y
 
 # ── Page table hardening ────────────────────────────────────────────────────
 CONFIG_PAGE_TABLE_CHECK=y
@@ -304,7 +146,6 @@ CONFIG_UBSAN=y
 CONFIG_UBSAN_BOUNDS=y
 CONFIG_UBSAN_LOCAL_BOUNDS=y
 CONFIG_UBSAN_TRAP=y
-# Disable non-bounds UBSAN checks to avoid noise and false positives:
 # CONFIG_UBSAN_SHIFT is not set
 # CONFIG_UBSAN_DIV_ZERO is not set
 # CONFIG_UBSAN_UNREACHABLE is not set
@@ -317,11 +158,10 @@ CONFIG_UBSAN_TRAP=y
 CONFIG_KFENCE=y
 CONFIG_KFENCE_SAMPLE_INTERVAL=100
 
-# ── Cut attack surface ─────────────────────────────────────────────────────
+# ── Attack surface reduction ───────────────────────────────────────────────
 CONFIG_SECURITY_DMESG_RESTRICT=y
 CONFIG_STATIC_USERMODEHELPER=y
 # CONFIG_PROC_KCORE is not set
-# CONFIG_BINFMT_MISC is not set
 # CONFIG_USERFAULTFD is not set
 # CONFIG_IO_URING is not set
 # CONFIG_KEXEC is not set
@@ -332,7 +172,6 @@ CONFIG_STATIC_USERMODEHELPER=y
 # CONFIG_FTRACE is not set
 # CONFIG_DEBUG_VM is not set
 # CONFIG_COREDUMP is not set
-# CONFIG_AIO is not set
 # CONFIG_MAGIC_SYSRQ is not set
 # CONFIG_KSM is not set
 # CONFIG_STAGING is not set
@@ -341,23 +180,201 @@ CONFIG_STATIC_USERMODEHELPER=y
 # CONFIG_CHECKPOINT_RESTORE is not set
 # CONFIG_RSEQ is not set
 # CONFIG_KCOV is not set
+# CONFIG_CROSS_MEMORY_ATTACH is not set
+# CONFIG_DEVMEM is not set
+# CONFIG_DEVPORT is not set
+# CONFIG_LEGACY_PTYS is not set
+# CONFIG_LEGACY_TIOCSTI is not set
+# CONFIG_LDISC_AUTOLOAD is not set
+# CONFIG_RUNTIME_TESTING_MENU is not set
+# CONFIG_GCC_PLUGINS is not set
 
-# ── Stack protector (disabled in defconfig for performance) ─────────────────
-# Uncomment to enable (recommended by KSPP, ~1-2% overhead):
-# CONFIG_STACKPROTECTOR=y
-# CONFIG_STACKPROTECTOR_STRONG=y
-
-CONFIG_ARM64_CNP=y
-CONFIG_ARM64_HW_AFDBM=y
-CONFIG_ARM64_TLB_RANGE=y
-CONFIG_CGROUP_SCHED=y
-CONFIG_FAIR_GROUP_SCHED=y
-CONFIG_IRQ_TIME_ACCOUNTING=y
-
+# ── SCMI / Mailbox ─────────────────────────────────────────────────────────
+CONFIG_ARM_SCMI_PROTOCOL=y
 CONFIG_COMMON_CLK_SCMI=y
 CONFIG_ARM_SCMI_CPUFREQ=y
 CONFIG_REGULATOR_ARM_SCMI=y
-CONFIG_MAILBOX=y
-CONFIG_ROCKCHIP_MBOX=y
 CONFIG_ARM_SCMI_TRANSPORT_SMC=y
 CONFIG_ARM_SCMI_TRANSPORT_MAILBOX=y
+CONFIG_MAILBOX=y
+CONFIG_ROCKCHIP_MBOX=y
+
+# ── Power management ───────────────────────────────────────────────────────
+CONFIG_PM=y
+CONFIG_PM_OPP=y
+CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
+CONFIG_POWER_RESET_SYSCON=y
+CONFIG_POWER_RESET_SYSCON_POWEROFF=y
+CONFIG_SYSCON_REBOOT_MODE=y
+# CONFIG_SUSPEND is not set
+
+# ── Networking ──────────────────────────────────────────────────────────────
+CONFIG_NET=y
+CONFIG_UNIX=y
+
+# ── Block layer / IO scheduling ────────────────────────────────────────────
+CONFIG_MQ_IOSCHED_DEADLINE=y
+CONFIG_IOSCHED_BFQ=y
+CONFIG_SCSI_MQ_DEFAULT=y
+# CONFIG_MQ_IOSCHED_KYBER is not set
+# CONFIG_BLOCK_LEGACY_AUTOLOAD is not set
+# CONFIG_BLK_DEV_WRITE_MOUNTED is not set
+# CONFIG_BLK_DEV is not set
+
+# ── Device infrastructure ──────────────────────────────────────────────────
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_FW_LOADER_USER_HELPER=y
+CONFIG_SRAM=y
+CONFIG_IOMMU_SUPPORT=y
+CONFIG_IOMMU_DEFAULT_DMA_LAZY=y
+CONFIG_RESET_CONTROLLER=y
+CONFIG_JUMP_LABEL=y
+CONFIG_STRIP_ASM_SYMS=y
+# CONFIG_STANDALONE is not set
+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
+# CONFIG_ARM_SMCCC_SOC_ID is not set
+
+# ── I2C ─────────────────────────────────────────────────────────────────────
+CONFIG_I2C=y
+
+# ── Regulators ──────────────────────────────────────────────────────────────
+CONFIG_REGULATOR=y
+CONFIG_REGULATOR_FIXED_VOLTAGE=y
+CONFIG_REGULATOR_GPIO=y
+
+# ── GPIO / Pinctrl ─────────────────────────────────────────────────────────
+CONFIG_PINCTRL_SINGLE=y
+
+# ── DMA ─────────────────────────────────────────────────────────────────────
+CONFIG_DMADEVICES=y
+CONFIG_PL330_DMA=y
+
+# ── PWM ─────────────────────────────────────────────────────────────────────
+CONFIG_PWM=y
+
+# ── MMC / SD ────────────────────────────────────────────────────────────────
+CONFIG_MMC=y
+CONFIG_MMC_BLOCK_MINORS=8
+CONFIG_MMC_SDHCI=y
+CONFIG_MMC_SDHCI_PLTFM=y
+CONFIG_MMC_SDHCI_OF_DWCMSHC=y
+CONFIG_MMC_SDHCI_CQE=y
+
+# ── LED subsystem ───────────────────────────────────────────────────────────
+CONFIG_NEW_LEDS=y
+CONFIG_LEDS_CLASS=y
+CONFIG_LEDS_TRIGGER_TIMER=y
+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+CONFIG_LEDS_TRIGGER_PANIC=y
+
+# ── Thermal ─────────────────────────────────────────────────────────────────
+CONFIG_THERMAL=y
+CONFIG_CPU_THERMAL=y
+CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
+CONFIG_THERMAL_DEFAULT_GOV_POWER_ALLOCATOR=y
+
+# ── Crypto / HW RNG ────────────────────────────────────────────────────────
+CONFIG_CRYPTO=y
+CONFIG_CRYPTO_HW=y
+CONFIG_HW_RANDOM=y
+CONFIG_CRYPTO_GHASH_ARM64_CE=y
+CONFIG_CRYPTO_LIB_SHA1_ARCH=y
+CONFIG_CRYPTO_LIB_SHA256_ARCH=y
+CONFIG_CRYPTO_AES_ARM64_CE_CCM=y
+CONFIG_CRYPTO_MANAGER_DISABLE_TESTS=y
+
+# ── Filesystems ─────────────────────────────────────────────────────────────
+CONFIG_EXT4_FS=y
+CONFIG_EXT4_FS_POSIX_ACL=y
+CONFIG_EXT4_FS_FAST_COMMIT=y
+CONFIG_VFAT_FS=y
+CONFIG_NLS_CODEPAGE_437=y
+CONFIG_NLS_ISO8859_1=y
+CONFIG_TMPFS=y
+CONFIG_TMPFS_POSIX_ACL=y
+# CONFIG_MISC_FILESYSTEMS is not set
+
+# ── Build / debug ──────────────────────────────────────────────────────────
+# CONFIG_SECTION_MISMATCH_WARN_ONLY is not set
+# CONFIG_SYMBOLIC_ERRNAME is not set
+
+# ── stack protector (~1-2% overhead, recommended by KSPP) ───────────
+CONFIG_STACKPROTECTOR=y
+CONFIG_STACKPROTECTOR_STRONG=y
+
+# ── disabled input / HID / USB ──────────────────────────────────────
+# CONFIG_INPUT_KEYBOARD is not set
+# CONFIG_INPUT_MOUSE is not set
+# CONFIG_SERIO is not set
+# CONFIG_HID_SUPPORT is not set
+# CONFIG_USB_SUPPORT is not set
+
+# ── disabled serial drivers (non-present hardware) ─────────────────
+# CONFIG_SERIAL_OF_PLATFORM is not set
+# CONFIG_SERIAL_AMBA_PL011 is not set
+# CONFIG_SERIAL_XILINX_PS_UART is not set
+# CONFIG_SERIAL_FSL_LPUART is not set
+# CONFIG_SERIAL_FSL_LINFLEXUART is not set
+# CONFIG_SERIAL_DEV_BUS is not set
+
+# ── disabled misc hardware ─────────────────────────────────────────
+# CONFIG_HWMON is not set
+# CONFIG_IPMI_HANDLER is not set
+# CONFIG_TCG_TPM is not set
+# CONFIG_EEPROM_AT24 is not set
+
+# ── disabled virtualization ────────────────────────────────────────
+# CONFIG_VIRTIO_MENU is not set
+# CONFIG_VHOST_MENU is not set
+
+# ── disabled platforms (non-present) ───────────────────────────────
+# CONFIG_SURFACE_PLATFORMS is not set
+# CONFIG_ARM64_PLATFORM_DEVICES is not set
+
+# ── vendor errata ─────────────────────
+# CONFIG_AMPERE_ERRATUM_AC03_CPU_38 is not set
+# CONFIG_AMPERE_ERRATUM_AC04_CPU_23 is not set
+# CONFIG_ARM64_ERRATUM_819472 is not set
+CONFIG_ARM64_ERRATUM_824069=y
+CONFIG_ARM64_ERRATUM_826319=y
+CONFIG_ARM64_ERRATUM_827319=y
+CONFIG_ARM64_ERRATUM_832075=y
+CONFIG_ARM64_ERRATUM_843419=y
+# CONFIG_ARM64_ERRATUM_858921 is not set
+CONFIG_ARM64_ERRATUM_1024718=y
+# CONFIG_ARM64_ERRATUM_1165522 is not set
+CONFIG_ARM64_ERRATUM_1319367=y
+# CONFIG_ARM64_ERRATUM_1463225 is not set
+# CONFIG_ARM64_ERRATUM_1508412 is not set
+CONFIG_ARM64_ERRATUM_1530923=y
+CONFIG_ARM64_ERRATUM_2441007=y
+# CONFIG_ARM64_ERRATUM_2441009 is not set
+# CONFIG_ARM64_ERRATUM_2051678 is not set
+# CONFIG_ARM64_ERRATUM_2054223 is not set
+# CONFIG_ARM64_ERRATUM_2067961 is not set
+# CONFIG_ARM64_ERRATUM_2077057 is not set
+# CONFIG_ARM64_ERRATUM_2645198 is not set
+# CONFIG_ARM64_ERRATUM_2658417 is not set
+# CONFIG_ARM64_ERRATUM_2966298 is not set
+# CONFIG_ARM64_ERRATUM_3117295 is not set
+# CONFIG_ARM64_ERRATUM_3194386 is not set
+# CONFIG_CAVIUM_ERRATUM_22375 is not set
+# CONFIG_CAVIUM_ERRATUM_23154 is not set
+# CONFIG_CAVIUM_ERRATUM_27456 is not set
+# CONFIG_CAVIUM_ERRATUM_30115 is not set
+# CONFIG_CAVIUM_TX2_ERRATUM_219 is not set
+# CONFIG_FUJITSU_ERRATUM_010001 is not set
+# CONFIG_FSL_ERRATUM_A008585 is not set
+# CONFIG_HISILICON_ERRATUM_161010101 is not set
+# CONFIG_HISILICON_ERRATUM_161600802 is not set
+# CONFIG_HISILICON_ERRATUM_162100801 is not set
+# CONFIG_NVIDIA_CARMEL_CNP_ERRATUM is not set
+# CONFIG_QCOM_FALKOR_ERRATUM_1003 is not set
+# CONFIG_QCOM_FALKOR_ERRATUM_1009 is not set
+# CONFIG_QCOM_FALKOR_ERRATUM_E1041 is not set
+# CONFIG_QCOM_QDF2400_ERRATUM_0065 is not set
+CONFIG_ROCKCHIP_ERRATUM_3568002=y
+# CONFIG_ROCKCHIP_ERRATUM_3588001 is not set
+# CONFIG_SOCIONEXT_SYNQUACER_PREITS is not set
