@@ -19,6 +19,7 @@ import (
 
 	"github.com/tez-capital/tezsign/secure"
 	"golang.org/x/crypto/argon2"
+	"golang.org/x/sys/unix"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -33,7 +34,10 @@ const (
 
 	tmpSuffix = ".tmp"
 
-	keyStateSlotSize     = 100
+	SYSTEM_PAGE_SIZE = 4 * 1024 // 4k
+	// for above we could use os.Getpagesize() but that may hurt the portability so for now we fix to 4K
+
+	keyStateSlotSize     = SYSTEM_PAGE_SIZE
 	keyStateSlotDataSize = keyStateSlotSize - 4
 	keyStateFileSize     = 2 * keyStateSlotSize
 	keyStateNonceSize    = 12
@@ -112,15 +116,15 @@ func readJSON(path string, v any) error {
 	return json.NewDecoder(f).Decode(v)
 }
 
-func writeJSONAtomic(path string, v any, perm os.FileMode) error {
+func writeJSONSync(path string, v any, perm os.FileMode) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
-	return writeBytesAtomic(path, b, perm)
+	return writeBytesSync(path, b, perm)
 }
 
-func writeBytesAtomic(path string, b []byte, perm os.FileMode) error {
+func writeBytesSync(path string, b []byte, perm os.FileMode) error {
 	tmp := path + tmpSuffix
 	file, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|os.O_SYNC, perm)
 	if err != nil {
@@ -193,7 +197,7 @@ func (fs *FileStore) InitMaster() error {
 		Created:                time.Now().UTC(),
 		NextDeterministicIndex: 1,
 	}
-	return writeJSONAtomic(masterPath, &mf, 0o600)
+	return writeJSONSync(masterPath, &mf, 0o600)
 }
 
 func (fs *FileStore) nextDeterministicIndex() (uint32, error) {
@@ -217,7 +221,7 @@ func (fs *FileStore) nextDeterministicIndex() (uint32, error) {
 	idx := mf.NextDeterministicIndex
 	mf.NextDeterministicIndex++
 
-	if err := writeJSONAtomic(masterPath, &mf, 0o600); err != nil {
+	if err := writeJSONSync(masterPath, &mf, 0o600); err != nil {
 		return 0, err
 	}
 
@@ -360,11 +364,11 @@ func (fs *FileStore) createKey(id string, masterPassword []byte, skLE32 []byte, 
 	}
 
 	// write files
-	if err := writeJSONAtomic(metaPath, &meta, 0o600); err != nil {
+	if err := writeJSONSync(metaPath, &meta, 0o600); err != nil {
 		return err
 	}
 
-	return writeBytesAtomic(binPath, encodeBundle(bundle), 0o600)
+	return writeBytesSync(binPath, encodeBundle(bundle), 0o600)
 }
 
 func (fs *FileStore) removeKey(id string) error {
@@ -503,7 +507,7 @@ func (fs *FileStore) WriteSeed(masterPassword []byte, enabled bool) error {
 	copy(out[1+12:], ct)
 
 	path := filepath.Join(fs.base, seedFileName)
-	return writeBytesAtomic(path, out, 0o600)
+	return writeBytesSync(path, out, 0o600)
 }
 
 // readSeed loads seed.bin and returns (enabled, seed32).
@@ -648,6 +652,7 @@ func encodeKeyStateSlot(slot []byte, dek []byte, id, tz4 string, ks *KeyState, s
 	if len(slot) != keyStateSlotSize {
 		return fmt.Errorf("invalid slot size %d", len(slot))
 	}
+	clear(slot)
 
 	var plain [keyStatePlainSize]byte
 	encodeKeyStatePlain(plain[:], ks, seq)
@@ -658,16 +663,20 @@ func encodeKeyStateSlot(slot []byte, dek []byte, id, tz4 string, ks *KeyState, s
 		return err
 	}
 
+	// payload layout: [u16 sealedLen][nonce(12)][ct+tag][padding...]
 	payload := slot[:keyStateSlotDataSize]
-	if _, err := io.ReadFull(crypto_rand.Reader, payload[:keyStateNonceSize]); err != nil {
+	offset := 2
+	if _, err := io.ReadFull(crypto_rand.Reader, payload[offset:offset+keyStateNonceSize]); err != nil {
 		return err
 	}
 
 	aad := []byte("state|id=" + id + "|tz4=" + tz4)
-	sealed := gcm.Seal(payload[:keyStateNonceSize], payload[:keyStateNonceSize], plain[:], aad)
-	if len(sealed) != keyStateSlotDataSize {
-		return fmt.Errorf("invalid sealed slot size %d", len(sealed))
+	nonce := payload[offset : offset+keyStateNonceSize]
+	sealed := gcm.Seal(payload[offset:offset+keyStateNonceSize], nonce, plain[:], aad)
+	if offset+len(sealed) > keyStateSlotDataSize {
+		return fmt.Errorf("sealed data (%d) is too large for slot (%d)", offset+len(sealed), keyStateSlotDataSize)
 	}
+	binary.BigEndian.PutUint16(payload[:2], uint16(len(sealed)))
 
 	checksum := crc32.ChecksumIEEE(payload)
 	binary.BigEndian.PutUint32(slot[keyStateSlotDataSize:], checksum)
@@ -694,11 +703,20 @@ func decodeKeyStateSlot(slot []byte, dek []byte, id, tz4 string) (*KeyState, uin
 		return nil, 0, false, err
 	}
 
+	sealedLen := int(binary.BigEndian.Uint16(payload[:2]))
+	if sealedLen < keyStateNonceSize+gcm.Overhead() || 2+sealedLen > keyStateSlotDataSize {
+		return nil, 0, false, fmt.Errorf("%w: invalid sealed length", ErrKeyStateCorrupted)
+	}
+
+	offset := 2
+	nonce := payload[offset : offset+keyStateNonceSize]
+	ct := payload[offset+keyStateNonceSize : offset+sealedLen]
+
 	var plain [keyStatePlainSize]byte
 	defer secure.MemoryWipe(plain[:])
 
 	aad := []byte("state|id=" + id + "|tz4=" + tz4)
-	out, err := gcm.Open(plain[:0], payload[:keyStateNonceSize], payload[keyStateNonceSize:], aad)
+	out, err := gcm.Open(plain[:0], nonce, ct, aad)
 	if err != nil {
 		return nil, 0, false, fmt.Errorf("%w: decrypt", ErrKeyStateCorrupted)
 	}
@@ -852,7 +870,7 @@ func (fs *FileStore) prepareKeyStateFile(id string, dek []byte, tz4 string) (*os
 	}
 
 	path := fs.keyStatePath(id)
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|syscall.O_DSYNC, 0o600)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|syscall.O_DSYNC|syscall.O_DIRECT, 0o600)
 	if err != nil {
 		return nil, nil, 0, missing, corrupted, err
 	}
@@ -906,16 +924,21 @@ func (fs *FileStore) writeKeyState(file *os.File, id string, dek []byte, tz4 str
 		return fmt.Errorf("invalid DEK (len=%d)", len(dek))
 	}
 
-	var slot [keyStateSlotSize]byte
-	if err := encodeKeyStateSlot(slot[:], dek, id, tz4, ks, seq); err != nil {
+	alignedBlock, err := unix.Mmap(-1, 0, keyStateSlotSize, unix.PROT_READ|unix.PROT_WRITE, unix.MAP_ANON|unix.MAP_PRIVATE)
+	if err != nil {
+		return err
+	}
+	defer unix.Munmap(alignedBlock)
+
+	if err := encodeKeyStateSlot(alignedBlock, dek, id, tz4, ks, seq); err != nil {
 		return err
 	}
 
-	if _, err := file.WriteAt(slot[:], 0); err != nil {
+	if _, err := file.WriteAt(alignedBlock, 0); err != nil {
 		return err
 	}
 
-	if _, err := file.WriteAt(slot[:], keyStateSlotSize); err != nil {
+	if _, err := file.WriteAt(alignedBlock, keyStateSlotSize); err != nil {
 		return err
 	}
 	return nil

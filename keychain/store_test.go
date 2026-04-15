@@ -58,7 +58,7 @@ func writeLegacyStateForTest(t *testing.T, path string, dek []byte, id, tz4 stri
 	copy(out[:12], nonce)
 	copy(out[12:], ct)
 
-	if err := writeBytesAtomic(path, out, 0o600); err != nil {
+	if err := writeBytesSync(path, out, 0o600); err != nil {
 		t.Fatalf("write legacy state: %v", err)
 	}
 }

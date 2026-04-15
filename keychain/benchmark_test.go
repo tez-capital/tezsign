@@ -176,7 +176,7 @@ func writeKeyStateAtomicLegacyLike(path string, dek []byte, id, tz4 string, ks *
 	copy(out[:12], nonce)
 	copy(out[12:], ct)
 
-	return writeBytesAtomic(path, out, 0o600)
+	return writeBytesSync(path, out, 0o600)
 }
 
 func signAndUpdateLegacyAtomicLike(kr *KeyRing, keyID string, raw []byte) ([]byte, error) {
