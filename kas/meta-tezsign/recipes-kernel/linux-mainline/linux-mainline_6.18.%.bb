@@ -1,4 +1,3 @@
-KVER := "${PV}"
 require linux-mainline.inc
 SRC_URI = "git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git;protocol=https;branch=linux-6.18.y"
 SRCREV = "${AUTOREV}"
