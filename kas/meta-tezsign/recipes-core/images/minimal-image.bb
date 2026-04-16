@@ -30,7 +30,7 @@ IMAGE_FSTYPES = "wic wic.bmap"
 IMAGE_POSTPROCESS_COMMAND += "extract_final_image;"
 
 # Rootfs cleanup — runs for both WIC and initramfs (cpio)
-ROOTFS_POSTPROCESS_COMMAND:append = " prune_prod_console_bits; prune_prod_systemd_userland;"
+ROOTFS_POSTPROCESS_COMMAND:append = " enable_dev_local_getty; prune_prod_console_bits; prune_prod_systemd_userland;"
 
 extract_final_image() {
     mkdir -p ${TOPDIR}/../release
@@ -39,12 +39,26 @@ extract_final_image() {
     fi
 }
 
+enable_dev_local_getty() {
+    if [ "${TEZSIGN_DEV}" != "1" ]; then
+        return
+    fi
+
+    mkdir -p ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/getty.target.wants
+    ln -sf ${systemd_system_unitdir}/getty@.service \
+        ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/getty.target.wants/getty@tty1.service
+    mkdir -p ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants
+    ln -sf ${systemd_system_unitdir}/getty@.service \
+        ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants/getty@tty1.service
+}
+
 prune_prod_console_bits() {
     if [ "${TEZSIGN_DEV}" = "1" ]; then
         return
     fi
 
     rm -f ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/getty.target.wants/getty@tty1.service
+    rm -f ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants/getty@tty1.service
 }
 
 prune_prod_systemd_userland() {

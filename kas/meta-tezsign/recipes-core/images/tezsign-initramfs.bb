@@ -23,7 +23,7 @@ rockchip_dd_bootloader() {
 extract_final_image() {
     :
 }
-ROOTFS_POSTPROCESS_COMMAND:append = " tezsign_initramfs_make_init_link;"
+ROOTFS_POSTPROCESS_COMMAND:append = " enable_dev_local_getty; tezsign_initramfs_make_init_link;"
 WKS_FILE = ""
 
 tezsign_initramfs_make_init_link() {

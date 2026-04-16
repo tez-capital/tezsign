@@ -36,8 +36,9 @@ local_conf_header:
     SOURCE_MIRROR_URL = "http://downloads.yoctoproject.org/mirror/sources/"
     INHERIT += "own-mirrors"
     
-    # Save downloads outside the build folder so they survive a clean rebuild
+    # Save downloads and sstate outside the build folder so they survive clean rebuilds
     DL_DIR = "${TOPDIR}/../downloads"
+    SSTATE_DIR = "${TOPDIR}/../sstate-cache"
 
   licenses: |
     LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"

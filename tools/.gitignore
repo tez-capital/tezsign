@@ -1,4 +1,0 @@
-bin/*
-!bin/.gitkeep
-builder/assets/ffs_registrar
-builder/assets/tezsign

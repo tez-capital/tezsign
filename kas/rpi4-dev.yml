@@ -11,5 +11,5 @@ local_conf_header:
     TEZSIGN_DEV = "1"
     IMAGE_BOOT_FILES:append = " vc4-kms-v3d-pi4.dtbo;overlays/vc4-kms-v3d-pi4.dtbo"
     RPI_EXTRA_CONFIG:append = "\ndtoverlay=vc4-kms-v3d-pi4"
-    CMDLINE:append = " console=tty1"
+    CMDLINE:append = " console=tty1 quiet loglevel=3"
     VOLATILE_LOG_DIR = "no"

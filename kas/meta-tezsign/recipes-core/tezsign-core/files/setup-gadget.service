@@ -8,8 +8,8 @@ After=local-fs.target generate-serial.service
 Type=oneshot
 ExecStart=/usr/bin/setup-gadget
 RemainAfterExit=yes
-StandardOutput=journal+console
-StandardError=journal+console
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

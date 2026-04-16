@@ -15,8 +15,8 @@ RestartSec=1
 CPUSchedulingPolicy=fifo
 CPUSchedulingPriority=50
 LimitRTPRIO=99
-StandardOutput=journal+console
-StandardError=journal+console
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
