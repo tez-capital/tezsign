@@ -1,0 +1,9 @@
+header:
+  version: 14
+  includes:
+    - base.yml
+
+repos:
+  meta-raspberrypi:
+    url: https://git.yoctoproject.org/meta-raspberrypi
+    branch: "scarthgap"

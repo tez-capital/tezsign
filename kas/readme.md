@@ -29,6 +29,7 @@ Resolution chain:
 
 - `rpi4-dev.yml` -> `rpi4.yml` -> `machine: raspberrypi4-tezsign`
 - `rpi0-2w-dev.yml` -> `rpi0-2w.yml` -> `machine: raspberrypi0-2w-tezsign`
+- `radxa-zero3-dev.yml` -> `radxa-zero3.yml` -> `machine: radxa-zero3-tezsign` -> upstream `radxa-zero-3w`
 - `radxa-zero3.yml` -> `machine: radxa-zero3-tezsign` -> upstream `radxa-zero-3w`
 - `radxa-zero3-dev.yml` -> `radxa-zero3.yml` -> `machine: radxa-zero3-tezsign` -> upstream `radxa-zero-3w`
 

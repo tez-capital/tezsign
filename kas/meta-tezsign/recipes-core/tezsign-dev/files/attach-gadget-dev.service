@@ -1,7 +1,7 @@
 [Unit]
 Description=Configure USB ECM Gadget Network IP (usb0)
-Requires=setup-gadget-dev.service
-After=setup-gadget-dev.service
+Requires=setup-gadget-dev.service attach-gadget.service
+After=setup-gadget-dev.service attach-gadget.service
 
 [Service]
 Type=oneshot

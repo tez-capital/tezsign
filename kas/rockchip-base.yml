@@ -1,0 +1,9 @@
+header:
+  version: 14
+  includes:
+    - base.yml
+
+repos:
+  meta-rockchip:
+    url: https://github.com/radxa/meta-rockchip.git
+    branch: "scarthgap"

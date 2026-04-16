@@ -10,18 +10,12 @@ repos:
     branch: "scarthgap"
     layers:
       meta:
-      meta-poky:
-  meta-raspberrypi:
-    url: https://git.yoctoproject.org/meta-raspberrypi
-    branch: "scarthgap"
   meta-arm:
     url: https://git.yoctoproject.org/meta-arm
     branch: "scarthgap"
     layers:
       meta-arm:
       meta-arm-toolchain:
-  meta-tezsign:
-    path: meta-tezsign
   meta-openembedded:
     url: https://github.com/openembedded/meta-openembedded.git
     branch: "scarthgap"
@@ -30,21 +24,10 @@ repos:
       meta-python:
       meta-networking:
       meta-filesystems:
-  meta-rockchip:
-    url: https://github.com/radxa/meta-rockchip.git
-    branch: "scarthgap"
+  meta-tezsign:
+    path: meta-tezsign
 
 local_conf_header:
-  # initramfs_setup: |
-  #   # Define the image type required for initramfs
-  #   IMAGE_FSTYPES = "cpio.gz"
-    
-  #   # Bundle the initramfs into the kernel image (zImage/uImage)
-  #   INITRAMFS_IMAGE = "core-image-base"
-  #   INITRAMFS_IMAGE_BUNDLE = "1"
-
-  #   CMDLINE_ROOTFS = "root=/dev/ram0 rw rootfstype=ramfs rootwait rdinit=/init"
-
   speed_and_cache: |
     # Tell Git to only download the latest snapshot, not the 20-year history
     BB_GIT_SHALLOW = "1"
