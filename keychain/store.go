@@ -34,14 +34,14 @@ const (
 
 	tmpSuffix = ".tmp"
 
-	SYSTEM_PAGE_SIZE = 4 * 1024 // 4k
-	// for above we could use os.Getpagesize() but that may hurt the portability so for now we fix to 4K
-
-	keyStateSlotSize     = SYSTEM_PAGE_SIZE
-	keyStateSlotDataSize = keyStateSlotSize - 4
-	keyStateFileSize     = 2 * keyStateSlotSize
-	keyStateNonceSize    = 12
-	keyStatePlainSize    = 68
+	// Slot header: the encrypted state (~98 bytes sealed) + CRC.
+	keyStateSlotHdrDataSize = 124                         // payload area before CRC
+	keyStateSlotHdrSize     = keyStateSlotHdrDataSize + 4 // 128: data + CRC32
+	keyStateSlotReserved    = 128 * 1024                  // per-slot reservation in file - we want to get slots in different physical pages
+	keyStateFileSize        = 2 * keyStateSlotReserved    // 128k total state file
+	keyStateWriteSize       = 4 * 1024                    // page-aligned O_DIRECT write size
+	keyStateNonceSize       = 12
+	keyStatePlainSize       = 68
 )
 
 var (
@@ -64,6 +64,89 @@ type FileStore struct {
 	base     string
 	masterMu sync.Mutex
 }
+
+// alignedStateFile wraps an *os.File with a pre-allocated, page-aligned
+// buffer obtained via mmap(MAP_ANON).  The buffer is created once when
+// the state file is opened and reused on every write call, eliminating
+// per-write mmap/munmap overhead.
+//
+// Writes are pipelined: each writeState encodes the slot, writes it to
+// the current slotIndex (foreground), then writes a redundant copy to the
+// other slot in the background.  The mutex serialises access so the
+// background copy finishes before the next write can begin.  slotIndex
+// alternates (0 ↔ 1) so a torn write always lands on the stale slot,
+// preserving the most recent valid data in the other.
+type alignedStateFile struct {
+	file      *os.File
+	mu        sync.Mutex
+	slotIndex int    // next slot to write (0 or 1), alternates after each write
+	buf       []byte // page-aligned write buffer, len == keyStateWriteSize
+}
+
+func openAlignedStateFile(path string) (*alignedStateFile, error) {
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|syscall.O_DSYNC|syscall.O_DIRECT, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	buf, err := unix.Mmap(-1, 0, keyStateWriteSize, unix.PROT_READ|unix.PROT_WRITE, unix.MAP_ANON|unix.MAP_PRIVATE)
+	if err != nil {
+		file.Close()
+		return nil, err
+	}
+	return &alignedStateFile{file: file, buf: buf}, nil
+}
+
+// Close drains any in-flight background write, releases the aligned
+// buffer and closes the underlying file.
+func (sf *alignedStateFile) Close() error {
+	sf.mu.Lock()
+	defer sf.mu.Unlock()
+	err := unix.Munmap(sf.buf)
+	if err2 := sf.file.Close(); err == nil {
+		err = err2
+	}
+	return err
+}
+
+// writeState encodes the key state into the aligned buffer and writes it
+// to the current slot (foreground).  A redundant copy is written to the
+// other slot in the background; the mutex stays locked until that copy
+// completes, so the next writeState call naturally waits.
+func (sf *alignedStateFile) writeState(dek []byte, id, tz4 string, ks *KeyState, seq uint64) error {
+	sf.mu.Lock()
+
+	clear(sf.buf)
+	if err := encodeKeyStateSlot(sf.buf[:keyStateSlotHdrSize], dek, id, tz4, ks, seq); err != nil {
+		sf.mu.Unlock()
+		return err
+	}
+
+	// Primary write — current slot (foreground, on the critical path).
+	primaryOff := int64(sf.slotIndex) * keyStateSlotReserved
+	if _, err := sf.file.WriteAt(sf.buf, primaryOff); err != nil {
+		sf.mu.Unlock()
+		return err
+	}
+
+	// Flip for next call: the slot we just wrote becomes the "good" one,
+	// so the next write targets the stale/potentially-torn slot.
+	sf.slotIndex ^= 1
+	redundantOff := int64(sf.slotIndex) * keyStateSlotReserved
+
+	// Redundant copy — background.  Mutex is released when done.
+	go func() {
+		defer sf.mu.Unlock()
+		// Best-effort; primary slot already holds the latest data.
+		sf.file.WriteAt(sf.buf, redundantOff)
+	}()
+
+	return nil
+}
+
+func (sf *alignedStateFile) ReadAt(p []byte, off int64) (int, error)  { return sf.file.ReadAt(p, off) }
+func (sf *alignedStateFile) WriteAt(p []byte, off int64) (int, error) { return sf.file.WriteAt(p, off) }
+func (sf *alignedStateFile) Stat() (os.FileInfo, error)               { return sf.file.Stat() }
+func (sf *alignedStateFile) Truncate(size int64) error                { return sf.file.Truncate(size) }
 
 // ----- on-disk formats -----
 
@@ -648,9 +731,13 @@ func decodeKeyStatePlain(src []byte) (*KeyState, uint64, error) {
 	return ks, seq, nil
 }
 
+// encodeKeyStateSlot writes the encrypted state into slot (which must be
+// at least keyStateSlotHdrSize bytes). CRC is placed at a fixed offset
+// (keyStateSlotHdrDataSize) so the format is independent of write size.
 func encodeKeyStateSlot(slot []byte, dek []byte, id, tz4 string, ks *KeyState, seq uint64) error {
-	if len(slot) != keyStateSlotSize {
-		return fmt.Errorf("invalid slot size %d", len(slot))
+	slotLen := len(slot)
+	if slotLen < keyStateSlotHdrSize {
+		return fmt.Errorf("slot buffer too small: %d < %d", slotLen, keyStateSlotHdrSize)
 	}
 	clear(slot)
 
@@ -663,8 +750,10 @@ func encodeKeyStateSlot(slot []byte, dek []byte, id, tz4 string, ks *KeyState, s
 		return err
 	}
 
+	slotDataSize := slotLen - 4
+
 	// payload layout: [u16 sealedLen][nonce(12)][ct+tag][padding...]
-	payload := slot[:keyStateSlotDataSize]
+	payload := slot[:slotDataSize]
 	offset := 2
 	if _, err := io.ReadFull(crypto_rand.Reader, payload[offset:offset+keyStateNonceSize]); err != nil {
 		return err
@@ -673,26 +762,31 @@ func encodeKeyStateSlot(slot []byte, dek []byte, id, tz4 string, ks *KeyState, s
 	aad := []byte("state|id=" + id + "|tz4=" + tz4)
 	nonce := payload[offset : offset+keyStateNonceSize]
 	sealed := gcm.Seal(payload[offset:offset+keyStateNonceSize], nonce, plain[:], aad)
-	if offset+len(sealed) > keyStateSlotDataSize {
-		return fmt.Errorf("sealed data (%d) is too large for slot (%d)", offset+len(sealed), keyStateSlotDataSize)
+	if offset+len(sealed) > slotDataSize {
+		return fmt.Errorf("sealed data (%d) is too large for slot (%d)", offset+len(sealed), slotDataSize)
 	}
 	binary.BigEndian.PutUint16(payload[:2], uint16(len(sealed)))
 
 	checksum := crc32.ChecksumIEEE(payload)
-	binary.BigEndian.PutUint32(slot[keyStateSlotDataSize:], checksum)
+	binary.BigEndian.PutUint32(slot[slotDataSize:slotDataSize+4], checksum)
 	return nil
 }
 
+// decodeKeyStateSlot decodes a slot buffer of any supported size (>= keyStateSlotHdrSize).
+// CRC is read from the last 4 bytes of the buffer, matching the encode layout.
 func decodeKeyStateSlot(slot []byte, dek []byte, id, tz4 string) (*KeyState, uint64, bool, error) {
-	if len(slot) != keyStateSlotSize {
-		return nil, 0, false, fmt.Errorf("invalid slot size %d", len(slot))
+	slotLen := len(slot)
+	if slotLen < keyStateSlotHdrSize {
+		return nil, 0, false, fmt.Errorf("slot buffer too small: %d < %d", slotLen, keyStateSlotHdrSize)
 	}
 	if slotIsZero(slot) {
 		return newEmptyKeyState(), 0, true, nil
 	}
 
-	payload := slot[:keyStateSlotDataSize]
-	wantChecksum := binary.BigEndian.Uint32(slot[keyStateSlotDataSize:])
+	slotDataSize := slotLen - 4
+
+	payload := slot[:slotDataSize]
+	wantChecksum := binary.BigEndian.Uint32(slot[slotDataSize : slotDataSize+4])
 	gotChecksum := crc32.ChecksumIEEE(payload)
 	if gotChecksum != wantChecksum {
 		return nil, 0, false, fmt.Errorf("%w: checksum", ErrKeyStateCorrupted)
@@ -704,7 +798,7 @@ func decodeKeyStateSlot(slot []byte, dek []byte, id, tz4 string) (*KeyState, uin
 	}
 
 	sealedLen := int(binary.BigEndian.Uint16(payload[:2]))
-	if sealedLen < keyStateNonceSize+gcm.Overhead() || 2+sealedLen > keyStateSlotDataSize {
+	if sealedLen < keyStateNonceSize+gcm.Overhead() || 2+sealedLen > slotDataSize {
 		return nil, 0, false, fmt.Errorf("%w: invalid sealed length", ErrKeyStateCorrupted)
 	}
 
@@ -728,52 +822,51 @@ func decodeKeyStateSlot(slot []byte, dek []byte, id, tz4 string) (*KeyState, uin
 
 	return ks, seq, false, nil
 }
-
-func readDoubleBufferKeyState(reader io.ReaderAt, dek []byte, id, tz4 string) (*KeyState, uint64, bool, bool, error) {
-	var slotA [keyStateSlotSize]byte
-	if _, err := reader.ReadAt(slotA[:], 0); err != nil {
-		return nil, 0, false, false, fmt.Errorf("%w: read slot A", ErrKeyStateCorrupted)
+func readDoubleBufferKeyState(reader io.ReaderAt, slotReadSize int, slotBOffset int64, dek []byte, id, tz4 string) (keyState *KeyState, seq uint64, missing bool, corrupted bool, nextSlot int, readErr error) {
+	slotA := make([]byte, slotReadSize)
+	if _, err := reader.ReadAt(slotA, 0); err != nil {
+		return nil, 0, false, false, 0, fmt.Errorf("%w: read slot A", ErrKeyStateCorrupted)
 	}
 
-	var slotB [keyStateSlotSize]byte
-	if _, err := reader.ReadAt(slotB[:], keyStateSlotSize); err != nil {
-		return nil, 0, false, false, fmt.Errorf("%w: read slot B", ErrKeyStateCorrupted)
+	slotB := make([]byte, slotReadSize)
+	if _, err := reader.ReadAt(slotB, slotBOffset); err != nil {
+		return nil, 0, false, false, 0, fmt.Errorf("%w: read slot B", ErrKeyStateCorrupted)
 	}
 
-	stateA, seqA, missingA, errA := decodeKeyStateSlot(slotA[:], dek, id, tz4)
-	stateB, seqB, missingB, errB := decodeKeyStateSlot(slotB[:], dek, id, tz4)
+	stateA, seqA, missingA, errA := decodeKeyStateSlot(slotA, dek, id, tz4)
+	stateB, seqB, missingB, errB := decodeKeyStateSlot(slotB, dek, id, tz4)
 
 	missingAll := missingA && missingB
-	corrupted := errors.Is(errA, ErrKeyStateCorrupted) || errors.Is(errB, ErrKeyStateCorrupted)
+	corrupted = errors.Is(errA, ErrKeyStateCorrupted) || errors.Is(errB, ErrKeyStateCorrupted)
 
 	switch {
 	case errA == nil && errB == nil:
 		switch {
 		case missingAll:
-			return newEmptyKeyState(), 0, true, false, nil
+			return newEmptyKeyState(), 0, true, false, 0, nil
 		case missingA:
-			return stateB, seqB, false, corrupted, nil
+			return stateB, seqB, false, corrupted, 0, nil
 		case missingB:
-			return stateA, seqA, false, corrupted, nil
+			return stateA, seqA, false, corrupted, 1, nil
 		case seqA > seqB:
-			return stateA, seqA, false, corrupted, nil
+			return stateA, seqA, false, corrupted, 1, nil
 		case seqB > seqA:
-			return stateB, seqB, false, corrupted, nil
+			return stateB, seqB, false, corrupted, 0, nil
 		default:
-			return mergeKeyStates(stateA, stateB), seqA, false, corrupted, nil
+			return mergeKeyStates(stateA, stateB), seqA, false, corrupted, 0, nil
 		}
 	case errA == nil:
 		if missingA {
-			return newEmptyKeyState(), 0, false, corrupted, nil
+			return newEmptyKeyState(), 0, false, corrupted, 0, nil
 		}
-		return stateA, seqA, false, corrupted, nil
+		return stateA, seqA, false, corrupted, 1, nil
 	case errB == nil:
 		if missingB {
-			return newEmptyKeyState(), 0, false, corrupted, nil
+			return newEmptyKeyState(), 0, false, corrupted, 0, nil
 		}
-		return stateB, seqB, false, corrupted, nil
+		return stateB, seqB, false, corrupted, 0, nil
 	default:
-		return nil, 0, missingAll, corrupted, errA
+		return nil, 0, missingAll, corrupted, 0, errA
 	}
 }
 
@@ -855,7 +948,7 @@ func (fs *FileStore) readKeyState(id string, dek []byte, tz4 string) (*KeyState,
 		}
 		defer file.Close()
 
-		keyState, seq, missing, corrupted, readErr := readDoubleBufferKeyState(file, dek, id, tz4)
+		keyState, seq, missing, corrupted, _, readErr := readDoubleBufferKeyState(file, keyStateSlotHdrSize, keyStateSlotReserved, dek, id, tz4)
 		return keyState, seq, missing, corrupted, keyStateFormatDoubleBuffer, readErr
 	default:
 		keyState, seq, missing, corrupted, readErr := fs.readLegacyKeyState(id, dek, tz4)
@@ -863,83 +956,62 @@ func (fs *FileStore) readKeyState(id string, dek []byte, tz4 string) (*KeyState,
 	}
 }
 
-func (fs *FileStore) prepareKeyStateFile(id string, dek []byte, tz4 string) (*os.File, *KeyState, uint64, bool, bool, error) {
+func (fs *FileStore) prepareKeyStateFile(id string, dek []byte, tz4 string) (*alignedStateFile, *KeyState, uint64, bool, bool, error) {
 	ks, seq, missing, corrupted, format, err := fs.readKeyState(id, dek, tz4)
 	if err != nil {
 		return nil, nil, 0, missing, corrupted, err
 	}
 
 	path := fs.keyStatePath(id)
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|syscall.O_DSYNC|syscall.O_DIRECT, 0o600)
+	sf, err := openAlignedStateFile(path)
 	if err != nil {
 		return nil, nil, 0, missing, corrupted, err
 	}
 
 	needsInit := format != keyStateFormatDoubleBuffer
 	if !needsInit {
-		info, err := file.Stat()
+		info, err := sf.Stat()
 		if err != nil {
-			file.Close()
+			sf.Close()
 			return nil, nil, 0, missing, corrupted, err
 		}
 		needsInit = info.Size() != keyStateFileSize
 	}
 
 	if !needsInit {
-		return file, ks, seq, missing, corrupted, nil
+		// Determine which slot to write next from the on-disk state.
+		_, _, _, _, nextSlot, _ := readDoubleBufferKeyState(sf, keyStateSlotHdrSize, keyStateSlotReserved, dek, id, tz4)
+		sf.slotIndex = nextSlot
+		return sf, ks, seq, missing, corrupted, nil
 	}
 
-	if err := file.Truncate(keyStateFileSize); err != nil {
-		file.Close()
+	if err := sf.Truncate(keyStateFileSize); err != nil {
+		sf.Close()
 		return nil, nil, 0, missing, corrupted, err
 	}
 
 	if missing {
-		return file, ks, 0, true, corrupted, nil
+		return sf, ks, 0, true, corrupted, nil
 	}
 
 	if seq == 0 {
 		seq = 1
 	}
-	if err := fs.writeKeyState(file, id, dek, tz4, ks, seq); err != nil {
-		file.Close()
+	if err := sf.writeState(dek, id, tz4, ks, seq); err != nil {
+		sf.Close()
 		return nil, nil, 0, missing, corrupted, err
 	}
 
-	return file, ks, seq, missing, corrupted, nil
+	return sf, ks, seq, missing, corrupted, nil
 }
 
-func (fs *FileStore) readKeyStateFromFile(file *os.File, id string, dek []byte, tz4 string) (*KeyState, uint64, bool, bool, error) {
+func (fs *FileStore) readKeyStateFromFile(sf *alignedStateFile, id string, dek []byte, tz4 string) (*KeyState, uint64, bool, bool, error) {
 	if len(dek) != 32 {
 		return nil, 0, false, false, fmt.Errorf("invalid DEK (len=%d)", len(dek))
 	}
-	return readDoubleBufferKeyState(file, dek, id, tz4)
-}
-
-func (fs *FileStore) writeKeyState(file *os.File, id string, dek []byte, tz4 string, ks *KeyState, seq uint64) error {
-	if file == nil {
-		return fmt.Errorf("state file is not open")
+	ks, seq, missing, corrupted, nextSlot, err := readDoubleBufferKeyState(sf, keyStateSlotHdrSize, keyStateSlotReserved, dek, id, tz4)
+	if err == nil {
+		sf.slotIndex = nextSlot
 	}
-	if len(dek) != 32 {
-		return fmt.Errorf("invalid DEK (len=%d)", len(dek))
-	}
-
-	alignedBlock, err := unix.Mmap(-1, 0, keyStateSlotSize, unix.PROT_READ|unix.PROT_WRITE, unix.MAP_ANON|unix.MAP_PRIVATE)
-	if err != nil {
-		return err
-	}
-	defer unix.Munmap(alignedBlock)
-
-	if err := encodeKeyStateSlot(alignedBlock, dek, id, tz4, ks, seq); err != nil {
-		return err
-	}
-
-	if _, err := file.WriteAt(alignedBlock, 0); err != nil {
-		return err
-	}
-
-	if _, err := file.WriteAt(alignedBlock, keyStateSlotSize); err != nil {
-		return err
-	}
-	return nil
+	return ks, seq, missing, corrupted, err
 }

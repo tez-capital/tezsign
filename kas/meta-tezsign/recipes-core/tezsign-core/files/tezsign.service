@@ -15,6 +15,9 @@ RestartSec=2
 CPUSchedulingPolicy=fifo
 CPUSchedulingPriority=50
 LimitRTPRIO=99
+LimitMEMLOCK=infinity
+IOSchedulingClass=realtime
+IOSchedulingPriority=0
 StandardOutput=null
 StandardError=null
 

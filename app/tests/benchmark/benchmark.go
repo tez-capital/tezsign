@@ -404,15 +404,20 @@ func runBenchmark(b *broker.Broker, tz4 string, target benchmarkTarget, samples,
 		nextLevel++
 	}
 
+	payloads := make([][]byte, 0, samples)
+	for i := 0; i < samples; i++ {
+		payloads = append(payloads, buildTenderbakePayload(target.kind, nextLevel, 0, nil))
+		nextLevel++
+	}
+
 	durations := make([]time.Duration, 0, samples)
 	failures := 0
 	benchStart := time.Now()
 
 	for i := 0; i < samples; i++ {
 		t0 := time.Now()
-		_, err := common.ReqSign(b, tz4, buildTenderbakePayload(target.kind, nextLevel, 0, nil))
+		_, err := common.ReqSign(b, tz4, payloads[i])
 		dt := time.Since(t0)
-		nextLevel++
 
 		if err != nil {
 			failures++

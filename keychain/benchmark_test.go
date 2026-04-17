@@ -117,8 +117,8 @@ func BenchmarkStatePersist(b *testing.B) {
 				Level: uint64(i + 1),
 				Round: uint32(i & 31),
 			}
-			if err := setup.store.writeKeyState(file, setup.keyID, dek, tz4, state, seq); err != nil {
-				b.Fatalf("writeKeyState: %v", err)
+			if err := file.writeState(dek, setup.keyID, tz4, state, seq); err != nil {
+				b.Fatalf("writeState: %v", err)
 			}
 		}
 	})

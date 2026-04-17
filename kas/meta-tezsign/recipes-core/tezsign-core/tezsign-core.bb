@@ -11,7 +11,6 @@ SRC_URI = " \
     file://tezsign.service \
     file://ffs_registrar \
     file://ffs_registrar.service \
-    file://cpu-governor.conf \
     file://io-scheduler.conf \
     file://99-io-performance.rules \
 "
@@ -52,9 +51,7 @@ do_install() {
     install -m 0644 ${WORKDIR}/tezsign.service ${D}${systemd_system_unitdir}/
     install -m 0644 ${WORKDIR}/generate-serial.service ${D}${systemd_system_unitdir}/
 
-    # Install the CPU governor and IO scheduler tmpfiles configuration
     install -d ${D}${sysconfdir}/tmpfiles.d
-    install -m 0644 ${WORKDIR}/cpu-governor.conf ${D}${sysconfdir}/tmpfiles.d/
     install -m 0644 ${WORKDIR}/io-scheduler.conf ${D}${sysconfdir}/tmpfiles.d/
 
     # Install the UDEV rules

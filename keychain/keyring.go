@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -51,7 +50,7 @@ type gKey struct {
 	tz4      string
 
 	watermark map[SIGN_KIND]HighWatermark
-	stateFile *os.File
+	stateFile *alignedStateFile
 	stateSeq  uint64
 
 	stateCorrupted bool
@@ -503,7 +502,7 @@ func (kr *KeyRing) SignAndUpdate(tz4 string, raw []byte) (sig []byte, err error)
 
 	writeChan := make(chan error, 1)
 	go func(snapshot *KeyState, seq uint64) {
-		if err := kr.store.writeKeyState(stateFile, keyID, dek, stateTZ4, snapshot, seq); err != nil {
+		if err := stateFile.writeState(dek, keyID, stateTZ4, snapshot, seq); err != nil {
 			writeChan <- fmt.Errorf("persist state: %w", err)
 			return
 		}
@@ -585,7 +584,7 @@ func (kr *KeyRing) SetLevel(id string, level uint64) error {
 	}
 	nextSeq := key.stateSeq + 1
 
-	if err := kr.store.writeKeyState(key.stateFile, id, key.dek, key.tz4, nextState, nextSeq); err != nil {
+	if err := key.stateFile.writeState(key.dek, id, key.tz4, nextState, nextSeq); err != nil {
 		return err
 	}
 

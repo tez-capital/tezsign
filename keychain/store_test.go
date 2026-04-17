@@ -106,8 +106,8 @@ func TestDoubleBufferWriteReadRoundTrip(t *testing.T) {
 		PREATTESTATION: {level: 39, round: 1},
 		ATTESTATION:    {level: 40, round: 2},
 	}
-	if err := fs.writeKeyState(file, id, dek, tz4, testKeyState(want), 7); err != nil {
-		t.Fatalf("writeKeyState: %v", err)
+	if err := file.writeState(dek, id, tz4, testKeyState(want), 7); err != nil {
+		t.Fatalf("writeState: %v", err)
 	}
 
 	got, gotSeq, missing, corrupted, err := fs.readKeyStateFromFile(file, id, dek, tz4)
@@ -155,16 +155,16 @@ func TestDoubleBufferRecoversFromCorruptedSecondSlot(t *testing.T) {
 		PREATTESTATION: {level: 12, round: 2},
 		ATTESTATION:    {level: 13, round: 3},
 	}
-	if err := fs.writeKeyState(file, id, dek, tz4, testKeyState(want), 3); err != nil {
-		t.Fatalf("writeKeyState: %v", err)
+	if err := file.writeState(dek, id, tz4, testKeyState(want), 3); err != nil {
+		t.Fatalf("writeState: %v", err)
 	}
 
 	var corruptByte [1]byte
-	if _, err := file.ReadAt(corruptByte[:], keyStateSlotSize+8); err != nil {
+	if _, err := file.ReadAt(corruptByte[:], keyStateSlotReserved+8); err != nil {
 		t.Fatalf("ReadAt: %v", err)
 	}
 	corruptByte[0] ^= 0xff
-	if _, err := file.WriteAt(corruptByte[:], keyStateSlotSize+8); err != nil {
+	if _, err := file.WriteAt(corruptByte[:], keyStateSlotReserved+8); err != nil {
 		t.Fatalf("WriteAt: %v", err)
 	}
 
@@ -219,7 +219,7 @@ func TestDoubleBufferPrefersNewerSequence(t *testing.T) {
 		ATTESTATION:    {level: 23, round: 0},
 	}
 
-	var slotA [keyStateSlotSize]byte
+	var slotA [keyStateSlotHdrSize]byte
 	if err := encodeKeyStateSlot(slotA[:], dek, id, tz4, testKeyState(newer), 2); err != nil {
 		t.Fatalf("encodeKeyStateSlot A: %v", err)
 	}
@@ -227,11 +227,11 @@ func TestDoubleBufferPrefersNewerSequence(t *testing.T) {
 		t.Fatalf("WriteAt slot A: %v", err)
 	}
 
-	var slotB [keyStateSlotSize]byte
+	var slotB [keyStateSlotHdrSize]byte
 	if err := encodeKeyStateSlot(slotB[:], dek, id, tz4, testKeyState(older), 1); err != nil {
 		t.Fatalf("encodeKeyStateSlot B: %v", err)
 	}
-	if _, err := file.WriteAt(slotB[:], keyStateSlotSize); err != nil {
+	if _, err := file.WriteAt(slotB[:], keyStateSlotReserved); err != nil {
 		t.Fatalf("WriteAt slot B: %v", err)
 	}
 
