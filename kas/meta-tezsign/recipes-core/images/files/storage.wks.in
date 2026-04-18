@@ -1,5 +1,5 @@
 part /boot --source bootimg-partition --ondisk mmcblk0 --fstype=vfat --label boot --active --align 4096 --fixed-size 100M
 
-part /app  --source rootfs --rootfs-dir=${DEPLOY_DIR_IMAGE}/appfs --ondisk mmcblk0 --fstype=ext4 --label app --align 4096 --fixed-size 64M --fsoptions="ro,exec,noatime,nofail"
+part /app  --source rootfs --rootfs-dir=${DEPLOY_DIR_IMAGE}/appfs --ondisk mmcblk0 --fstype=ext4 --label app --align 4096 --fixed-size 24M --fsoptions="ro,exec,noatime,nofail"
 
 part /data --ondisk mmcblk0 --fstype=ext4 --label data --align 4096 --fixed-size 128M --mkfs-extraopts="-J size=8 -m 0 -I 1024 -O has_journal,inline_data,fast_commit" --fsoptions="rw,noatime,nodiratime,data=journal,barrier=1,commit=5,nofail,errors=remount-ro"
