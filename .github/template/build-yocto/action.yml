@@ -72,6 +72,20 @@ runs:
             -o ./kas/meta-tezsign/recipes-core/tezsign-core/files/ffs_registrar \
             ./app/ffs_registrar
 
+    - name: Generate image metadata files
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        image_version="${IMAGE_VERSION:-$(git rev-parse --short=12 HEAD)}"
+        image_date="${IMAGE_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+
+        printf '%s\n' "${image_version}" > ./kas/meta-tezsign/recipes-core/images/files/.image-version
+        printf '%s\n' "${image_date}" > ./kas/meta-tezsign/recipes-core/images/files/.image-date
+
+        chmod 0644 \
+          ./kas/meta-tezsign/recipes-core/images/files/.image-version \
+          ./kas/meta-tezsign/recipes-core/images/files/.image-date
+
     - name: Restore Yocto cache
       uses: actions/cache@v5
       with:
