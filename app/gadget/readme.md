@@ -34,6 +34,6 @@ export GOOS="linux"
 export GOARCH="arm64"
 export CGO_ENABLED="1"
 export GOARM64="v8.0"
-export CGO_CFLAGS="-march=armv8-a -mtune=cortex_a72 -O2"
+export CGO_CFLAGS="-march=armv8-a -mtune=cortex_a72 -D__BLST_PORTABLE__ -O2"
 go build -v -trimpath -buildvcs=false -ldflags='-s -w -extldflags "-static"'  -o ./kas/meta-tezsign/recipes-core/images/files/tezsign ./app/gadget
 ```
