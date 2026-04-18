@@ -9,7 +9,7 @@
 | **Hardware Start Cost** | **< $20 USD** * | **~$50 USD** * | **~$50 USD** * |
 | **Tezbake Integration** | Full | Partial | Partial |
 | **Avg Signature Time** | ~8ms | ~6ms | ~30ms |
-| **Security** | 🔒 **Highest** (Custom Image and Wire Proto) | 🔒 **High** (Custom Image) | 🛡️ Medium |
+| **Security** | 🔒 **Higher** (Custom Image and Wire Proto) | 🔒 **High** (Custom Image) | 🛡️ Medium |
 | **Power Loss Safe** | ✅ **Yes** | ✅ **Yes** | ⚠️ No |
 | **Boot Time** | 🚀 **3s** | 🚀 **3s** | ~1.5m |
 | **Multi-Device Support**| ✅ **Yes** | ❌ No | ❌ No |

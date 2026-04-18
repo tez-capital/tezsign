@@ -109,10 +109,11 @@ func TestDoubleBufferWriteReadRoundTrip(t *testing.T) {
 	if err := file.writeState(dek, id, tz4, testKeyState(want), 7); err != nil {
 		t.Fatalf("writeState: %v", err)
 	}
+	file.wait()
 
-	got, gotSeq, missing, corrupted, err := fs.readKeyStateFromFile(file, id, dek, tz4)
+	got, gotSeq, missing, corrupted, err := file.readState(dek, id, tz4)
 	if err != nil {
-		t.Fatalf("readKeyStateFromFile: %v", err)
+		t.Fatalf("readState: %v", err)
 	}
 
 	if missing {
@@ -158,19 +159,20 @@ func TestDoubleBufferRecoversFromCorruptedSecondSlot(t *testing.T) {
 	if err := file.writeState(dek, id, tz4, testKeyState(want), 3); err != nil {
 		t.Fatalf("writeState: %v", err)
 	}
+	file.wait()
 
 	var corruptByte [1]byte
-	if _, err := file.ReadAt(corruptByte[:], keyStateSlotReserved+8); err != nil {
+	if _, err := file.file.ReadAt(corruptByte[:], keyStateSlotSize+8); err != nil {
 		t.Fatalf("ReadAt: %v", err)
 	}
 	corruptByte[0] ^= 0xff
-	if _, err := file.WriteAt(corruptByte[:], keyStateSlotReserved+8); err != nil {
+	if _, err := file.file.WriteAt(corruptByte[:], keyStateSlotSize+8); err != nil {
 		t.Fatalf("WriteAt: %v", err)
 	}
 
-	got, gotSeq, missing, corrupted, err := fs.readKeyStateFromFile(file, id, dek, tz4)
+	got, gotSeq, missing, corrupted, err := file.readState(dek, id, tz4)
 	if err != nil {
-		t.Fatalf("readKeyStateFromFile: %v", err)
+		t.Fatalf("readState: %v", err)
 	}
 
 	if missing {
@@ -219,25 +221,25 @@ func TestDoubleBufferPrefersNewerSequence(t *testing.T) {
 		ATTESTATION:    {level: 23, round: 0},
 	}
 
-	var slotA [keyStateSlotHdrSize]byte
+	var slotA [keyStateSlotSize]byte
 	if err := encodeKeyStateSlot(slotA[:], dek, id, tz4, testKeyState(newer), 2); err != nil {
 		t.Fatalf("encodeKeyStateSlot A: %v", err)
 	}
-	if _, err := file.WriteAt(slotA[:], 0); err != nil {
+	if _, err := file.file.WriteAt(slotA[:], 0); err != nil {
 		t.Fatalf("WriteAt slot A: %v", err)
 	}
 
-	var slotB [keyStateSlotHdrSize]byte
+	var slotB [keyStateSlotSize]byte
 	if err := encodeKeyStateSlot(slotB[:], dek, id, tz4, testKeyState(older), 1); err != nil {
 		t.Fatalf("encodeKeyStateSlot B: %v", err)
 	}
-	if _, err := file.WriteAt(slotB[:], keyStateSlotReserved); err != nil {
+	if _, err := file.file.WriteAt(slotB[:], keyStateSlotSize); err != nil {
 		t.Fatalf("WriteAt slot B: %v", err)
 	}
 
-	got, gotSeq, missing, corrupted, err := fs.readKeyStateFromFile(file, id, dek, tz4)
+	got, gotSeq, missing, corrupted, err := file.readState(dek, id, tz4)
 	if err != nil {
-		t.Fatalf("readKeyStateFromFile: %v", err)
+		t.Fatalf("readState: %v", err)
 	}
 
 	if missing {
@@ -293,7 +295,7 @@ func TestPrepareKeyStateFileMigratesLegacyState(t *testing.T) {
 	}
 	assertKeyStateEqual(t, ks, want)
 
-	info, err := file.Stat()
+	info, err := file.file.Stat()
 	if err != nil {
 		t.Fatalf("Stat: %v", err)
 	}
@@ -301,9 +303,9 @@ func TestPrepareKeyStateFileMigratesLegacyState(t *testing.T) {
 		t.Fatalf("expected %d-byte state file, got %d", keyStateFileSize, info.Size())
 	}
 
-	got, gotSeq, missing, corrupted, err := fs.readKeyStateFromFile(file, id, dek, tz4)
+	got, gotSeq, missing, corrupted, err := file.readState(dek, id, tz4)
 	if err != nil {
-		t.Fatalf("readKeyStateFromFile: %v", err)
+		t.Fatalf("readState: %v", err)
 	}
 	if missing {
 		t.Fatalf("expected migrated state")

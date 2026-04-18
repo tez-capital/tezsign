@@ -10,7 +10,7 @@
 # GPT partitions start at sector 32768 (16 MiB):
 
 part /boot --offset 32768s --source rootfs --rootfs-dir=${DEPLOY_DIR_IMAGE}/rockchip-bootfs --ondisk mmcblk0 --fstype=ext4 --label boot --part-name boot --active --size 64M --no-fstab-update
-part /app  --source rootfs --rootfs-dir=${DEPLOY_DIR_IMAGE}/appfs --ondisk mmcblk0 --fstype=ext4 --label app --part-name app --align 4096 --fixed-size 64M --fsoptions="ro,exec,noatime,nofail" --no-fstab-update
-part /data --ondisk mmcblk0 --fstype=ext4 --label data --part-name data --align 4096 --fixed-size 128M --mkfs-extraopts="-J size=8 -m 0 -I 1024 -O has_journal,inline_data,fast_commit" --fsoptions="rw,noatime,nodiratime,data=journal,barrier=1,commit=60,nofail" --no-fstab-update
+part /app  --source rootfs --rootfs-dir=${DEPLOY_DIR_IMAGE}/appfs --ondisk mmcblk0 --fstype=ext4 --label app --part-name app --align 4096 --fixed-size 24M --fsoptions="ro,exec,noatime,nofail" --no-fstab-update
+part /data --ondisk mmcblk0 --fstype=ext4 --label data --part-name data --align 4096 --fixed-size 128M --mkfs-extraopts="-J size=8 -m 0 -I 1024 -O has_journal,inline_data,fast_commit" --fsoptions="rw,noatime,nodiratime,data=journal,barrier=1,commit=5,nofail" --no-fstab-update
 
 bootloader --ptable gpt

@@ -50,7 +50,7 @@ type gKey struct {
 	tz4      string
 
 	watermark map[SIGN_KIND]HighWatermark
-	stateFile *alignedStateFile
+	stateFile *stateFile
 	stateSeq  uint64
 
 	stateCorrupted bool
@@ -384,7 +384,7 @@ func (kr *KeyRing) Status() []*signerpb.KeyStatus {
 			isUnlocked := (key.dek != nil && key.encSecret != nil && key.dataNonce != nil && key.stateFile != nil)
 
 			if isUnlocked {
-				if ksDisk, seqDisk, missingState, corrupted, err := kr.store.readKeyStateFromFile(key.stateFile, id, key.dek, key.tz4); err != nil {
+				if ksDisk, seqDisk, missingState, corrupted, err := key.stateFile.readState(key.dek, id, key.tz4); err != nil {
 					if errors.Is(err, ErrKeyStateCorrupted) {
 						key.stateCorrupted = true
 					} else {
@@ -493,30 +493,19 @@ func (kr *KeyRing) SignAndUpdate(tz4 string, raw []byte) (sig []byte, err error)
 	}
 	nextSeq := key.stateSeq + 1
 
-	stateFile := key.stateFile
-	dek := key.dek
-	stateTZ4 := key.tz4
-	blPubkey := key.blPubkey
-	dataNonce := key.dataNonce
-	encSecret := key.encSecret
-
-	writeChan := make(chan error, 1)
-	go func(snapshot *KeyState, seq uint64) {
-		if err := stateFile.writeState(dek, keyID, stateTZ4, snapshot, seq); err != nil {
-			writeChan <- fmt.Errorf("persist state: %w", err)
-			return
-		}
-		writeChan <- nil
-	}(nextState, nextSeq)
+	// send state to the worker (non-blocking); signing runs in parallel
+	if err := key.stateFile.sendState(key.dek, keyID, key.tz4, nextState, nextSeq); err != nil {
+		return nil, fmt.Errorf("persist state: %w", err)
+	}
 
 	// decrypt secret (32B LE) using in-memory DEK; authenticate with AAD
-	gcmDEK, err := newAESGCM(dek)
+	gcmDEK, err := newAESGCM(key.dek)
 	if err != nil {
 		return nil, err
 	}
-	aad := []byte("bl=" + blPubkey + "|tz4=" + stateTZ4)
+	aad := []byte("bl=" + key.blPubkey + "|tz4=" + key.tz4)
 
-	le, err := gcmDEK.Open(nil, dataNonce, encSecret, aad)
+	le, err := gcmDEK.Open(nil, key.dataNonce, key.encSecret, aad)
 	if err != nil {
 		return nil, fmt.Errorf("corrupted key (secret)")
 	}
@@ -535,9 +524,10 @@ func (kr *KeyRing) SignAndUpdate(tz4 string, raw []byte) (sig []byte, err error)
 	sig, _ = signer.SignCompressed(&sk, signBytes)
 	secure.MemoryWipe(le)
 	sk.Zeroize()
-	err = <-writeChan
-	if err != nil {
-		return nil, err
+
+	// collect primary-slot write result
+	if err := key.stateFile.recvWrite(); err != nil {
+		return nil, fmt.Errorf("persist state: %w", err)
 	}
 
 	key.watermark[knd] = HighWatermark{level: level, round: round}

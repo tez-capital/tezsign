@@ -113,60 +113,48 @@ CONFIG_KERNEL_MODE_NEON=y
 # CONFIG_EFI is not set
 
 # ── ARM64 self-protection ──────────────────────────────────────────────────
-CONFIG_UNMAP_KERNEL_AT_EL0=y
+# CONFIG_UNMAP_KERNEL_AT_EL0 is not set
 CONFIG_ARM64_SW_TTBR0_PAN=y
-CONFIG_SHADOW_CALL_STACK=y
+# CONFIG_SHADOW_CALL_STACK is not set
 CONFIG_UNWIND_PATCH_PAC_INTO_SCS=y
-CONFIG_MITIGATE_SPECTRE_BRANCH_HISTORY=y
-CONFIG_ARM64_PTR_AUTH=y
-CONFIG_ARM64_PTR_AUTH_KERNEL=y
+# ONFIG_MITIGATE_SPECTRE_BRANCH_HISTORY is not set
+# CONFIG_ARM64_PTR_AUTH is not set
+# CONFIG_ARM64_PTR_AUTH_KERNEL is not set
 CONFIG_ARM64_BTI=y
 CONFIG_ARM64_BTI_KERNEL=y
-CONFIG_ARM64_MTE=y
+# CONFIG_ARM64_MTE is not set
 CONFIG_ARM64_E0PD=y
 CONFIG_ARM64_EPAN=y
 
 # ── Memory allocator hardening ──────────────────────────────────────────────
 CONFIG_SLAB_FREELIST_HARDENED=y
 CONFIG_SLAB_FREELIST_RANDOM=y
-CONFIG_RANDOM_KMALLOC_CACHES=y
-CONFIG_SHUFFLE_PAGE_ALLOCATOR=y
-CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y
-CONFIG_INIT_STACK_ALL_ZERO=y
-CONFIG_RANDOMIZE_KSTACK_OFFSET_DEFAULT=y
+# CONFIG_INIT_STACK_ALL_ZERO is not set
+# CONFIG_RANDOM_KMALLOC_CACHES is not set
+# CONFIG_SHUFFLE_PAGE_ALLOCATOR is not set
+# CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set
 # CONFIG_INIT_ON_FREE_DEFAULT_ON is not set
+# CONFIG_RANDOMIZE_KSTACK_OFFSET_DEFAULT is not set
 
 # ── Kernel code / data integrity ────────────────────────────────────────────
 CONFIG_BUG=y
-CONFIG_BUG_ON_DATA_CORRUPTION=y
 CONFIG_FORTIFY_SOURCE=y
-CONFIG_HARDENED_USERCOPY=y
+# CONFIG_HARDENED_USERCOPY is not set
 CONFIG_LIST_HARDENED=y
-CONFIG_ZERO_CALL_USED_REGS=y
-CONFIG_DEBUG_WX=y
 CONFIG_STRICT_KERNEL_RWX=y
-CONFIG_KASAN_HW_TAGS=y
+# CONFIG_BUG_ON_DATA_CORRUPTION is not set
+# CONFIG_ZERO_CALL_USED_REGS is not set
+# CONFIG_DEBUG_WX is not set
+# CONFIG_KASAN_HW_TAGS is not set
 
 # ── Page table hardening ────────────────────────────────────────────────────
-CONFIG_PAGE_TABLE_CHECK=y
-CONFIG_PAGE_TABLE_CHECK_ENFORCED=y
+# CONFIG_PAGE_TABLE_CHECK is not set
 
-# ── UBSAN (bounds-only, trap on violation) ──────────────────────────────────
-CONFIG_UBSAN=y
-CONFIG_UBSAN_BOUNDS=y
-CONFIG_UBSAN_LOCAL_BOUNDS=y
-CONFIG_UBSAN_TRAP=y
-# CONFIG_UBSAN_SHIFT is not set
-# CONFIG_UBSAN_DIV_ZERO is not set
-# CONFIG_UBSAN_UNREACHABLE is not set
-# CONFIG_UBSAN_SIGNED_WRAP is not set
-# CONFIG_UBSAN_BOOL is not set
-# CONFIG_UBSAN_ENUM is not set
-# CONFIG_UBSAN_ALIGNMENT is not set
+# ── UBSAN ───────────────────────────────────────────────────────────────────
+# CONFIG_UBSAN is not set
 
-# ── KFENCE (lightweight memory-safety error detector) ───────────────────────
-CONFIG_KFENCE=y
-CONFIG_KFENCE_SAMPLE_INTERVAL=100
+# ── KFENCE ──────────────────────────────────────────────────────────────────
+# CONFIG_KFENCE is not set
 
 # ── Attack surface reduction ───────────────────────────────────────────────
 CONFIG_SECURITY_DMESG_RESTRICT=y
