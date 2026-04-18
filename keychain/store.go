@@ -131,7 +131,22 @@ func writeBytesSync(path string, b []byte, perm os.FileMode) error {
 		return err
 	}
 	file.Close()
-	return os.Rename(tmp, path)
+	if err := os.Rename(tmp, path); err != nil {
+		return err
+	}
+	return syncParentDir(path)
+}
+
+// syncParentDir fsyncs the parent directory to persist a newly
+// created or renamed directory entry.
+func syncParentDir(path string) error {
+	d, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	err = d.Sync()
+	d.Close()
+	return err
 }
 
 func randBytes(n int) []byte {
@@ -830,7 +845,7 @@ func (fs *FileStore) readKeyState(id string, dek []byte, tz4 string) (*KeyState,
 		return keyState, seq, missing, corrupted, keyStateFormatMissing, readErr
 	case err != nil:
 		return nil, 0, false, false, keyStateFormatMissing, err
-	case info.Size() == keyStateFileSize:
+	case info.Size()%keyStateSlotSize == 0: // we could end up with one slot only
 		file, err := os.Open(path)
 		if err != nil {
 			return nil, 0, false, false, keyStateFormatDoubleBuffer, err
@@ -852,7 +867,7 @@ func (fs *FileStore) prepareKeyStateFile(id string, dek []byte, tz4 string) (*st
 	}
 
 	path := fs.keyStatePath(id)
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|syscall.O_DSYNC, 0o600)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|syscall.O_SYNC, 0o600)
 	if err != nil {
 		return nil, nil, 0, missing, corrupted, err
 	}
@@ -879,6 +894,14 @@ func (fs *FileStore) prepareKeyStateFile(id string, dek []byte, tz4 string) (*st
 	}
 
 	if missing {
+		if err := file.Sync(); err != nil {
+			file.Close()
+			return nil, nil, 0, missing, corrupted, err
+		}
+		if err := syncParentDir(path); err != nil {
+			file.Close()
+			return nil, nil, 0, missing, corrupted, err
+		}
 		sf := newStateFile(file, 0)
 		return sf, ks, 0, true, corrupted, nil
 	}
@@ -902,27 +925,43 @@ func (fs *FileStore) prepareKeyStateFile(id string, dek []byte, tz4 string) (*st
 		return nil, nil, 0, missing, corrupted, err
 	}
 
+	if err := syncParentDir(path); err != nil {
+		file.Close()
+		return nil, nil, 0, missing, corrupted, err
+	}
+
 	sf := newStateFile(file, 0)
 	return sf, ks, seq, missing, corrupted, nil
 }
 
+// stateWriteReq carries the raw parameters for a state write.
+type stateWriteReq struct {
+	dek []byte
+	id  string
+	tz4 string
+	ks  *KeyState
+	seq uint64
+}
+
 // stateFile wraps an os.File with a persistent worker goroutine for
-// pipelined double-buffer writes. The worker owns the slot index and
-// performs both writes per request: primary (reported back via respCh),
-// then secondary (best-effort, before consuming the next request).
-// All channels are pre-allocated — no per-call heap allocations.
+// pipelined double-buffer writes.  The worker owns the slot index,
+// encodes the slot, and performs both writes per request: primary
+// (reported back via respCh), then secondary (best-effort, before
+// consuming the next request).
+// O_DSYNC + data=journal guarantees that a successful WriteAt means
+// data is on persistent media, and a torn write is rolled back.
 type stateFile struct {
 	file    *os.File
-	workCh  chan [keyStateSlotSize]byte // slot data; closed to signal shutdown
-	syncCh  chan struct{}               // send to drain worker without writing
-	respCh  chan error                  // worker sends primary-write result here
-	stopped chan struct{}               // closed when worker exits
+	workCh  chan stateWriteReq // raw params; closed to signal shutdown
+	syncCh  chan struct{}      // send to drain worker without writing
+	respCh  chan error         // worker sends primary-write result here
+	stopped chan struct{}      // closed when worker exits
 }
 
 func newStateFile(file *os.File, nextSlot int) *stateFile {
 	sf := &stateFile{
 		file:    file,
-		workCh:  make(chan [keyStateSlotSize]byte),
+		workCh:  make(chan stateWriteReq),
 		syncCh:  make(chan struct{}),
 		respCh:  make(chan error, 1),
 		stopped: make(chan struct{}),
@@ -935,16 +974,23 @@ func (sf *stateFile) worker(nextSlot int) {
 	defer close(sf.stopped)
 	for {
 		select {
-		case slot, ok := <-sf.workCh:
+		case req, ok := <-sf.workCh:
 			if !ok {
 				return
 			}
+			var slot [keyStateSlotSize]byte
+			if err := encodeKeyStateSlot(slot[:], req.dek, req.id, req.tz4, req.ks, req.seq); err != nil {
+				sf.respCh <- err
+				continue
+			}
 			primaryOffset := int64(nextSlot) * keyStateSlotSize
-			secondaryOffset := int64(nextSlot^1) * keyStateSlotSize
-			nextSlot ^= 1
 
 			_, err := sf.file.WriteAt(slot[:], primaryOffset)
 			sf.respCh <- err
+
+			nextSlot ^= 1
+			secondaryOffset := int64(nextSlot) * keyStateSlotSize
+
 			if err == nil {
 				sf.file.WriteAt(slot[:], secondaryOffset) // best-effort
 			}
@@ -986,24 +1032,11 @@ func chooseNextSlot(reader io.ReaderAt, dek []byte, id, tz4 string) int {
 	}
 }
 
-// sendState encodes the key state and sends it to the worker without
-// blocking for the write result.  The caller must call recvWrite to
-// collect the result before issuing another send.
-func (sf *stateFile) sendState(dek []byte, id, tz4 string, ks *KeyState, seq uint64) error {
-	if sf.file == nil {
-		return fmt.Errorf("state file is not open")
-	}
-	if len(dek) != 32 {
-		return fmt.Errorf("invalid DEK (len=%d)", len(dek))
-	}
-
-	var slot [keyStateSlotSize]byte
-	if err := encodeKeyStateSlot(slot[:], dek, id, tz4, ks, seq); err != nil {
-		return err
-	}
-
-	sf.workCh <- slot
-	return nil
+// sendState sends the raw parameters to the worker for encoding and
+// writing.  The caller must call recvWrite to collect the result
+// before issuing another send.
+func (sf *stateFile) sendState(dek []byte, id, tz4 string, ks *KeyState, seq uint64) {
+	sf.workCh <- stateWriteReq{dek: dek, id: id, tz4: tz4, ks: ks, seq: seq}
 }
 
 // recvWrite waits for the primary-slot write result from the worker.
@@ -1011,12 +1044,10 @@ func (sf *stateFile) recvWrite() error {
 	return <-sf.respCh
 }
 
-// writeState encodes the key state, sends it to the worker, and waits
-// for the primary slot write to complete.
+// writeState sends the key state to the worker and waits for the
+// primary slot write to complete.
 func (sf *stateFile) writeState(dek []byte, id, tz4 string, ks *KeyState, seq uint64) error {
-	if err := sf.sendState(dek, id, tz4, ks, seq); err != nil {
-		return err
-	}
+	sf.sendState(dek, id, tz4, ks, seq)
 	return sf.recvWrite()
 }
 

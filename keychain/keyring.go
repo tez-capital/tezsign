@@ -493,10 +493,8 @@ func (kr *KeyRing) SignAndUpdate(tz4 string, raw []byte) (sig []byte, err error)
 	}
 	nextSeq := key.stateSeq + 1
 
-	// send state to the worker (non-blocking); signing runs in parallel
-	if err := key.stateFile.sendState(key.dek, keyID, key.tz4, nextState, nextSeq); err != nil {
-		return nil, fmt.Errorf("persist state: %w", err)
-	}
+	// send state to the worker; encoding + write run in parallel with signing
+	key.stateFile.sendState(key.dek, keyID, key.tz4, nextState, nextSeq)
 
 	// decrypt secret (32B LE) using in-memory DEK; authenticate with AAD
 	gcmDEK, err := newAESGCM(key.dek)
