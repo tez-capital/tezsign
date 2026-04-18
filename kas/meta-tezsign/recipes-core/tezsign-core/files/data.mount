@@ -7,7 +7,7 @@ After=local-fs-pre.target
 What=/dev/disk/by-label/data
 Where=/data
 Type=ext4
-Options=rw,noatime,nodiratime,data=journal,nobarrier,commit=60,nofail
+Options=rw,noatime,nodiratime,data=journal,barrier=1,commit=30,nofail,errors=remount-ro
 
 [Install]
 WantedBy=local-fs.target
