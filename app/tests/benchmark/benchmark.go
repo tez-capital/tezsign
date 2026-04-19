@@ -169,7 +169,24 @@ func runLatencyMode(mgmtBroker, signBroker *broker.Broker, masterPass []byte, cf
 	fmt.Println("== End-to-End")
 	fmt.Printf("benchmark key=%s tz4=%s samples=%d warmup=%d\n", keyID, keyTz4, cfg.samples, cfg.warmup)
 	for _, target := range targets {
-		result, err := runBenchmark(signBroker, keyTz4, target, cfg.samples, cfg.warmup, l)
+		lastLevel, lastRound, err := benchmarkKindWatermarkFromStatus(mgmtBroker, keyID, target.kind)
+		if err != nil {
+			return fmt.Errorf("%s: read current watermark: %w", target.name, err)
+		}
+		startLevel := lastLevel + 1
+		if startLevel == 0 {
+			return fmt.Errorf("%s: cannot continue benchmark: level overflow", target.name)
+		}
+
+		l.Info("benchmark start watermark",
+			"kind", target.name,
+			"key", keyID,
+			"last_level", lastLevel,
+			"last_round", lastRound,
+			"start_level", startLevel,
+		)
+
+		result, err := runBenchmark(signBroker, keyTz4, target, startLevel, cfg.samples, cfg.warmup, l)
 		if err != nil {
 			return fmt.Errorf("%s: %w", target.name, err)
 		}
@@ -388,15 +405,44 @@ func benchmarkKeyIDs(keys []benchmarkKey) []string {
 	return keyIDs
 }
 
-func runBenchmark(b *broker.Broker, tz4 string, target benchmarkTarget, samples, warmup int, l *slog.Logger) (benchmarkResult, error) {
+func benchmarkKindWatermarkFromStatus(mgmtBroker *broker.Broker, keyID string, kind byte) (level uint64, round uint32, err error) {
+	status, err := common.ReqStatus(mgmtBroker)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	for _, key := range status.GetKeys() {
+		if key.GetKeyId() != keyID {
+			continue
+		}
+
+		switch kind {
+		case 0x11:
+			return key.GetLastBlockLevel(), key.GetLastBlockRound(), nil
+		case 0x12:
+			return key.GetLastPreattestationLevel(), key.GetLastPreattestationRound(), nil
+		case 0x13:
+			return key.GetLastAttestationLevel(), key.GetLastAttestationRound(), nil
+		default:
+			return 0, 0, fmt.Errorf("unknown benchmark kind 0x%02x", kind)
+		}
+	}
+
+	return 0, 0, fmt.Errorf("status: key %q not found", keyID)
+}
+
+func runBenchmark(b *broker.Broker, tz4 string, target benchmarkTarget, startLevel uint64, samples, warmup int, l *slog.Logger) (benchmarkResult, error) {
 	if samples <= 0 {
 		return benchmarkResult{}, fmt.Errorf("samples must be > 0")
 	}
 	if warmup < 0 {
 		return benchmarkResult{}, fmt.Errorf("warmup must be >= 0")
 	}
+	if startLevel == 0 {
+		return benchmarkResult{}, fmt.Errorf("start level must be > 0")
+	}
 
-	nextLevel := uint64(1)
+	nextLevel := startLevel
 	for i := 0; i < warmup; i++ {
 		if _, err := common.ReqSign(b, tz4, buildTenderbakePayload(target.kind, nextLevel, 0, nil)); err != nil {
 			return benchmarkResult{}, fmt.Errorf("warmup %s[%d]: %w", target.name, i, err)

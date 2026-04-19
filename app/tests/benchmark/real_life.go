@@ -72,8 +72,38 @@ func runRealLifeMode(mgmtBroker, signBroker *broker.Broker, masterPass []byte, c
 	unlocked = true
 
 	fmt.Println("== Real-Life")
+
+	key1Level, key1Round, err := benchmarkKindWatermarkFromStatus(mgmtBroker, key1.id, target.kind)
+	if err != nil {
+		return fmt.Errorf("read current watermark for key1 %q: %w", key1.id, err)
+	}
+	key2Level, key2Round, err := benchmarkKindWatermarkFromStatus(mgmtBroker, key2.id, target.kind)
+	if err != nil {
+		return fmt.Errorf("read current watermark for key2 %q: %w", key2.id, err)
+	}
+
+	startLevel := key1Level
+	if key2Level > startLevel {
+		startLevel = key2Level
+	}
+	startLevel++
+	if startLevel == 0 {
+		return fmt.Errorf("cannot continue real-life benchmark: level overflow")
+	}
+
+	l.Info("real-life start watermark",
+		"kind", target.name,
+		"key1", key1.id,
+		"key1_last_level", key1Level,
+		"key1_last_round", key1Round,
+		"key2", key2.id,
+		"key2_last_level", key2Level,
+		"key2_last_round", key2Round,
+		"start_level", startLevel,
+	)
+
 	fmt.Printf(
-		"real-life key1=%s tz4=%s key2=%s tz4=%s kind=%s cycles=%d sign_requests=%d interval=%s\n",
+		"real-life key1=%s tz4=%s key2=%s tz4=%s kind=%s cycles=%d sign_requests=%d interval=%s start_level=%d\n",
 		key1.id,
 		key1.tz4,
 		key2.id,
@@ -82,9 +112,10 @@ func runRealLifeMode(mgmtBroker, signBroker *broker.Broker, masterPass []byte, c
 		cfg.realLifePairs,
 		cfg.realLifePairs*2,
 		cfg.realLifeInterval,
+		startLevel,
 	)
 
-	result, err := runRealLifeBenchmark(signBroker, key1, key2, target, cfg.realLifePairs, cfg.realLifeInterval, l)
+	result, err := runRealLifeBenchmark(signBroker, key1, key2, target, startLevel, cfg.realLifePairs, cfg.realLifeInterval, l)
 	if err != nil {
 		return err
 	}
@@ -113,14 +144,19 @@ func runRealLifeBenchmark(
 	key1 benchmarkKey,
 	key2 benchmarkKey,
 	target benchmarkTarget,
+	startLevel uint64,
 	pairs int,
 	interval time.Duration,
 	l *slog.Logger,
 ) (realLifeResult, error) {
+	if startLevel == 0 {
+		return realLifeResult{}, fmt.Errorf("start level must be > 0")
+	}
+
 	durations := make([]time.Duration, 0, pairs*2)
 	pairDurations := make([]time.Duration, 0, pairs)
 	failures := 0
-	level := uint64(1)
+	level := startLevel
 	benchStart := time.Now()
 	runSeed := benchStart.UTC().UnixNano()
 
