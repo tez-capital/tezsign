@@ -237,82 +237,91 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal()
   if(!c||!c.getContext) return;
   var ctx=c.getContext('2d');
   var dpr=window.devicePixelRatio||1;
-  var w,h;
-  var nodes=[];
-  var N=80;
-  var LINK=180;
+  var w,h,nodes=[];
+  var K=0.03; // node count = K * sqrt(area)
+  var LINK_FRAC=0.10;
+  var LABELS=['tz1','tz2','tz3','BLpk','sig','edpk','sppk','BLsk','nonce','blk','op','hash'];
+  var HEX='0123456789abcdef';
+
+  function rh(n){var s='';for(var i=0;i<n;i++)s+=HEX[Math.random()*16|0];return s;}
 
   function resize(){
     w=window.innerWidth;
     h=window.innerHeight;
     c.width=w*dpr;
     c.height=h*dpr;
-    c.style.width=w+'px';
-    c.style.height=h+'px';
     ctx.setTransform(dpr,0,0,dpr,0,0);
-  }
-
-  var HEX='0123456789abcdef';
-  var labels=['tz1','tz2','tz3','BLpk','sig','edpk','sppk','BLsk','nonce','blk','op','hash'];
-
-  function randHex(n){var s='';for(var i=0;i<n;i++)s+=HEX[Math.random()*16|0];return s;}
-
-  function init(){
-    resize();
-    nodes=[];
-    for(var i=0;i<N;i++){
-      var hasLabel=i%5===0;
+    var target=Math.max(8,Math.round(K*Math.sqrt(w*h)));
+    while(nodes.length>target) nodes.pop();
+    while(nodes.length<target){
+      var i=nodes.length;
       nodes.push({
-        x:Math.random()*w,
-        y:Math.random()*h,
-        vx:(Math.random()-.5)*.4,
-        vy:(Math.random()-.5)*.4,
+        nx:Math.random(),ny:Math.random(),
+        vx:(Math.random()-.5)*.0003,vy:(Math.random()-.5)*.0003,
         r:Math.random()*1.5+2,
-        label:hasLabel?labels[i%labels.length]+randHex(6):null
+        label:i%5===0?LABELS[i%LABELS.length]+rh(6):null
       });
     }
   }
 
-  window.addEventListener('resize',function(){resize();});
-  init();
+  window.addEventListener('resize',resize);
+  resize();
 
-  function frame(){
+  function frame(now){
+    rafId=requestAnimationFrame(frame);
+    if(now-lastFrame<33) return; // cap ~30fps
+    lastFrame=now;
     ctx.clearRect(0,0,w,h);
+    var N=nodes.length;
+    var ld=Math.sqrt(w*w+h*h)*LINK_FRAC;
+    var ld2=ld*ld;
+    // update positions & cache pixel coords
     for(var i=0;i<N;i++){
       var a=nodes[i];
-      a.x+=a.vx;
-      a.y+=a.vy;
-      if(a.x<0){a.x=0;a.vx*=-1;}
-      if(a.x>w){a.x=w;a.vx*=-1;}
-      if(a.y<0){a.y=0;a.vy*=-1;}
-      if(a.y>h){a.y=h;a.vy*=-1;}
+      a.nx+=a.vx; a.ny+=a.vy;
+      if(a.nx<0){a.nx=0;a.vx*=-1;}
+      if(a.nx>1){a.nx=1;a.vx*=-1;}
+      if(a.ny<0){a.ny=0;a.vy*=-1;}
+      if(a.ny>1){a.ny=1;a.vy*=-1;}
+      a.px=a.nx*w; a.py=a.ny*h;
+    }
+    // draw links batched
+    ctx.lineWidth=1;
+    for(var i=0;i<N;i++){
+      var a=nodes[i];
       for(var j=i+1;j<N;j++){
         var b=nodes[j];
-        var dx=a.x-b.x,dy=a.y-b.y;
-        var d=Math.sqrt(dx*dx+dy*dy);
-        if(d<LINK){
-          var alpha=0.22*(1-d/LINK);
-          ctx.beginPath();
-          ctx.moveTo(a.x,a.y);
-          ctx.lineTo(b.x,b.y);
-          ctx.strokeStyle='rgba(0,0,0,'+alpha+')';
-          ctx.lineWidth=1;
+        var dx=a.px-b.px,dy=a.py-b.py,d2=dx*dx+dy*dy;
+        if(d2<ld2){
+          ctx.beginPath();ctx.moveTo(a.px,a.py);ctx.lineTo(b.px,b.py);
+          ctx.strokeStyle='rgba(0,0,0,'+(0.22*(1-Math.sqrt(d2)/ld))+')';
           ctx.stroke();
         }
       }
-      ctx.beginPath();
-      ctx.arc(a.x,a.y,a.r,0,6.283);
-      ctx.fillStyle='rgba(0,0,0,.4)';
-      ctx.fill();
-      if(a.label){
-        ctx.font='8px monospace';
-        ctx.fillStyle='rgba(0,0,0,.13)';
-        ctx.fillText(a.label,a.x+a.r+3,a.y+3);
-      }
     }
-    requestAnimationFrame(frame);
+    // draw nodes batched
+    ctx.fillStyle='rgba(0,0,0,.4)';
+    ctx.beginPath();
+    for(var i=0;i<N;i++){
+      var a=nodes[i];
+      ctx.moveTo(a.px+a.r,a.py);
+      ctx.arc(a.px,a.py,a.r,0,6.283);
+    }
+    ctx.fill();
+    // draw labels
+    ctx.font='8px monospace';ctx.fillStyle='rgba(0,0,0,.13)';
+    for(var i=0;i<N;i++){
+      var a=nodes[i];
+      if(a.label) ctx.fillText(a.label,a.px+a.r+3,a.py+3);
+    }
   }
-  frame();
+  var lastFrame=0,rafId;
+  // pause when tab hidden
+  document.addEventListener('visibilitychange',function(){
+    if(document.hidden){cancelAnimationFrame(rafId);rafId=0;}
+    else if(!rafId){lastFrame=0;rafId=requestAnimationFrame(frame);}
+  });
+  rafId=requestAnimationFrame(frame);
 })();
 </script>
 

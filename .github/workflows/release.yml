@@ -2,7 +2,11 @@ name: "Build Release"
 
 on:
   push:
+    paths-ignore:
+      - 'web/**'
   pull_request:
+    paths-ignore:
+      - 'web/**'
 
 jobs:
     build-gadget:
