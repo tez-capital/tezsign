@@ -17,7 +17,6 @@ type selectionStage int
 
 const (
 	stageDevice selectionStage = iota
-	stageKind
 )
 
 type deviceCandidate struct {
@@ -33,9 +32,7 @@ type selectionModel struct {
 	stage          selectionStage
 	devices        []deviceCandidate
 	table          table.Model
-	kindCursor     int
 	selectedDevice *deviceCandidate
-	selectedKind   UpdateKind
 	err            error
 }
 
@@ -68,10 +65,9 @@ func newSelectionModel(devices []deviceCandidate) selectionModel {
 	t.SetStyles(newTableStyles())
 
 	return selectionModel{
-		stage:        stageDevice,
-		devices:      devices,
-		table:        t,
-		selectedKind: UpdateKindFull,
+		stage:   stageDevice,
+		devices: devices,
+		table:   t,
 	}
 }
 
@@ -104,29 +100,9 @@ func (m selectionModel) View() string {
 			return "No TezSign SD cards detected. Press q to exit."
 		}
 		return fmt.Sprintf(
-			"Select a device (↑/↓ to navigate, enter to choose)\n\n%s\n\nPress enter to continue or q to cancel.",
+			"Select a device (↑/↓ to navigate, enter to start full update)\n\n%s\n\nPress enter to continue or q to cancel.",
 			m.table.View(),
 		)
-	case stageKind:
-		options := []struct {
-			kind  UpdateKind
-			title string
-		}{
-			{UpdateKindFull, "Full (boot, app, rootfs if present)"},
-			{UpdateKindAppOnly, "TezSign app only"},
-		}
-
-		var sb strings.Builder
-		sb.WriteString("Select update kind (↑/↓ to navigate, enter to start)\n\n")
-		for i, option := range options {
-			cursor := "  "
-			if i == m.kindCursor {
-				cursor = "> "
-			}
-			sb.WriteString(fmt.Sprintf("%s%s\n", cursor, option.title))
-		}
-		sb.WriteString("\nPress q to cancel.")
-		return sb.String()
 	default:
 		return ""
 	}
@@ -163,21 +139,6 @@ func (m selectionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, tea.Quit
 				}
 				m.selectedDevice = &m.devices[cursor]
-				m.stage = stageKind
-			}
-		case stageKind:
-			switch msg.String() {
-			case "up", "k":
-				if m.kindCursor > 0 {
-					m.kindCursor--
-				}
-			case "down", "j":
-				if m.kindCursor < 1 {
-					m.kindCursor++
-				}
-			case "enter":
-				options := []UpdateKind{UpdateKindFull, UpdateKindAppOnly}
-				m.selectedKind = options[m.kindCursor]
 				return m, tea.Quit
 			}
 		}

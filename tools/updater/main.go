@@ -14,9 +14,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/diskfs/go-diskfs"
 	"github.com/diskfs/go-diskfs/disk"
-	"github.com/diskfs/go-diskfs/partition"
-	"github.com/diskfs/go-diskfs/partition/gpt"
-	"github.com/diskfs/go-diskfs/partition/mbr"
 	"github.com/tez-capital/tezsign/logging"
 	"github.com/tez-capital/tezsign/tools/constants"
 )
@@ -24,8 +21,7 @@ import (
 type UpdateKind string
 
 const (
-	UpdateKindFull    UpdateKind = "full"
-	UpdateKindAppOnly UpdateKind = "app"
+	UpdateKindFull UpdateKind = "full"
 )
 
 func main() {
@@ -38,42 +34,25 @@ func main() {
 	}
 
 	var source string
-	var appBinary string
 	var sourceProvided bool
 	if len(args) >= 1 {
 		source = args[0]
 		sourceProvided = true
-		appBinary = source // allow supplying only the source while still using interactive flow
 	}
 
 	// Keep the previous non-interactive flow when destination is provided explicitly.
 	if sourceProvided && len(args) >= 2 {
 		destination := args[1]
-		kind := UpdateKindFull
 		if len(args) >= 3 {
-			kind = UpdateKind(args[2])
-			switch kind {
-			case UpdateKindFull, UpdateKindAppOnly:
-			default:
-				logger.Error("Invalid update kind. Valid options are: full, app")
+			kind := UpdateKind(args[2])
+			if kind != UpdateKindFull {
+				logger.Error("Invalid update kind. Valid option is: full")
 				os.Exit(1)
 			}
 		}
 
-		switch kind {
-		case UpdateKindFull:
-			if err := performUpdate(source, destination, kind, logger); err != nil {
-				logger.Error("Update failed", "error", err)
-				os.Exit(1)
-			}
-		case UpdateKindAppOnly:
-			appBinary = source
-			if err := performAppBinaryUpdate(appBinary, destination, logger); err != nil {
-				logger.Error("Update failed", "error", err)
-				os.Exit(1)
-			}
-		default:
-			logger.Error("Invalid update kind. Valid options are: full, app")
+		if err := performUpdate(source, destination, UpdateKindFull, logger); err != nil {
+			logger.Error("Update failed", "error", err)
 			os.Exit(1)
 		}
 
@@ -87,71 +66,37 @@ func main() {
 		os.Exit(1)
 	}
 
-	selectedDevice, kind, err := runSelection(devices)
+	selectedDevice, err := runSelection(devices)
 	if err != nil {
 		logger.Error("Selection failed", "error", err)
 		os.Exit(1)
 	}
 
 	if !sourceProvided {
-		switch kind {
-		case UpdateKindFull:
-			flavour, err := deviceFlavour(selectedDevice.Path)
-			if err != nil {
-				logger.Error("Failed to detect device flavor", "error", err)
-				os.Exit(1)
-			}
-			url := fmt.Sprintf("%s%s.img.xz", constants.LatestReleaseURL, flavour)
-			downloaded, cleanupFn, err := downloadWithProgress(url)
-			if err != nil {
-				logger.Error("Failed to download image", "error", err)
-				os.Exit(1)
-			}
-			defer cleanupFn()
-			source = downloaded
-		case UpdateKindAppOnly:
-			url := fmt.Sprintf("%s%s", constants.LatestReleaseURL, constants.AppBinaryName)
-			downloaded, cleanupFn, err := downloadWithProgress(url)
-			if err != nil {
-				logger.Error("Failed to download gadget binary", "error", err)
-				os.Exit(1)
-			}
-			defer cleanupFn()
-			appBinary = downloaded
-		default:
-			logger.Error("Unsupported update kind", "kind", kind)
+		flavour, err := deviceFlavour(selectedDevice.Path)
+		if err != nil {
+			logger.Error("Failed to detect device flavor", "error", err)
 			os.Exit(1)
 		}
+		url := fmt.Sprintf("%s%s.img.xz", constants.LatestReleaseURL, flavour)
+		downloaded, cleanupFn, err := downloadWithProgress(url)
+		if err != nil {
+			logger.Error("Failed to download image", "error", err)
+			os.Exit(1)
+		}
+		defer cleanupFn()
+		source = downloaded
 	}
 
-	switch kind {
-	case UpdateKindFull:
-		if _, err := os.Stat(source); err != nil {
-			logger.Error("Invalid source image", "error", err)
-			os.Exit(1)
-		}
-	case UpdateKindAppOnly:
-		if _, err := os.Stat(appBinary); err != nil {
-			logger.Error("Invalid gadget binary", "error", err)
-			os.Exit(1)
-		}
+	if _, err := os.Stat(source); err != nil {
+		logger.Error("Invalid source image", "error", err)
+		os.Exit(1)
 	}
 
-	fmt.Printf("Updating %s with a %s update...\n\n", selectedDevice.Path, string(kind))
+	fmt.Printf("Updating %s with a %s update...\n\n", selectedDevice.Path, string(UpdateKindFull))
 
-	switch kind {
-	case UpdateKindFull:
-		if err := performUpdate(source, selectedDevice.Path, kind, logger); err != nil {
-			logger.Error("Update failed", "error", err)
-			os.Exit(1)
-		}
-	case UpdateKindAppOnly:
-		if err := performAppBinaryUpdate(appBinary, selectedDevice.Path, logger); err != nil {
-			logger.Error("Update failed", "error", err)
-			os.Exit(1)
-		}
-	default:
-		logger.Error("Unsupported update kind", "kind", kind)
+	if err := performUpdate(source, selectedDevice.Path, UpdateKindFull, logger); err != nil {
+		logger.Error("Update failed", "error", err)
 		os.Exit(1)
 	}
 
@@ -175,29 +120,18 @@ func readBlockSizeBytes(name string) uint64 {
 	return sectors * 512 // sectors are 512-byte blocks
 }
 
-func hasExpectedPartitionCount(t partition.Table) bool {
-	switch tt := t.(type) {
-	case *gpt.Table:
-		return len(tt.Partitions) >= 3
-	case *mbr.Table:
-		nonZero := 0
-		for _, p := range tt.Partitions {
-			if p != nil && p.Size > 0 {
-				nonZero++
-			}
-		}
-		return nonZero == 4
-	default:
-		return false
-	}
-}
-
 func checkTezsignMarker(disk *disk.Disk) (bool, error) {
 	table, err := disk.GetPartitionTable()
 	if err != nil {
 		return false, err
 	}
-	if !hasExpectedPartitionCount(table) {
+	nonZeroPartitions := 0
+	for _, p := range table.GetPartitions() {
+		if p != nil && p.GetSize() > 0 {
+			nonZeroPartitions++
+		}
+	}
+	if nonZeroPartitions != 3 {
 		return false, nil
 	}
 	hasApp := false
@@ -281,27 +215,27 @@ func discoverTezsignDevices(logger *slog.Logger) ([]deviceCandidate, error) {
 	return devices, nil
 }
 
-func runSelection(devices []deviceCandidate) (deviceCandidate, UpdateKind, error) {
+func runSelection(devices []deviceCandidate) (deviceCandidate, error) {
 	program := tea.NewProgram(newSelectionModel(devices))
 	model, err := program.Run()
 	if err != nil {
-		return deviceCandidate{}, "", err
+		return deviceCandidate{}, err
 	}
 
 	selection, ok := model.(selectionModel)
 	if !ok {
-		return deviceCandidate{}, "", errors.New("failed to read selection state")
+		return deviceCandidate{}, errors.New("failed to read selection state")
 	}
 
 	if selection.err != nil {
-		return deviceCandidate{}, "", selection.err
+		return deviceCandidate{}, selection.err
 	}
 
 	if selection.selectedDevice == nil {
-		return deviceCandidate{}, "", errors.New("no device selected")
+		return deviceCandidate{}, errors.New("no device selected")
 	}
 
-	return *selection.selectedDevice, selection.selectedKind, nil
+	return *selection.selectedDevice, nil
 }
 
 func downloadWithProgress(url string) (string, func(), error) {
@@ -379,11 +313,9 @@ Usage:
   %[1]s
       Interactive mode: pick a device and download the latest release automatically.
   %[1]s <source>
-      Interactive mode using a local image/binary; destination is still selected interactively.
-  %[1]s <source> <destination> [full|app]
-      Non-interactive update using local files (default kind: full).
-  %[1]s <app_binary> <destination> app
-      App-only update with a prebuilt gadget binary.
+      Interactive mode using a local image; destination is still selected interactively.
+  %[1]s <source> <destination> [full]
+      Non-interactive full update using a local image.
 
 Options:
   -h, --help    Show this help message.

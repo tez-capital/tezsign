@@ -5,6 +5,7 @@ INHIBIT_DEFAULT_DEPS = "1"
 
 SRC_URI = " \
     file://tezsign \
+    file://.image-flavour \
     file://.image-version \
     file://.image-date \
 "
@@ -48,9 +49,48 @@ do_deploy() {
         image_date="unknown"
     fi
 
+    image_flavour="$(cat ${WORKDIR}/.image-flavour 2>/dev/null || true)"
+    image_flavour="$(printf '%s' "$image_flavour" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    if [ -z "$image_flavour" ] || [ "$image_flavour" = "unknown" ]; then
+        # Manual builds: derive canonical flavour from kas-provided release name first, then machine.
+        release_name="$(printf '%s' "${TEZSIGN_RELEASE_NAME}" | tr '[:upper:]' '[:lower:]')"
+        machine_name="$(printf '%s' "${MACHINE}" | tr '[:upper:]' '[:lower:]')"
+
+        case "$release_name" in
+            rpi4|rpi4_dev)
+                image_flavour="rpi4"
+                ;;
+            rpi0-2w|rpi0-2w_dev|rpi0_2w|rpi0_2w_dev)
+                image_flavour="rpi0_2w"
+                ;;
+            radxa-zero3|radxa-zero3_dev|radxa_zero3|radxa_zero3_dev)
+                image_flavour="radxa_zero3"
+                ;;
+        esac
+
+        if [ -z "$image_flavour" ] || [ "$image_flavour" = "unknown" ]; then
+            case "$machine_name" in
+                raspberrypi4-tezsign*)
+                    image_flavour="rpi4"
+                    ;;
+                raspberrypi0-2w-tezsign*)
+                    image_flavour="rpi0_2w"
+                    ;;
+                radxa-zero3-tezsign*)
+                    image_flavour="radxa_zero3"
+                    ;;
+            esac
+        fi
+    fi
+
+    if [ -z "$image_flavour" ] || [ "$image_flavour" = "unknown" ]; then
+        image_flavour="unknown"
+    fi
+
+    printf '%s\n' "$image_flavour" > ${DEPLOYDIR}/appfs/.image-flavour
     printf '%s\n' "$image_version" > ${DEPLOYDIR}/appfs/.image-version
     printf '%s\n' "$image_date" > ${DEPLOYDIR}/appfs/.image-date
-    chmod 0444 ${DEPLOYDIR}/appfs/.image-version ${DEPLOYDIR}/appfs/.image-date
+    chmod 0444 ${DEPLOYDIR}/appfs/.image-flavour ${DEPLOYDIR}/appfs/.image-version ${DEPLOYDIR}/appfs/.image-date
 
     # Normalize the prebuilt gadget binary before it lands in appfs.
     ${STRIP} ${DEPLOYDIR}/appfs/tezsign

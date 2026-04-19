@@ -8,10 +8,15 @@ inputs:
   release-name:
     description: 'Expected TEZSIGN_RELEASE_NAME output'
     required: true
-  upload-gadget-binary:
-    description: 'Upload the standalone tezsign gadget binary artifact'
-    required: false
-    default: 'false'
+  image-flavour:
+    description: 'Image flavour marker written into appfs (.image-flavour)'
+    required: true
+  gadget-goarm64:
+    description: 'GOARM64 value for gadget build'
+    required: true
+  gadget-cgo-cflags:
+    description: 'CGO_CFLAGS value for gadget build'
+    required: true
 
 runs:
   using: "composite"
@@ -47,7 +52,9 @@ runs:
           -e GOMODCACHE=/tmp/go-mod-cache \
           -e GOOS=linux \
           -e GOARCH=arm64 \
+          -e GOARM64="${{ inputs.gadget-goarm64 }}" \
           -e CGO_ENABLED=1 \
+          -e CGO_CFLAGS="${{ inputs.gadget-cgo-cflags }}" \
           -v "${PWD}:/work" \
           --workdir /work \
           tezsign/builder:latest \
@@ -78,13 +85,16 @@ runs:
       run: |
         image_version="${IMAGE_VERSION:-$(git rev-parse --short=12 HEAD)}"
         image_date="${IMAGE_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+        image_flavour="${{ inputs.image-flavour }}"
 
         printf '%s\n' "${image_version}" > ./kas/meta-tezsign/recipes-core/images/files/.image-version
         printf '%s\n' "${image_date}" > ./kas/meta-tezsign/recipes-core/images/files/.image-date
+        printf '%s\n' "${image_flavour}" > ./kas/meta-tezsign/recipes-core/images/files/.image-flavour
 
         chmod 0644 \
           ./kas/meta-tezsign/recipes-core/images/files/.image-version \
-          ./kas/meta-tezsign/recipes-core/images/files/.image-date
+          ./kas/meta-tezsign/recipes-core/images/files/.image-date \
+          ./kas/meta-tezsign/recipes-core/images/files/.image-flavour
 
     - name: Restore Yocto cache
       uses: actions/cache@v5
@@ -133,13 +143,5 @@ runs:
       with:
         name: ${{ inputs.release-name }}.img.xz
         path: ${{ github.workspace }}/kas/release/${{ inputs.release-name }}.img.xz
-        retention-days: 1
-        if-no-files-found: error
-
-    - uses: actions/upload-artifact@v7
-      if: ${{ inputs.upload-gadget-binary == 'true' }}
-      with:
-        name: tezsign_gadget_binary
-        path: ${{ github.workspace }}/kas/meta-tezsign/recipes-core/images/files/tezsign
         retention-days: 1
         if-no-files-found: error
