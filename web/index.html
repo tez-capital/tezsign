@@ -45,37 +45,37 @@
     <p class="section-subtitle">Trusted by TezBake bakers across the network — battle-tested in production.</p>
     <div class="features">
 
-      <div class="feature">
+      <div class="feature" onclick="openModal(this)" data-title="Air-Gapped Security" data-detail="Unlike other signers, TezSign runs a fully read-only Yocto Linux image — the filesystem cannot be modified at runtime. There is no SSH, no shell, and no network stack. Communication happens exclusively through a custom USB wire protocol. Private keys are generated on-device, encrypted with AES-256-GCM, and stored in power-loss-safe encrypted slots. Keys cannot be extracted — only signing operations are exposed.">
         <div class="feature-icon">🔒</div>
         <h3>Air-Gapped Security</h3>
         <p>Keys never leave the gadget. Custom read-only image and wire protocol keep secrets isolated.</p>
       </div>
 
-      <div class="feature">
+      <div class="feature" onclick="openModal(this)" data-title="4–10 ms Signatures" data-detail="BLS12-381 signing completes in 4–10 ms depending on hardware. The device boots in ~3 seconds from a cold start. Actual speed varies with the board (RPi 4 is fastest) and SD card quality.">
         <div class="feature-icon">⚡</div>
         <h3>4–10 ms Signatures</h3>
         <p>Fast BLS signing. 3-second boot. Ready before your baker even asks.</p>
       </div>
 
-      <div class="feature">
+      <div class="feature" onclick="openModal(this)" data-title="Under $20" data-detail="Supported devices start under $20 USD. Supported boards: Raspberry Pi Zero 2W, Raspberry Pi 4, or Radxa Zero 3W. You'll also need a 4 GB+ SD card — industrial-grade/endurance cards are recommended for longevity.">
         <div class="feature-icon">💰</div>
         <h3>Under $20</h3>
-        <p>RPi Zero 2W, RPi 4, or Radxa Zero 3. No expensive HSMs.</p>
+        <p>RPi Zero 2W, RPi 4, or Radxa Zero 3W. No expensive HSMs.</p>
       </div>
 
-      <div class="feature">
+      <div class="feature" onclick="openModal(this)" data-title="Built for Bakers" data-detail="TezSign supports multiple keys across multiple gadgets simultaneously. It integrates natively with TezBake — setup is a single command. The device is hardened against sudden power loss, so state is never corrupted even if power is cut mid-operation.">
         <div class="feature-icon">🧑‍🍳</div>
         <h3>Built for Bakers</h3>
         <p>Multi-baker, multi-device, power-loss safe, full TezBake integration, and 3-second boot.</p>
       </div>
 
-      <div class="feature">
+      <div class="feature" onclick="openModal(this)" data-title="11–15 MB Image" data-detail="The compressed gadget image is only 11–15 MB depending on the target board. Built with Yocto/OpenEmbedded from source — no package manager, no unnecessary services. The minimal footprint means a smaller attack surface and faster flashing.">
         <div class="feature-icon">📦</div>
         <h3>11–15 MB Image</h3>
         <p>Minimal Yocto Linux. Just what's needed for signing, nothing more.</p>
       </div>
 
-      <div class="feature">
+      <div class="feature" onclick="openModal(this)" data-title="Auto Unlock" data-detail="TezSign supports optional auto-unlock on boot, so your baker resumes signing immediately after a power cycle without manual password entry. You can still require manual unlock if you prefer — it's your choice.">
         <div class="feature-icon">🔓</div>
         <h3>Auto Unlock</h3>
         <p>Optional automatic unlock on boot. No manual intervention after a power cycle.</p>
@@ -99,6 +99,30 @@
     </p>
   </div>
 </footer>
+
+<!-- modal -->
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal()">&times;</button>
+    <div class="modal-icon" id="modal-icon"></div>
+    <h3 id="modal-title"></h3>
+    <p id="modal-body"></p>
+  </div>
+</div>
+<script>
+function openModal(el){
+  document.getElementById('modal-icon').textContent=el.querySelector('.feature-icon').textContent;
+  document.getElementById('modal-title').textContent=el.dataset.title;
+  document.getElementById('modal-body').textContent=el.dataset.detail;
+  document.getElementById('modal').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeModal(){
+  document.getElementById('modal').classList.remove('open');
+  document.body.style.overflow='';
+}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
+</script>
 
 <script>
 (function(){

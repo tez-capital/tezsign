@@ -97,4 +97,4 @@ sudo reboot
 
 ### Yocto Builds
 
-Local image builds now use KAS and Yocto directly. See `kas/readme.md` for the production and dev build commands for Raspberry Pi 4, Raspberry Pi Zero 2 W, and Radxa Zero 3.
+Local image builds now use KAS and Yocto directly. See `kas/readme.md` for the production and dev build commands for Raspberry Pi 4, Raspberry Pi Zero 2 W, and Radxa Zero 3W.

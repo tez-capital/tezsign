@@ -5,11 +5,11 @@
 ## Comparison With Other Available Solutions
 | Feature | **TezSign** | **Russignol** | **BLS Signer** |
 | :--- | :--- | :--- | :--- |
-| **Supported Devices** | 🥧 RPi Zero 2W, RPi4, Radxa Zero 3 | 🥧 RPi Zero 2W w/ PaperInk | 🥧 RPi Zero 2W w/ PaperInk |
+| **Supported Devices** | 🥧 RPi Zero 2W, RPi 4, Radxa Zero 3W | 🥧 RPi Zero 2W w/ PaperInk | 🥧 RPi Zero 2W w/ PaperInk |
 | **Hardware Start Cost** | **< $20 USD** * | **~$50 USD** * | **~$50 USD** * |
 | **Tezbake Integration** | Full | Partial | Partial |
 | **Avg Signature Time** | 4 - 10 ms** | ~6ms | ~30ms |
-| **Security** | 🔒 **Higher** (Custom RO Image and Wire Proto) | 🔒 **High** (Custom Image) | 🛡️ Medium |
+| **Security** | 🔒 **Higher** (Read-Only Image and Wire Proto) | 🔒 **High** (Custom Image) | 🛡️ Medium |
 | **Power Loss Safe** | ✅ **Yes** | ✅ **Yes** | ⚠️ No |
 | **Boot Time** | 🚀 **3s** ** | 🚀 **3s** | ~1.5m |
 | **Multi-Device Support**| ✅ **Yes** | ❌ No | ❌ No |
@@ -17,7 +17,7 @@
 | **Companion App** | Required | Optional | No |
 | **Physical Pinlock** | ❌ No (App-based) | 👆 Yes (Touch Screen) | 👆 Yes (Touch Screen) |
 | **Auto Unlock on Boot**| ✅ **Yes** (Optional) | ❌ No | ❌ No |
-| **Compressed Image Size** | 📦 11 - 15 MB ** | 📦 7 MB | 🐘 1.95 GB |
+| **Compressed Image Size** | 📦 10 - 15 MB ** | 📦 7 MB | 🐘 1.95 GB |
 | **License** | 📜 SSPL | 📜 MIT* (partial) | 📜 MIT |
 
 > **Note:** The comparison table above is accurate as of December 2, 2025.
@@ -33,7 +33,7 @@
 
 ### What you need:
 
-* **Hardware Gadget:** Radxa Zero 3 or any Raspberry Pi Zero 2W, 4, or other models with an OTG USB port. Note that the Raspberry Pi 5 is *not* recommended.
+* **Hardware Gadget:** Raspberry Pi Zero 2W, Raspberry Pi 4, or Radxa Zero 3W.
 * **SD Card:** 4GB or larger. A high-quality, industrial-grade/endurance SD card is **highly recommended**.
 
 > **NOTE:** There is a known issue with the Raspberry Pi DWC2 USB driver that can cause USB stack failures. We have implemented a workaround in the Yocto kernel patch at `kas/meta-tezsign/recipes-kernel/linux-mainline/linux-mainline-6.18/0001-dwc2-gadget-skip-stop-xfr-on-active-dequeue.patch`.
@@ -57,7 +57,7 @@
     - [tezsign Releases](https://github.com/tez-capital/tezsign/releases)  
     - **IMPORTANT:** For production use, avoid images with `dev` in their name.
 2.  Use Balena Etcher (or a tool you are familiar with) to flash the gadget image to your SD card.
-3.  Plug the SD card into your board (e.g., Radxa Zero 3, RPi Zero 2W).
+3.  Plug the SD card into your board (e.g., Radxa Zero 3W, RPi Zero 2W).
 4.  Connect the board to your host machine.
     * **Important:** Make sure you use a good quality USB cable and connect it to the **OTG port** of your board.
 5.  **(Linux Hosts Only) Add udev rules:**
@@ -75,15 +75,13 @@
     You will need to log out and log back in for this group change to take effect.
 
 
-After the initial connection, the device will configure itself and reboot. This process takes approximately 30 seconds.
-
-> **NOTE:** The Radxa Zero 3 may encounter an issue where it fails to boot correctly after the initial configuration. If this occurs, wait until the LED diode stops blinking (indicating the configuration is complete), then unplug and reconnect the device. This issue appears to be related to certain SD cards, as some exhibit this behavior while others do not.
+The device comes preconfigured and is ready within 5 seconds of being connected.
 
 ---
 
 ## ✨ Initialization & Usage
 
-After about 30 seconds, your device should be ready. It's time to initialize it.
+After connecting the device, it should be ready within a few seconds. It's time to initialize it.
 
 Assuming your host app is available in your path as `tezsign`:
 
