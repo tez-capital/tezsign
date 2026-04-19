@@ -160,36 +160,6 @@ jobs:
               artifact-id: tezsign-host-macos-arm64
               libusb-host: aarch64-darwin-none
 
-    # build-host-windows-amd64:
-    #     runs-on: windows-latest
-    #     steps:
-    #       - uses: actions/checkout@v5
-    #         with:
-    #             fetch-depth: 0
-
-    #       - uses: ./.github/template/build-host-windows
-    #         with:
-    #           toolchain: x86_64-windows-gnu
-    #           artifact-id: tezsign-host-windows-amd64
-    #           goos: windows
-    #           goarch: amd64
-    #           libusb-host: x64-mingw-static
-
-    # build-host-windows-arm64:
-    #     runs-on: windows-11-arm
-    #     steps:
-    #       - uses: actions/checkout@v5
-    #         with:
-    #             fetch-depth: 0
-
-    #       - uses: ./.github/template/build-host-windows
-    #         with:
-    #           toolchain: aarch64-windows-gnu
-    #           artifact-id: tezsign-host-windows-arm64
-    #           goos: windows
-    #           goarch: arm64
-    #           libusb-host: arm64-mingw-static
-
     publish:
         runs-on: ubuntu-latest
         if: github.ref == 'refs/heads/main'
@@ -201,8 +171,6 @@ jobs:
           - build-host-linux-arm64
           - build-host-macos-amd64
           - build-host-macos-arm64
-          # - build-host-windows-amd64
-          # - build-host-windows-arm64
           - build-updater
         steps:
           - uses: actions/checkout@v5
@@ -218,11 +186,11 @@ jobs:
           - name: Set date
             id: release_date
             run: echo "date=$(date +'%Y%m%d%H%M')" >> "$GITHUB_OUTPUT"
-            
-          - name: publish
-            uses: ncipollo/release-action@v1
+
+          - name: Create release
+            uses: softprops/action-gh-release@v3
             with:
-              artifacts: ./release/*
-              tag: release-${{ steps.release_date.outputs.date }}
-              commit: ${{ github.sha }}
+              files: ./release/*
+              tag_name: release-${{ steps.release_date.outputs.date }}
+              target_commitish: ${{ github.sha }}
               prerelease: true

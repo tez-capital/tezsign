@@ -102,7 +102,7 @@ runs:
         path: |
           ${{ github.workspace }}/kas/downloads
           ${{ github.workspace }}/kas/sstate-cache
-        key: yocto-${{ runner.os }}-${{ inputs.release-name }}-${{ hashFiles('kas/*.yml', 'kas/meta-tezsign/**/*.bb', 'kas/meta-tezsign/**/*.bbappend', 'kas/meta-tezsign/**/*.conf', 'kas/meta-tezsign/**/*.cfg', 'kas/meta-tezsign/**/*.patch', 'go.mod', 'go.sum') }}
+        key: yocto-${{ runner.os }}-${{ inputs.release-name }}-${{ hashFiles('kas/*.yml', 'kas/meta-tezsign/**') }}
         restore-keys: |
           yocto-${{ runner.os }}-${{ inputs.release-name }}-
           yocto-${{ runner.os }}-

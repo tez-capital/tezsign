@@ -30,6 +30,7 @@ USERADD_PARAM:${PN} = " \
 
 INHIBIT_PACKAGE_STRIP = "1"
 INHIBIT_PACKAGE_DEBUG_SPLIT = "1"
+do_unpack[nostamp] = "1"
 do_install[depends] += "virtual/${TARGET_PREFIX}binutils:do_populate_sysroot"
 
 do_install() {
