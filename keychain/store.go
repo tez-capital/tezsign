@@ -983,17 +983,10 @@ func (sf *stateFile) worker(nextSlot int) {
 				sf.respCh <- err
 				continue
 			}
-			primaryOffset := int64(nextSlot) * keyStateSlotSize
-
-			_, err := sf.file.WriteAt(slot[:], primaryOffset)
+			offset := int64(nextSlot) * keyStateSlotSize
+			_, err := sf.file.WriteAt(slot[:], offset)
 			sf.respCh <- err
-
 			nextSlot ^= 1
-			secondaryOffset := int64(nextSlot) * keyStateSlotSize
-
-			if err == nil {
-				sf.file.WriteAt(slot[:], secondaryOffset) // best-effort
-			}
 		case <-sf.syncCh:
 			sf.respCh <- nil
 		}
