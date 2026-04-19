@@ -1,0 +1,2 @@
+# Set all LEDs to heartbeat trigger (blink with system load).
+SUBSYSTEM=="leds", ACTION=="add", KERNEL=="*heartbeat*", ATTR{trigger}="heartbeat"

@@ -3,7 +3,6 @@ package keychain
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 )
 
 var (
@@ -104,7 +103,6 @@ func DecodeAndValidateSignPayload(raw []byte) (SIGN_KIND, uint64, uint32, []byte
 
 	default:
 		// This is a cold path; fmt.Errorf is acceptable here for better debug info.
-		return UNSPECIFIED, 0, 0, nil,
-			fmt.Errorf("unsupported operation 0x%02x", raw[0])
+		return UNSPECIFIED, 0, 0, nil, ErrUnsupportedOperation
 	}
 }

@@ -34,6 +34,9 @@ func (w *SimpleLogResetWriter) openFile() error {
 }
 
 func (w *SimpleLogResetWriter) Write(p []byte) (n int, err error) {
+	if w == nil {
+		return 0, nil
+	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 

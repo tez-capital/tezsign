@@ -1,0 +1,147 @@
+name: build-yocto
+description: Build a TezSign Yocto image with KAS
+
+inputs:
+  kas-file:
+    description: 'KAS file to build'
+    required: true
+  release-name:
+    description: 'Expected TEZSIGN_RELEASE_NAME output'
+    required: true
+  image-flavour:
+    description: 'Image flavour marker written into appfs (.image-flavour)'
+    required: true
+  gadget-goarm64:
+    description: 'GOARM64 value for gadget build'
+    required: true
+  gadget-cgo-cflags:
+    description: 'CGO_CFLAGS value for gadget build'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Free runner disk space
+      shell: bash
+      run: |
+        df -h
+        sudo rm -rf \
+          /opt/az \
+          /opt/ghc \
+          /opt/hostedtoolcache/CodeQL \
+          /usr/local/.ghcup \
+          /usr/local/lib/android \
+          /usr/share/dotnet
+        docker system prune -af || true
+        df -h
+
+    - name: Build Yocto payload binaries
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        docker build -f tools/Containerfile -t tezsign/builder:latest .
+
+        mkdir -p \
+          kas/meta-tezsign/recipes-core/images/files \
+          kas/meta-tezsign/recipes-core/tezsign-core/files
+
+        docker run --rm \
+          --user "$(id -u):$(id -g)" \
+          -e HOME=/tmp \
+          -e GOCACHE=/tmp/go-cache \
+          -e GOMODCACHE=/tmp/go-mod-cache \
+          -e GOOS=linux \
+          -e GOARCH=arm64 \
+          -e GOARM64="${{ inputs.gadget-goarm64 }}" \
+          -e CGO_ENABLED=1 \
+          -e CGO_CFLAGS="${{ inputs.gadget-cgo-cflags }}" \
+          -v "${PWD}:/work" \
+          --workdir /work \
+          tezsign/builder:latest \
+          go build -v -trimpath -buildvcs=false \
+            -ldflags='-s -w -buildid= -extldflags "-static"' \
+            -o ./kas/meta-tezsign/recipes-core/images/files/tezsign \
+            ./app/gadget
+
+        docker run --rm \
+          --user "$(id -u):$(id -g)" \
+          -e HOME=/tmp \
+          -e GOCACHE=/tmp/go-cache \
+          -e GOMODCACHE=/tmp/go-mod-cache \
+          -e GOOS=linux \
+          -e GOARCH=arm64 \
+          -e CGO_ENABLED=0 \
+          -v "${PWD}:/work" \
+          --workdir /work \
+          tezsign/builder:latest \
+          go build -trimpath -buildvcs=false \
+            -ldflags='-s -w -buildid=' \
+            -o ./kas/meta-tezsign/recipes-core/tezsign-core/files/ffs_registrar \
+            ./app/ffs_registrar
+
+    - name: Generate image metadata files
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        image_version="${IMAGE_VERSION:-$(git rev-parse --short=12 HEAD)}"
+        image_date="${IMAGE_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+        image_flavour="${{ inputs.image-flavour }}"
+
+        printf '%s\n' "${image_version}" > ./kas/meta-tezsign/recipes-core/images/files/.image-version
+        printf '%s\n' "${image_date}" > ./kas/meta-tezsign/recipes-core/images/files/.image-date
+        printf '%s\n' "${image_flavour}" > ./kas/meta-tezsign/recipes-core/images/files/.image-flavour
+
+        chmod 0644 \
+          ./kas/meta-tezsign/recipes-core/images/files/.image-version \
+          ./kas/meta-tezsign/recipes-core/images/files/.image-date \
+          ./kas/meta-tezsign/recipes-core/images/files/.image-flavour
+
+    - name: Restore Yocto cache
+      uses: actions/cache@v5
+      with:
+        path: |
+          ${{ github.workspace }}/kas/downloads
+          ${{ github.workspace }}/kas/sstate-cache
+        key: yocto-${{ runner.os }}-${{ inputs.release-name }}-${{ hashFiles('kas/*.yml', 'kas/meta-tezsign/**/*.bb', 'kas/meta-tezsign/**/*.bbappend', 'kas/meta-tezsign/**/*.conf', 'kas/meta-tezsign/**/*.cfg', 'kas/meta-tezsign/**/*.patch', 'go.mod', 'go.sum') }}
+        restore-keys: |
+          yocto-${{ runner.os }}-${{ inputs.release-name }}-
+          yocto-${{ runner.os }}-
+
+    - name: Build Yocto image
+      shell: bash
+      working-directory: ${{ github.workspace }}/kas
+      run: |
+        echo "Yocto runner CPUs: $(nproc)"
+
+        for repo in poky meta-raspberrypi meta-openembedded meta-arm meta-rockchip meta-virtualization; do
+          if [ -e "${repo}" ] && [ ! -d "${repo}/.git" ]; then
+            rm -rf "${repo}"
+          fi
+        done
+
+        mkdir -p build downloads release sstate-cache
+        docker run --privileged --rm \
+          --user "$(id -u):$(id -g)" \
+          -e HOME=/tmp \
+          -e USER="$(id -un)" \
+          -e LOGNAME="$(id -un)" \
+          -v "${PWD}:/work" \
+          --workdir /work \
+          ghcr.io/siemens/kas/kas:latest \
+          build "${{ inputs.kas-file }}"
+
+    - name: Compress image
+      shell: bash
+      working-directory: ${{ github.workspace }}/kas
+      run: |
+        image="release/${{ inputs.release-name }}.img"
+        test -f "${image}"
+        xz -T0 -9e -f "${image}"
+        ls -lh "${image}.xz"
+
+    - uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.release-name }}.img.xz
+        path: ${{ github.workspace }}/kas/release/${{ inputs.release-name }}.img.xz
+        retention-days: 1
+        if-no-files-found: error

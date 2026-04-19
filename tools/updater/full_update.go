@@ -16,17 +16,14 @@ import (
 	"github.com/diskfs/go-diskfs/disk"
 	"github.com/diskfs/go-diskfs/filesystem"
 	"github.com/diskfs/go-diskfs/partition"
-	"github.com/diskfs/go-diskfs/partition/gpt"
-	"github.com/diskfs/go-diskfs/partition/mbr"
 	"github.com/diskfs/go-diskfs/partition/part"
 	"github.com/ulikunitz/xz"
 )
 
 var validFlavours = map[string]bool{
-	"raspberry_pi":     true,
-	"raspberry_pi.dev": true,
-	"radxa_zero3":      true,
-	"radxa_zero3.dev":  true,
+	"radxa-zero3": true,
+	"rpi4":        true,
+	"rpi0-2w":     true,
 }
 
 func maybeDecompressSource(path string, logger *slog.Logger) (string, func(), error) {
@@ -209,7 +206,11 @@ func performUpdate(source, destination string, kind UpdateKind, logger *slog.Log
 			return errors.New("boot partition size mismatch between source image and destination device, cannot proceed with update")
 		}
 
-		if sourceRootfsPartition.GetSize() != destinationRootfsPartition.GetSize() {
+		if (sourceRootfsPartition == nil) != (destinationRootfsPartition == nil) {
+			return errors.New("rootfs partition presence mismatch between source image and destination device, cannot proceed with update")
+		}
+
+		if sourceRootfsPartition != nil && sourceRootfsPartition.GetSize() != destinationRootfsPartition.GetSize() {
 			return errors.New("rootfs partition size mismatch between source image and destination device, cannot proceed with update")
 		}
 
@@ -224,9 +225,11 @@ func performUpdate(source, destination string, kind UpdateKind, logger *slog.Log
 			}
 		}
 
-		logger.Info("Updating rootfs partition...")
-		if err = copyPartitionData(sourceImg, sourceRootfsPartition, dstImg, destinationRootfsPartition, "rootfs partition", logger); err != nil {
-			return fmt.Errorf("failed to update rootfs partition: %w", err)
+		if sourceRootfsPartition != nil {
+			logger.Info("Updating rootfs partition...")
+			if err = copyPartitionData(sourceImg, sourceRootfsPartition, dstImg, destinationRootfsPartition, "rootfs partition", logger); err != nil {
+				return fmt.Errorf("failed to update rootfs partition: %w", err)
+			}
 		}
 
 		logger.Info("Updating app partition...")
@@ -241,8 +244,6 @@ func performUpdate(source, destination string, kind UpdateKind, logger *slog.Log
 				return fmt.Errorf("failed to restore tezsign_id: %w", err)
 			}
 		}
-	case UpdateKindAppOnly:
-		return errors.New("app-only updates require a gadget binary, not an image")
 	default:
 		return fmt.Errorf("unsupported update kind: %s", kind)
 	}
@@ -271,27 +272,7 @@ func deviceFlavour(devicePath string) (string, error) {
 		return flavour, nil
 	}
 
-	tbl, err := d.GetPartitionTable()
-	if err != nil {
-		return "", err
-	}
-
-	fallback := flavourFromTable(tbl)
-	if fallback == "" {
-		return "", errors.New("unable to determine image flavour")
-	}
-	return fallback, nil
-}
-
-func flavourFromTable(t partition.Table) string {
-	switch t.(type) {
-	case *gpt.Table:
-		return "radxa_zero3"
-	case *mbr.Table:
-		return "raspberry_pi"
-	default:
-		return ""
-	}
+	return "", errors.New("Image is corrupted, no .image-flavour. Flash a new image manually")
 }
 
 func readImageFlavour(fs filesystem.FileSystem) (string, error) {

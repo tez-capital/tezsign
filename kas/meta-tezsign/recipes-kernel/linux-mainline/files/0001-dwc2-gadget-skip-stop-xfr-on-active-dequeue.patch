@@ -1,0 +1,16 @@
+diff --git a/drivers/usb/dwc2/gadget.c b/drivers/usb/dwc2/gadget.c
+index 834fc0261..5df5085b7 100644
+--- a/drivers/usb/dwc2/gadget.c
++++ b/drivers/usb/dwc2/gadget.c
+@@ -4346,6 +4346,9 @@ static int dwc2_hsotg_ep_dequeue(struct usb_ep *ep, struct usb_request *req)
+ 	/* Dequeue already started request */
+-	if (req == &hs_ep->req->req)
+-		dwc2_hsotg_ep_stop_xfr(hs, hs_ep);
++	if (req == &hs_ep->req->req) {
++		dev_warn_ratelimited(hs->dev,
++					     "%s: skipping stop_xfr on active dequeue\n",
++					     __func__);
++	}
+ 
+ 	dwc2_hsotg_complete_request(hs, hs_ep, hs_req, -ECONNRESET);
+ 	spin_unlock_irqrestore(&hs->lock, flags);

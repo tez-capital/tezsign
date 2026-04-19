@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -487,7 +486,7 @@ func run(l *slog.Logger) error {
 	// --- broker handler: parse → validate → sign/deny → respond ---
 
 	for {
-		enabled, err := net.Dial("unix", common.EnabledSock)
+		enabled, err := common.DialUnix(common.EnabledSock)
 		if err != nil {
 			l.Info("gadget not enabled (socket down), retrying", "err", err)
 			time.Sleep(100 * time.Millisecond)

@@ -6,9 +6,9 @@ The security of `tezsign` is a top priority. This document details the security 
 
 ### System-Level Security
 
-* **Minimal OS:** Uses a minimal Armbian build to reduce the attack surface.
-* **Disabled Wireless Connectivity:** To maintain a strict air-gap, wireless drivers are removed (Radxa), or system overlays are used to disable Wi-Fi and Bluetooth (RPi). Note that the overlay method does not currently work on the RPi 5.
-* **Immutable File System:** The `bootfs`, `rootfs`, and `app` partitions are mounted as **read-only**.
+* **Minimal OS:** Uses a minimal Yocto image to reduce the attack surface.
+* **Disabled Wireless Connectivity:** To maintain a strict air-gap, wireless drivers are removed (Radxa), or system overlays are used to disable Wi-Fi and Bluetooth (RPi).
+* **Immutable File System:** The root filesystem is baked into the kernel as an **initramfs** — there is no separate rootfs partition to mount or tamper with. The `boot` and `app` partitions are mounted as **read-only**. Unlike other hardware signers, the entire filesystem is immutable at runtime — it cannot be modified even if an attacker gains access to the device.
 * **Secure Data Partition:** A separate `data` partition for application data is mounted as **read-write** but **non-executable**.
 * **Offline Updates:** Updates cannot be performed while the device is operating. They are meant to be done directly by re-flashing the SD card.
 * **Principle of Least Privilege:**

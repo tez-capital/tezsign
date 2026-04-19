@@ -1,0 +1,12 @@
+header:
+  version: 14
+  includes:
+    - radxa-zero3.yml
+
+local_conf_header:
+  release: |
+    TEZSIGN_RELEASE_NAME = "radxa-zero3_dev"
+
+  settings: |
+    TEZSIGN_DEV = "1"
+    VOLATILE_LOG_DIR = "no"

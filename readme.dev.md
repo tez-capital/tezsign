@@ -42,6 +42,32 @@ The password is: `tezsign`
 
 You will now have a full shell on the `tezsign` gadget with `sudo` access, allowing you to inspect logs, test services, and debug the application.
 
+### Running Benchmarks
+
+Benchmarks are run from the host machine, not from the SSH shell on the gadget. Keep the gadget connected over USB, then run the benchmark command from the repository root:
+
+```bash
+go run ./app/tests/benchmark -n 1000 -warmup 50 -kind all
+```
+
+The command prompts for the master passphrase unless you provide it with `-pass` or `TEZSIGN_BENCH_PASS`:
+
+```bash
+TEZSIGN_BENCH_PASS='your-passphrase' go run ./app/tests/benchmark -n 1000 -warmup 50 -kind all
+```
+
+For a real-life two-key pattern, use `-mode real-life`. This uses the same two keys for every cycle: generate one payload, sign it with key 1, sign the same payload with key 2, sleep, then repeat with the next payload.
+
+```bash
+go run ./app/tests/benchmark -mode real-life -kind attestation -real-life-pairs 10 -real-life-interval 3s
+```
+
+`-real-life-pairs 10` means 10 cycles with the same 2 keys, so 20 sign requests total. To reuse specific existing keys instead of creating temporary benchmark keys:
+
+```bash
+go run ./app/tests/benchmark -mode real-life -kind attestation -key key-a -key2 key-b -cleanup=false
+```
+
 ### Working with the Read-Only Filesystem
 
 By default, all partitions on the device (except for `/data`) are mounted as **read-only** for security. Partition layouts may differ between devices. You can inspect all current mount points and their state (like `ro` for read-only) by running:
@@ -69,49 +95,6 @@ sudo reboot
 ```
 
 
-### local_build_check.sh
+### Yocto Builds
 
-Run the same matrix used by the GitHub `build-gadget` job against local source images:
-
-```sh
-tools/builder/local_build_check.sh
-```
-
-The script expects source images in `./imgs` and produces:
-
-- `./imgs/archives/raspberry_pi.img.xz`
-- `./imgs/archives/raspberry_pi.dev.img.xz`
-- `./imgs/archives/radxa_zero3.img.xz`
-- `./imgs/archives/radxa_zero3.dev.img.xz`
-
-Temporary builder workspace is created in `./imgs/.tezsign_image_builder`.
-
-If `raspberry_pi_dev.img` or `radxa_zero3_dev.img` are missing, it falls back to
-`raspberry_pi.img` / `radxa_zero3.img` for those dev rows.
-
-#### usage help
-```sh
-tools/builder/local_build_check.sh --help
-```
-
-#### board only
-```sh
-tools/builder/local_build_check.sh --raspberry_pi
-```
-```sh
-tools/builder/local_build_check.sh --radxa_zero
-```
-
-#### board + flavour
-```sh
-tools/builder/local_build_check.sh --raspberry_pi --prod
-```
-```sh
-tools/builder/local_build_check.sh --raspberry_pi --dev
-```
-```sh
-tools/builder/local_build_check.sh --radxa_zero --prod
-```
-```sh
-tools/builder/local_build_check.sh --radxa_zero --dev
-```
+Local image builds now use KAS and Yocto directly. See `kas/readme.md` for the production and dev build commands for Raspberry Pi 4, Raspberry Pi Zero 2 W, and Radxa Zero 3W.

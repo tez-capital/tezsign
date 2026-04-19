@@ -1,0 +1,16 @@
+# Rockchip SD-card image layout for TezSign.
+# The rootfs is bundled as initramfs inside the kernel Image (lives in RAM).
+# Bootloader binaries (idbloader, u-boot) are written to raw sectors
+# via post-processing (dd), matching the Armbian approach.
+#
+# Raw layout (no GPT entries):
+#   sector 64    -> idbloader.img  (SPL)
+#   sector 16384 -> u-boot.itb     (U-Boot proper)
+#
+# GPT partitions start at sector 32768 (16 MiB):
+
+part /boot --offset 32768s --source rootfs --rootfs-dir=${DEPLOY_DIR_IMAGE}/rockchip-bootfs --ondisk mmcblk0 --fstype=ext4 --label boot --part-name boot --active --fixed-size 64M --no-fstab-update
+part /app  --source rootfs --rootfs-dir=${DEPLOY_DIR_IMAGE}/appfs --ondisk mmcblk0 --fstype=ext4 --label app --part-name app --align 4096 --fixed-size 24M --fsoptions="ro,exec,noatime" --no-fstab-update
+part /data --ondisk mmcblk0 --fstype=ext4 --label data --part-name data --align 4096 --fixed-size 128M --mkfs-extraopts="-J size=8 -m 0 -O has_journal,extents,sparse_super,metadata_csum,inline_data,fast_commit" --fsoptions="rw,noatime,nodiratime,data=journal,barrier=1,commit=30" --no-fstab-update
+
+bootloader --ptable gpt

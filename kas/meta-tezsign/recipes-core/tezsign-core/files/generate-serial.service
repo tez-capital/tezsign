@@ -1,0 +1,14 @@
+[Unit]
+Description=Generate Tezsign Hardware Serial ID
+RequiresMountsFor=/app
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/generate-serial-number
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

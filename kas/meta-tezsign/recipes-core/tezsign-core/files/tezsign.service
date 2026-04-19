@@ -1,0 +1,25 @@
+[Unit]
+Description=Runs tezsign
+After=attach-gadget.service
+
+[Service]
+Type=simple
+User=tezsign
+Group=tezsign
+Environment="DATA_STORE=/data/tezsign"
+Environment="LOG_LEVEL=warn"
+ExecStart=/app/tezsign
+RemainAfterExit=yes
+Restart=on-failure
+RestartSec=2
+CPUSchedulingPolicy=fifo
+CPUSchedulingPriority=50
+LimitRTPRIO=99
+LimitMEMLOCK=infinity
+IOSchedulingClass=best-effort
+IOSchedulingPriority=0
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target

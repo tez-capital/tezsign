@@ -1,0 +1,44 @@
+header:
+  version: 14
+
+distro: minimal
+target: minimal-image
+
+repos:
+  poky:
+    url: https://git.yoctoproject.org/poky
+    branch: "scarthgap"
+    layers:
+      meta:
+  meta-arm:
+    url: https://git.yoctoproject.org/meta-arm
+    branch: "scarthgap"
+    layers:
+      meta-arm:
+      meta-arm-toolchain:
+  meta-openembedded:
+    url: https://github.com/openembedded/meta-openembedded.git
+    branch: "scarthgap"
+    layers:
+      meta-oe: # This is where 'dash' lives
+      meta-python:
+      meta-networking:
+      meta-filesystems:
+  meta-tezsign:
+    path: meta-tezsign
+
+local_conf_header:
+  speed_and_cache: |
+    # Tell Git to only download the latest snapshot, not the 20-year history
+    BB_GIT_SHALLOW = "1"
+    
+    # Use Yocto's high-speed source mirrors before trying the main servers
+    SOURCE_MIRROR_URL = "http://downloads.yoctoproject.org/mirror/sources/"
+    INHERIT += "own-mirrors"
+    
+    # Save downloads and sstate outside the build folder so they survive clean rebuilds
+    DL_DIR = "${TOPDIR}/../downloads"
+    SSTATE_DIR = "${TOPDIR}/../sstate-cache"
+
+  licenses: |
+    LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"

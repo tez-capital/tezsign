@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TezSign — Hardware BLS Signer for Tezos</title>
+  <meta name="description" content="TezSign is a secure, air-gapped hardware signing solution for Tezos consensus operations. The most robust BLS signer for Tezos bakers.">
+  <link rel="icon" href="logo.png" type="image/png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<canvas id="net-bg"></canvas>
+
+<!-- GitHub link -->
+<a href="https://github.com/tez-capital/tezsign" target="_blank" rel="noopener" class="gh-link" aria-label="GitHub">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .3a12 12 0 00-3.79 23.4c.6.1.82-.26.82-.58v-2.17c-3.34.73-4.04-1.61-4.04-1.61a3.18 3.18 0 00-1.33-1.76c-1.09-.74.08-.73.08-.73a2.52 2.52 0 011.84 1.24 2.56 2.56 0 003.5 1 2.56 2.56 0 01.76-1.6c-2.67-.3-5.47-1.33-5.47-5.93a4.64 4.64 0 011.24-3.22 4.3 4.3 0 01.12-3.18s1-.33 3.3 1.23a11.38 11.38 0 016 0c2.28-1.56 3.29-1.23 3.29-1.23a4.3 4.3 0 01.12 3.18 4.64 4.64 0 011.23 3.22c0 4.61-2.8 5.63-5.48 5.92a2.87 2.87 0 01.82 2.23v3.29c0 .32.21.7.82.58A12 12 0 0012 .3z"/></svg>
+</a>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<!-- HERO                                                                -->
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<header class="hero">
+  <h1 class="hero-title" data-text="TEZSIGN"><span class="t-tez">TEZ</span><span class="t-sign">SIGN</span></h1>
+
+  <img src="logo.png" alt="TezSign logo" class="hero-logo">
+
+  <p class="hero-tagline">MOST ROBUST HW BLS SIGNER ON&nbsp;TEZOS</p>
+  <p class="hero-byline">Built by <a href="https://tez.capital/" target="_blank" rel="noopener">tez.capital</a></p>
+
+  <div class="hero-actions">
+    <a href="https://docs.tez.capital/tezbake/tutorials/baking-with-tezsign/" target="_blank" rel="noopener" class="hero-cta cta-primary">
+      Get Started
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+    </a>
+  </div>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<!-- FEATURES                                                            -->
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<section id="features">
+  <div class="wrap">
+    <h2 class="section-title">Why TezSign</h2>
+    <p class="section-subtitle">Trusted by TezBake bakers across the network — battle-tested in production.</p>
+    <div class="features">
+
+      <div class="feature" onclick="openModal(this)" data-title="Air-Gapped Security" data-detail="Unlike other signers, TezSign runs a fully read-only Yocto Linux image — the filesystem cannot be modified at runtime. There is no SSH, no shell, and no network stack. Communication happens exclusively through a custom USB wire protocol. Private keys are generated on-device, encrypted with AES-256-GCM, and stored in power-loss-safe encrypted slots. Keys cannot be extracted — only signing operations are exposed.">
+        <div class="feature-icon">🔒</div>
+        <h3>Air-Gapped Security</h3>
+        <p>Keys never leave the gadget. Custom read-only image and wire protocol keep secrets isolated.</p>
+      </div>
+
+      <div class="feature" onclick="openModal(this)" data-title="4–10 ms Signatures" data-detail="BLS12-381 signing completes in 4–10 ms depending on hardware. The device boots in ~3 seconds from a cold start. Actual speed varies with the board (RPi 4 is fastest) and SD card quality.">
+        <div class="feature-icon">⚡</div>
+        <h3>4–10 ms Signatures</h3>
+        <p>Fast BLS signing. 3-second boot. Ready before your baker even asks.</p>
+      </div>
+
+      <div class="feature" onclick="openModal(this)" data-title="Under $20" data-detail="Supported devices start under $20 USD. Supported boards: Raspberry Pi Zero 2W, Raspberry Pi 4, or Radxa Zero 3W. You'll also need a 4 GB+ SD card — industrial-grade/endurance cards are recommended for longevity.">
+        <div class="feature-icon">💰</div>
+        <h3>Under $20</h3>
+        <p>RPi Zero 2W, RPi 4, or Radxa Zero 3W. No expensive HSMs.</p>
+      </div>
+
+      <div class="feature" onclick="openModal(this)" data-title="Built for Bakers" data-detail="TezSign supports multiple keys across multiple gadgets simultaneously. It integrates natively with TezBake — setup is a single command. The device is hardened against sudden power loss, so state is never corrupted even if power is cut mid-operation.">
+        <div class="feature-icon">🧑‍🍳</div>
+        <h3>Built for Bakers</h3>
+        <p>Multi-baker, multi-device, power-loss safe, full TezBake integration, and 3-second boot.</p>
+      </div>
+
+      <div class="feature" onclick="openModal(this)" data-title="11–15 MB Image" data-detail="The compressed gadget image is only 11–15 MB depending on the target board. Built with Yocto/OpenEmbedded from source — no package manager, no unnecessary services. The minimal footprint means a smaller attack surface and faster flashing.">
+        <div class="feature-icon">📦</div>
+        <h3>11–15 MB Image</h3>
+        <p>Minimal Yocto Linux. Just what's needed for signing, nothing more.</p>
+      </div>
+
+      <div class="feature" onclick="openModal(this)" data-title="Auto Unlock" data-detail="TezSign supports optional auto-unlock on boot, so your baker resumes signing immediately after a power cycle without manual password entry. You can still require manual unlock if you prefer — it's your choice.">
+        <div class="feature-icon">🔓</div>
+        <h3>Auto Unlock</h3>
+        <p>Optional automatic unlock on boot. No manual intervention after a power cycle.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<!-- FOOTER                                                              -->
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<footer>
+  <div class="wrap">
+    <p>
+      <a href="https://docs.tez.capital/tezbake/tutorials/baking-with-tezsign/" target="_blank" rel="noopener">Documentation</a>
+      &nbsp;·&nbsp;
+      <a href="https://github.com/tez-capital/tezsign" target="_blank" rel="noopener">GitHub</a>
+      &nbsp;·&nbsp;
+      <a href="https://tez.capital/" target="_blank" rel="noopener">tez.capital</a>
+    </p>
+  </div>
+</footer>
+
+<!-- modal -->
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal()">&times;</button>
+    <div class="modal-icon" id="modal-icon"></div>
+    <h3 id="modal-title"></h3>
+    <p id="modal-body"></p>
+  </div>
+</div>
+<script>
+function openModal(el){
+  document.getElementById('modal-icon').textContent=el.querySelector('.feature-icon').textContent;
+  document.getElementById('modal-title').textContent=el.dataset.title;
+  document.getElementById('modal-body').textContent=el.dataset.detail;
+  document.getElementById('modal').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeModal(){
+  document.getElementById('modal').classList.remove('open');
+  document.body.style.overflow='';
+}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
+</script>
+
+<script>
+(function(){
+  var el=document.querySelector('.hero-title');
+  var from='TEZ.CAPITAL';
+  var to='TEZSIGN';
+  var chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&';
+  var extraCount=from.length-to.length; // 4 extra chars
+  var slots=[];
+
+  for(var i=0;i<to.length;i++){
+    slots.push({
+      phase:'idle',
+      char:from[i],
+      tick:0,
+      scrambleCount:6+Math.floor(Math.random()*6),
+      lockChar:to[i],
+      delay:i*80+Math.random()*40
+    });
+  }
+
+  // Total animation duration (approx): last char delay + max scramble ticks
+  var lastDelay=(to.length-1)*80+40;
+  var maxScramble=12;
+  var animDur=lastDelay+maxScramble*50;
+
+  var start=null;
+  var holdTime=300;
+  var lastTick=0;
+  var tickInterval=50;
+  var animStarted=false;
+
+  function render(now){
+    if(!start) start=now;
+    var t=now-start;
+
+    if(now-lastTick<tickInterval){
+      requestAnimationFrame(render);
+      return;
+    }
+    lastTick=now;
+
+    var s='';
+    var elapsed=t-holdTime;
+
+    if(elapsed<0){
+      // Still holding TEZ.CAPITAL
+      for(var k=0;k<from.length;k++){
+        var cls=k<3?'t-tez':'t-sign';
+        s+='<span class="'+cls+'">'+from[k]+'</span>';
+      }
+      el.innerHTML=s;
+      requestAnimationFrame(render);
+      return;
+    }
+
+    // Progress 0..1 of the scramble animation
+    var progress=Math.min(elapsed/animDur,1);
+    // How many extra chars remain (shrinks proportionally)
+    var extrasLeft=Math.round(extraCount*(1-progress));
+    var totalLen=to.length+extrasLeft;
+
+    var done=true;
+    for(var i=0;i<to.length;i++){
+      var sl=slots[i];
+
+      if(sl.phase==='idle'&&elapsed>sl.delay){
+        sl.phase='scramble';
+        sl.tick=0;
+      }
+
+      if(sl.phase==='scramble'){
+        sl.tick++;
+        sl.char=chars[Math.random()*chars.length|0];
+        if(sl.tick>=sl.scrambleCount){
+          sl.phase='locked';
+          sl.char=sl.lockChar;
+        }
+      }
+
+      if(sl.phase!=='locked') done=false;
+
+      var cls=i<3?'t-tez':'t-sign';
+      s+='<span class="'+cls+'">'+sl.char+'</span>';
+    }
+
+    // Append scrambling extra chars that haven't been removed yet
+    for(var j=0;j<extrasLeft;j++){
+      s+='<span class="t-sign" style="opacity:'+(0.4*(1-progress))+'">'+chars[Math.random()*chars.length|0]+'</span>';
+    }
+
+    el.innerHTML=s;
+
+    if(done&&extrasLeft===0){
+      el.innerHTML='<span class="t-tez">TEZ</span><span class="t-sign">SIGN</span>';
+      return;
+    }
+    requestAnimationFrame(render);
+  }
+
+  el.innerHTML=from.split('').map(function(c,i){
+    return i<3?'<span class="t-tez">'+c+'</span>':'<span class="t-sign">'+c+'</span>';
+  }).join('');
+
+  requestAnimationFrame(render);
+})();
+</script>
+
+<script>
+(function(){
+  var c=document.getElementById('net-bg');
+  if(!c||!c.getContext) return;
+  var ctx=c.getContext('2d');
+  var dpr=window.devicePixelRatio||1;
+  var w,h;
+  var nodes=[];
+  var N=80;
+  var LINK=180;
+
+  function resize(){
+    w=window.innerWidth;
+    h=window.innerHeight;
+    c.width=w*dpr;
+    c.height=h*dpr;
+    c.style.width=w+'px';
+    c.style.height=h+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  var HEX='0123456789abcdef';
+  var labels=['tz1','tz2','tz3','BLpk','sig','edpk','sppk','BLsk','nonce','blk','op','hash'];
+
+  function randHex(n){var s='';for(var i=0;i<n;i++)s+=HEX[Math.random()*16|0];return s;}
+
+  function init(){
+    resize();
+    nodes=[];
+    for(var i=0;i<N;i++){
+      var hasLabel=i%5===0;
+      nodes.push({
+        x:Math.random()*w,
+        y:Math.random()*h,
+        vx:(Math.random()-.5)*.4,
+        vy:(Math.random()-.5)*.4,
+        r:Math.random()*1.5+2,
+        label:hasLabel?labels[i%labels.length]+randHex(6):null
+      });
+    }
+  }
+
+  window.addEventListener('resize',function(){resize();});
+  init();
+
+  function frame(){
+    ctx.clearRect(0,0,w,h);
+    for(var i=0;i<N;i++){
+      var a=nodes[i];
+      a.x+=a.vx;
+      a.y+=a.vy;
+      if(a.x<0){a.x=0;a.vx*=-1;}
+      if(a.x>w){a.x=w;a.vx*=-1;}
+      if(a.y<0){a.y=0;a.vy*=-1;}
+      if(a.y>h){a.y=h;a.vy*=-1;}
+      for(var j=i+1;j<N;j++){
+        var b=nodes[j];
+        var dx=a.x-b.x,dy=a.y-b.y;
+        var d=Math.sqrt(dx*dx+dy*dy);
+        if(d<LINK){
+          var alpha=0.22*(1-d/LINK);
+          ctx.beginPath();
+          ctx.moveTo(a.x,a.y);
+          ctx.lineTo(b.x,b.y);
+          ctx.strokeStyle='rgba(0,0,0,'+alpha+')';
+          ctx.lineWidth=1;
+          ctx.stroke();
+        }
+      }
+      ctx.beginPath();
+      ctx.arc(a.x,a.y,a.r,0,6.283);
+      ctx.fillStyle='rgba(0,0,0,.4)';
+      ctx.fill();
+      if(a.label){
+        ctx.font='8px monospace';
+        ctx.fillStyle='rgba(0,0,0,.13)';
+        ctx.fillText(a.label,a.x+a.r+3,a.y+3);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+</script>
+
+</body>
+</html>

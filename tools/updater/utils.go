@@ -56,6 +56,19 @@ func filesystemForPartition(d *disk.Disk, p part.Partition) (filesystem.FileSyst
 	return d.GetFilesystem(idx)
 }
 
+func ensureMountAvailable() error {
+	if _, err := exec.LookPath("mount"); err != nil {
+		return fmt.Errorf("mount binary not found: %w", err)
+	}
+	if _, err := exec.LookPath("umount"); err != nil {
+		return fmt.Errorf("umount binary not found: %w", err)
+	}
+	if _, err := os.Stat("/dev/disk/by-label/app"); err != nil {
+		return fmt.Errorf("app partition label not found: %w", err)
+	}
+	return nil
+}
+
 func mountAppPartition(writable bool) (string, func(), error) {
 	if err := ensureMountAvailable(); err != nil {
 		return "", nil, err

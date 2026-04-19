@@ -1,0 +1,19 @@
+header:
+  version: 14
+  includes:
+    - rockchip-base.yml
+
+machine: radxa-zero3-tezsign
+
+local_conf_header:
+  release: |
+    TEZSIGN_RELEASE_NAME = "radxa-zero3"
+
+  main: |
+    INITRAMFS_IMAGE = "tezsign-initramfs"
+    INITRAMFS_IMAGE_BUNDLE = "1"
+
+  rockchip_qa: |
+    WARN_QA:remove = "patch-fuzz"
+    ERROR_QA:remove = "patch-status"
+

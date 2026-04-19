@@ -1,107 +1,59 @@
-name: "Build Armbian (Parallel)"
+name: "Build Release"
 
 on:
   push:
   pull_request:
 
 jobs:
-    build-armbian:
-        runs-on: ubuntu-24.04-arm
-        permissions:
-          contents: write
-        strategy:
-            fail-fast: false
-            matrix:
-                include:
-                    - board: "rpi4b"
-                      artifact_id: "raspberry_pi_dev"
-                      armbian_release: "trixie"
-                      tezsign_flavour: "dev"
-                      armbian_kernel_branch: "legacy"
-                    - board: "rpi4b"
-                      artifact_id: "raspberry_pi"
-                      armbian_release: "trixie"
-                      tezsign_flavour: "prod"
-                      armbian_kernel_branch: "legacy"
-                    - board: "radxa-zero3"
-                      artifact_id: "radxa_zero3_dev"
-                      armbian_release: "trixie"
-                      armbian_boot_scenario: "binman-atf-mainline"
-                      tezsign_flavour: "dev"
-                    - board: "radxa-zero3"
-                      artifact_id: "radxa_zero3"
-                      armbian_release: "trixie"
-                      armbian_boot_scenario: "binman-atf-mainline"
-                      tezsign_flavour: "prod"
-
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v5
-
-            - name: Build base Armbian Image
-              uses: ./.github/template/build-armbian
-              with:
-                  artifact_id: ${{ matrix.artifact_id }}
-                  armbian_token: ${{ secrets.GITHUB_TOKEN }}
-                  armbian_board: ${{ matrix.board }}
-                  armbian_release: ${{ matrix.armbian_release }}
-                  armbian_boot_scenario: ${{ matrix.armbian_boot_scenario || '' }}
-                  tezsign_flavour: ${{ matrix.tezsign_flavour }}
-                  armbian_kernel_branch: ${{ matrix.armbian_kernel_branch || 'current' }}
-
     build-gadget:
-        runs-on: ubuntu-latest
-        needs:
-          - build-armbian
+        runs-on: ubuntu-24.04
         strategy:
             fail-fast: false
             matrix:
                 include:
-                    - image_id: "raspberry_pi"
-                      source_artifact: "raspberry_pi"
-                      create_binary_artifact: "true"
-                      tezsign_flavour: "prod"
-                    - image_id: "raspberry_pi"
-                      source_artifact: "raspberry_pi_dev"
-                      create_binary_artifact: "false"
-                      tezsign_flavour: "dev"
-                    - image_id: "radxa_zero3"
-                      source_artifact: "radxa_zero3"
-                      create_binary_artifact: "false"
-                      tezsign_flavour: "prod"
-                    - image_id: "radxa_zero3"
-                      source_artifact: "radxa_zero3_dev"
-                      create_binary_artifact: "false"
-                      tezsign_flavour: "dev"
+                    - kas_file: "rpi4.yml"
+                      release_name: "rpi4"
+                      image_flavour: "rpi4"
+                      gadget_goarm64: "v8.0"
+                      gadget_cgo_cflags: "-march=armv8-a -mcpu=cortex_a72 -D__BLST_PORTABLE__ -O2"
+                    - kas_file: "rpi4-dev.yml"
+                      release_name: "rpi4_dev"
+                      image_flavour: "rpi4"
+                      gadget_goarm64: "v8.0"
+                      gadget_cgo_cflags: "-march=armv8-a -mcpu=cortex_a72 -D__BLST_PORTABLE__ -O2"
+                    - kas_file: "rpi0-2w.yml"
+                      release_name: "rpi0-2w"
+                      image_flavour: "rpi0-2w"
+                      gadget_goarm64: "v8.0"
+                      gadget_cgo_cflags: "-march=armv8-a -mcpu=cortex_a53 -D__BLST_PORTABLE__ -O2"
+                    - kas_file: "rpi0-2w-dev.yml"
+                      release_name: "rpi0-2w_dev"
+                      image_flavour: "rpi0-2w"
+                      gadget_goarm64: "v8.0"
+                      gadget_cgo_cflags: "-march=armv8-a -mcpu=cortex_a53 -D__BLST_PORTABLE__ -O2"
+                    - kas_file: "radxa-zero3.yml"
+                      release_name: "radxa-zero3"
+                      image_flavour: "radxa-zero3"
+                      gadget_goarm64: "v8.2"
+                      gadget_cgo_cflags: "-march=armv8.2-a+crypto -mcpu=cortex_a55 -O2"
+                    - kas_file: "radxa-zero3-dev.yml"
+                      release_name: "radxa-zero3_dev"
+                      image_flavour: "radxa-zero3"
+                      gadget_goarm64: "v8.2"
+                      gadget_cgo_cflags: "-march=armv8.2-a+crypto -mcpu=cortex_a55 -O2"
         steps:
             - uses: actions/checkout@v5
               with:
                   fetch-depth: 0
 
-            - name: Build ${{ matrix.image_id }} image
-              uses: ./.github/template/amend-image
+            - name: Build ${{ matrix.release_name }} image
+              uses: ./.github/template/build-yocto
               with:
-                image_id: ${{ matrix.image_id }}
-                source_artifact: ${{ matrix.source_artifact }}
-                create_binary_artifact: ${{ matrix.create_binary_artifact }}
-                tezsign_flavour: ${{ matrix.tezsign_flavour }}
-
-    cleanup-artifacts:
-        runs-on: ubuntu-latest
-        strategy:
-            fail-fast: false
-            matrix:
-                include:
-                    - artifact: "raspberry_pi"
-                    - artifact: "radxa_zero3"
-                    - artifact: "raspberry_pi_dev"
-                    - artifact: "radxa_zero3_dev"
-        needs:
-          - build-gadget
-        steps:
-          - uses: geekyeggo/delete-artifact@v5
-            with:
-                name: ${{ matrix.artifact }}
+                kas-file: ${{ matrix.kas_file }}
+                release-name: ${{ matrix.release_name }}
+                image-flavour: ${{ matrix.image_flavour }}
+                gadget-goarm64: ${{ matrix.gadget_goarm64 }}
+                gadget-cgo-cflags: ${{ matrix.gadget_cgo_cflags }}
 
     build-updater:
         runs-on: ubuntu-latest
@@ -111,9 +63,12 @@ jobs:
                   fetch-depth: 0
 
             - name: Set up Go
-              uses: actions/setup-go@v4
+              uses: actions/setup-go@v6
               with:
-                go-version: '>=1.26.0'
+                go-version-file: go.mod
+
+            - name: Create build dir
+              run: mkdir -p build
 
             - name: Build tezsign updater (Linux aarch64)
               env:
@@ -137,7 +92,7 @@ jobs:
                   go build -ldflags='-s -w -extldflags "-static"' -trimpath -o ./build/tezsign_updater_macos_arm64 ./tools/updater
 
             - name: Upload tezsign_updater artifact
-              uses: actions/upload-artifact@v5
+              uses: actions/upload-artifact@v7
               with:
                 name: tezsign_updater
                 path: ./build/*
@@ -149,7 +104,6 @@ jobs:
           - uses: actions/checkout@v5
             with:
                 fetch-depth: 0
-                submodules: true
 
           - uses: ./.github/template/build-host-linux
             with:
@@ -165,7 +119,6 @@ jobs:
           - uses: actions/checkout@v5
             with:
                 fetch-depth: 0
-                submodules: true
 
           - uses: ./.github/template/build-host-linux
             with:
@@ -181,10 +134,6 @@ jobs:
           - uses: actions/checkout@v5
             with:
                 fetch-depth: 0
-                submodules: true
-
-          - name: Install autoconf
-            run: brew install autoconf automake gperf
 
           - uses: ./.github/template/build-host-macos
             with:
@@ -199,9 +148,6 @@ jobs:
           - uses: actions/checkout@v5
             with:
                 fetch-depth: 0
-                submodules: true
-          - name: Install autoconf
-            run: brew install autoconf automake gperf
 
           - uses: ./.github/template/build-host-macos
             with:
@@ -216,7 +162,6 @@ jobs:
     #       - uses: actions/checkout@v5
     #         with:
     #             fetch-depth: 0
-    #             submodules: true
 
     #       - uses: ./.github/template/build-host-windows
     #         with:
@@ -232,7 +177,6 @@ jobs:
     #       - uses: actions/checkout@v5
     #         with:
     #             fetch-depth: 0
-    #             submodules: true
 
     #       - uses: ./.github/template/build-host-windows
     #         with:
@@ -245,9 +189,10 @@ jobs:
     publish:
         runs-on: ubuntu-latest
         if: github.ref == 'refs/heads/main'
+        permissions:
+          contents: write
         needs: 
           - build-gadget
-          - cleanup-artifacts # make sure artifacts are cleaned up before publishing
           - build-host-linux-amd64
           - build-host-linux-arm64
           - build-host-macos-amd64
@@ -261,18 +206,19 @@ jobs:
           - name: create release dir
             run: mkdir ./release
 
-          - uses: actions/download-artifact@v5
+          - uses: actions/download-artifact@v7
             with:
               path: ./release
               merge-multiple: true
 
           - name: Set date
-            run: echo "DATE=$(date +'%Y%m%d%H%M')" >> $GITHUB_ENV
+            id: release_date
+            run: echo "date=$(date +'%Y%m%d%H%M')" >> "$GITHUB_OUTPUT"
             
           - name: publish
             uses: ncipollo/release-action@v1
             with:
               artifacts: ./release/*
-              tag: ${{ format('release-{0}', env.DATE) }}
+              tag: release-${{ steps.release_date.outputs.date }}
               commit: ${{ github.sha }}
               prerelease: true

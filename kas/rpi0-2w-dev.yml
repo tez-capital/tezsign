@@ -1,0 +1,16 @@
+header:
+  version: 14
+  includes:
+    - rpi0-2w.yml
+
+local_conf_header:
+  release: |
+    TEZSIGN_RELEASE_NAME = "rpi0-2w_dev"
+
+  settings: |
+    TEZSIGN_DEV = "1"
+    TEZSIGN_DWC2_DR_MODE = "otg"
+    IMAGE_BOOT_FILES:append = " vc4-kms-v3d.dtbo;overlays/vc4-kms-v3d.dtbo"
+    RPI_EXTRA_CONFIG:append = "\ndtoverlay=vc4-kms-v3d"
+    CMDLINE:append = " console=tty1 quiet loglevel=3"
+    VOLATILE_LOG_DIR = "no"
