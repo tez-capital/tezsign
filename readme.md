@@ -8,23 +8,24 @@
 | **Supported Devices** | 🥧 RPi Zero 2W, RPi4, Radxa Zero 3 | 🥧 RPi Zero 2W w/ PaperInk | 🥧 RPi Zero 2W w/ PaperInk |
 | **Hardware Start Cost** | **< $20 USD** * | **~$50 USD** * | **~$50 USD** * |
 | **Tezbake Integration** | Full | Partial | Partial |
-| **Avg Signature Time** | ~8ms | ~6ms | ~30ms |
+| **Avg Signature Time** | 4 - 10 ms** | ~6ms | ~30ms |
 | **Security** | 🔒 **Higher** (Custom RO Image and Wire Proto) | 🔒 **High** (Custom Image) | 🛡️ Medium |
 | **Power Loss Safe** | ✅ **Yes** | ✅ **Yes** | ⚠️ No |
-| **Boot Time** | 🚀 **3s** | 🚀 **3s** | ~1.5m |
+| **Boot Time** | 🚀 **3s** ** | 🚀 **3s** | ~1.5m |
 | **Multi-Device Support**| ✅ **Yes** | ❌ No | ❌ No |
 | **Multi-Baker Support** | ✅ **Yes** | ❌ No | ❌ No |
 | **Companion App** | Required | Optional | No |
 | **Physical Pinlock** | ❌ No (App-based) | 👆 Yes (Touch Screen) | 👆 Yes (Touch Screen) |
 | **Auto Unlock on Boot**| ✅ **Yes** (Optional) | ❌ No | ❌ No |
-| **Compressed Image Size** | 📦 ~14MB | 📦 7MB | 🐘 1.95GB |
+| **Compressed Image Size** | 📦 11 - 15 MB ** | 📦 7 MB | 🐘 1.95 GB |
 | **License** | 📜 SSPL | 📜 MIT* (partial) | 📜 MIT |
 
 > **Note:** The comparison table above is accurate as of December 2, 2025.
 
 > **Disclaimer:** The values for other signers in the comparison table are provided by their respective providers or users and have not been independently verified by us. If you notice any inaccuracies, please [let us know](https://github.com/tez-capital/tezsign/issues).
 
-> **\*** * Shipping & taxes may apply.
+> **\*** Shipping & taxes may apply.
+> **\*\*** Actual speed and size may vary depending on factors such as the hardware, SD card type, and operating conditions.
 >
 > **Note on Power Loss:** "Yes" indicates the device is hardened against corruption if power is suddenly cut.
 
