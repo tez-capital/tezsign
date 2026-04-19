@@ -10,6 +10,8 @@
 </head>
 <body>
 
+<canvas id="net-bg"></canvas>
+
 <!-- GitHub link -->
 <a href="https://github.com/tez-capital/tezsign" target="_blank" rel="noopener" class="gh-link" aria-label="GitHub">
   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .3a12 12 0 00-3.79 23.4c.6.1.82-.26.82-.58v-2.17c-3.34.73-4.04-1.61-4.04-1.61a3.18 3.18 0 00-1.33-1.76c-1.09-.74.08-.73.08-.73a2.52 2.52 0 011.84 1.24 2.56 2.56 0 003.5 1 2.56 2.56 0 01.76-1.6c-2.67-.3-5.47-1.33-5.47-5.93a4.64 4.64 0 011.24-3.22 4.3 4.3 0 01.12-3.18s1-.33 3.3 1.23a11.38 11.38 0 016 0c2.28-1.56 3.29-1.23 3.29-1.23a4.3 4.3 0 01.12 3.18 4.64 4.64 0 011.23 3.22c0 4.61-2.8 5.63-5.48 5.92a2.87 2.87 0 01.82 2.23v3.29c0 .32.21.7.82.58A12 12 0 0012 .3z"/></svg>
@@ -19,7 +21,7 @@
 <!-- HERO                                                                -->
 <!-- ════════════════════════════════════════════════════════════════════ -->
 <header class="hero">
-  <h1 class="hero-title">TEZ<span class="underlined">SIGN</span></h1>
+  <h1 class="hero-title" data-text="TEZSIGN"><span class="t-tez">TEZ</span><span class="t-sign">SIGN</span></h1>
 
   <img src="logo.png" alt="TezSign logo" class="hero-logo">
 
@@ -97,6 +99,198 @@
     </p>
   </div>
 </footer>
+
+<script>
+(function(){
+  var el=document.querySelector('.hero-title');
+  var from='TEZ.CAPITAL';
+  var to='TEZSIGN';
+  var chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&';
+  var extraCount=from.length-to.length; // 4 extra chars
+  var slots=[];
+
+  for(var i=0;i<to.length;i++){
+    slots.push({
+      phase:'idle',
+      char:from[i],
+      tick:0,
+      scrambleCount:6+Math.floor(Math.random()*6),
+      lockChar:to[i],
+      delay:i*80+Math.random()*40
+    });
+  }
+
+  // Total animation duration (approx): last char delay + max scramble ticks
+  var lastDelay=(to.length-1)*80+40;
+  var maxScramble=12;
+  var animDur=lastDelay+maxScramble*50;
+
+  var start=null;
+  var holdTime=300;
+  var lastTick=0;
+  var tickInterval=50;
+  var animStarted=false;
+
+  function render(now){
+    if(!start) start=now;
+    var t=now-start;
+
+    if(now-lastTick<tickInterval){
+      requestAnimationFrame(render);
+      return;
+    }
+    lastTick=now;
+
+    var s='';
+    var elapsed=t-holdTime;
+
+    if(elapsed<0){
+      // Still holding TEZ.CAPITAL
+      for(var k=0;k<from.length;k++){
+        var cls=k<3?'t-tez':'t-sign';
+        s+='<span class="'+cls+'">'+from[k]+'</span>';
+      }
+      el.innerHTML=s;
+      requestAnimationFrame(render);
+      return;
+    }
+
+    // Progress 0..1 of the scramble animation
+    var progress=Math.min(elapsed/animDur,1);
+    // How many extra chars remain (shrinks proportionally)
+    var extrasLeft=Math.round(extraCount*(1-progress));
+    var totalLen=to.length+extrasLeft;
+
+    var done=true;
+    for(var i=0;i<to.length;i++){
+      var sl=slots[i];
+
+      if(sl.phase==='idle'&&elapsed>sl.delay){
+        sl.phase='scramble';
+        sl.tick=0;
+      }
+
+      if(sl.phase==='scramble'){
+        sl.tick++;
+        sl.char=chars[Math.random()*chars.length|0];
+        if(sl.tick>=sl.scrambleCount){
+          sl.phase='locked';
+          sl.char=sl.lockChar;
+        }
+      }
+
+      if(sl.phase!=='locked') done=false;
+
+      var cls=i<3?'t-tez':'t-sign';
+      s+='<span class="'+cls+'">'+sl.char+'</span>';
+    }
+
+    // Append scrambling extra chars that haven't been removed yet
+    for(var j=0;j<extrasLeft;j++){
+      s+='<span class="t-sign" style="opacity:'+(0.4*(1-progress))+'">'+chars[Math.random()*chars.length|0]+'</span>';
+    }
+
+    el.innerHTML=s;
+
+    if(done&&extrasLeft===0){
+      el.innerHTML='<span class="t-tez">TEZ</span><span class="t-sign">SIGN</span>';
+      return;
+    }
+    requestAnimationFrame(render);
+  }
+
+  el.innerHTML=from.split('').map(function(c,i){
+    return i<3?'<span class="t-tez">'+c+'</span>':'<span class="t-sign">'+c+'</span>';
+  }).join('');
+
+  requestAnimationFrame(render);
+})();
+</script>
+
+<script>
+(function(){
+  var c=document.getElementById('net-bg');
+  if(!c||!c.getContext) return;
+  var ctx=c.getContext('2d');
+  var dpr=window.devicePixelRatio||1;
+  var w,h;
+  var nodes=[];
+  var N=80;
+  var LINK=180;
+
+  function resize(){
+    w=window.innerWidth;
+    h=window.innerHeight;
+    c.width=w*dpr;
+    c.height=h*dpr;
+    c.style.width=w+'px';
+    c.style.height=h+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  var HEX='0123456789abcdef';
+  var labels=['tz1','tz2','tz3','BLpk','sig','edpk','sppk','BLsk','nonce','blk','op','hash'];
+
+  function randHex(n){var s='';for(var i=0;i<n;i++)s+=HEX[Math.random()*16|0];return s;}
+
+  function init(){
+    resize();
+    nodes=[];
+    for(var i=0;i<N;i++){
+      var hasLabel=i%5===0;
+      nodes.push({
+        x:Math.random()*w,
+        y:Math.random()*h,
+        vx:(Math.random()-.5)*.4,
+        vy:(Math.random()-.5)*.4,
+        r:Math.random()*1.5+2,
+        label:hasLabel?labels[i%labels.length]+randHex(6):null
+      });
+    }
+  }
+
+  window.addEventListener('resize',function(){resize();});
+  init();
+
+  function frame(){
+    ctx.clearRect(0,0,w,h);
+    for(var i=0;i<N;i++){
+      var a=nodes[i];
+      a.x+=a.vx;
+      a.y+=a.vy;
+      if(a.x<0){a.x=0;a.vx*=-1;}
+      if(a.x>w){a.x=w;a.vx*=-1;}
+      if(a.y<0){a.y=0;a.vy*=-1;}
+      if(a.y>h){a.y=h;a.vy*=-1;}
+      for(var j=i+1;j<N;j++){
+        var b=nodes[j];
+        var dx=a.x-b.x,dy=a.y-b.y;
+        var d=Math.sqrt(dx*dx+dy*dy);
+        if(d<LINK){
+          var alpha=0.22*(1-d/LINK);
+          ctx.beginPath();
+          ctx.moveTo(a.x,a.y);
+          ctx.lineTo(b.x,b.y);
+          ctx.strokeStyle='rgba(0,0,0,'+alpha+')';
+          ctx.lineWidth=1;
+          ctx.stroke();
+        }
+      }
+      ctx.beginPath();
+      ctx.arc(a.x,a.y,a.r,0,6.283);
+      ctx.fillStyle='rgba(0,0,0,.4)';
+      ctx.fill();
+      if(a.label){
+        ctx.font='8px monospace';
+        ctx.fillStyle='rgba(0,0,0,.13)';
+        ctx.fillText(a.label,a.x+a.r+3,a.y+3);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+</script>
 
 </body>
 </html>
