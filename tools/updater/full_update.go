@@ -21,9 +21,9 @@ import (
 )
 
 var validFlavours = map[string]bool{
-	"radxa_zero3": true,
+	"radxa-zero3": true,
 	"rpi4":        true,
-	"rpi0_2w":     true,
+	"rpi0-2w":     true,
 }
 
 func maybeDecompressSource(path string, logger *slog.Logger) (string, func(), error) {

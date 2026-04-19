@@ -61,10 +61,10 @@ do_deploy() {
                 image_flavour="rpi4"
                 ;;
             rpi0-2w|rpi0-2w_dev|rpi0_2w|rpi0_2w_dev)
-                image_flavour="rpi0_2w"
+                image_flavour="rpi0-2w"
                 ;;
             radxa-zero3|radxa-zero3_dev|radxa_zero3|radxa_zero3_dev)
-                image_flavour="radxa_zero3"
+                image_flavour="radxa-zero3"
                 ;;
         esac
 
@@ -74,10 +74,10 @@ do_deploy() {
                     image_flavour="rpi4"
                     ;;
                 raspberrypi0-2w-tezsign*)
-                    image_flavour="rpi0_2w"
+                    image_flavour="rpi0-2w"
                     ;;
                 radxa-zero3-tezsign*)
-                    image_flavour="radxa_zero3"
+                    image_flavour="radxa-zero3"
                     ;;
             esac
         fi
