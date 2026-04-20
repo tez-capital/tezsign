@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
 	"os"
@@ -57,6 +60,14 @@ type benchmarkKey struct {
 	created bool
 }
 
+type brokerGetter func() *broker.Broker
+type reconnectFn func(cause error) error
+
+const (
+	benchmarkReconnectMaxAttempts = 60
+	benchmarkReconnectRetryDelay  = 500 * time.Millisecond
+)
+
 func main() {
 	cfg := parseConfig()
 
@@ -83,23 +94,67 @@ func main() {
 		"cleanup", cfg.cleanup,
 	)
 
-	mgmtSession, err := common.Connect(common.ConnectParams{Logger: l, Channel: common.ChanMgmt})
+	mgmtSession, signSession, err := connectBenchmarkSessions(l, "")
 	if err != nil {
-		l.Error("connect mgmt", slog.Any("err", err))
+		l.Error("connect", slog.Any("err", err))
 		os.Exit(1)
 	}
-	defer mgmtSession.Close()
 
-	signSession, err := common.Connect(common.ConnectParams{Logger: l, Channel: common.ChanSign})
-	if err != nil {
-		l.Error("connect sign", slog.Any("err", err))
-		os.Exit(1)
-	}
-	defer signSession.Close()
-
+	serial := mgmtSession.Serial
 	mgmtBroker := mgmtSession.Broker
 	signBroker := signSession.Broker
-	l.Info("connected", slog.String("serial", mgmtSession.Serial))
+	l.Info("connected", slog.String("serial", serial))
+
+	closeSessions := func() {
+		if signSession != nil {
+			signSession.Close()
+			signSession = nil
+		}
+		if mgmtSession != nil {
+			mgmtSession.Close()
+			mgmtSession = nil
+		}
+	}
+	defer closeSessions()
+
+	getMgmtBroker := func() *broker.Broker { return mgmtBroker }
+	getSignBroker := func() *broker.Broker { return signBroker }
+
+	reconnectSessions := func(cause error) error {
+		l.Warn("benchmark transport error; reconnecting",
+			slog.String("serial", serial),
+			slog.Any("cause", cause),
+		)
+		closeSessions()
+
+		var lastErr error
+		for attempt := 1; attempt <= benchmarkReconnectMaxAttempts; attempt++ {
+			nextMgmt, nextSign, err := connectBenchmarkSessions(l, serial)
+			if err == nil {
+				mgmtSession = nextMgmt
+				signSession = nextSign
+				mgmtBroker = mgmtSession.Broker
+				signBroker = signSession.Broker
+				l.Info("benchmark reconnected",
+					slog.String("serial", serial),
+					slog.Int("attempt", attempt),
+				)
+				return nil
+			}
+
+			lastErr = err
+			l.Warn("benchmark reconnect attempt failed",
+				slog.Int("attempt", attempt),
+				slog.Any("err", err),
+			)
+			time.Sleep(benchmarkReconnectRetryDelay)
+		}
+
+		if lastErr == nil {
+			lastErr = fmt.Errorf("unknown reconnect error")
+		}
+		return fmt.Errorf("reconnect failed after %d attempts: %w", benchmarkReconnectMaxAttempts, lastErr)
+	}
 
 	masterPass, err := resolveMasterPass(cfg)
 	if err != nil {
@@ -108,10 +163,10 @@ func main() {
 	}
 	defer secure.MemoryWipe(masterPass)
 
-	if info, err := common.ReqInitInfo(mgmtBroker); err != nil {
+	if info, err := common.ReqInitInfo(getMgmtBroker()); err != nil {
 		l.Warn("init info", slog.Any("err", err))
 	} else if !info.GetMasterPresent() {
-		ok, err := common.ReqInitMaster(mgmtBroker, false, masterPass)
+		ok, err := common.ReqInitMaster(getMgmtBroker(), false, masterPass)
 		if err != nil {
 			l.Error("init master", slog.Any("err", err))
 			os.Exit(1)
@@ -125,12 +180,12 @@ func main() {
 
 	switch normalizeBenchmarkMode(cfg.mode) {
 	case "latency":
-		if err := runLatencyMode(mgmtBroker, signBroker, masterPass, cfg, l); err != nil {
+		if err := runLatencyMode(getMgmtBroker, getSignBroker, reconnectSessions, masterPass, cfg, l); err != nil {
 			l.Error("benchmark failed", slog.Any("err", err))
 			os.Exit(1)
 		}
 	case "real-life":
-		if err := runRealLifeMode(mgmtBroker, signBroker, masterPass, cfg, l); err != nil {
+		if err := runRealLifeMode(getMgmtBroker, getSignBroker, reconnectSessions, masterPass, cfg, l); err != nil {
 			l.Error("real-life benchmark failed", slog.Any("err", err))
 			os.Exit(1)
 		}
@@ -140,8 +195,15 @@ func main() {
 	}
 }
 
-func runLatencyMode(mgmtBroker, signBroker *broker.Broker, masterPass []byte, cfg benchmarkConfig, l *slog.Logger) error {
-	keyID, keyTz4, created, err := resolveBenchmarkKey(mgmtBroker, masterPass, cfg, l)
+func runLatencyMode(
+	getMgmtBroker brokerGetter,
+	getSignBroker brokerGetter,
+	reconnectSessions reconnectFn,
+	masterPass []byte,
+	cfg benchmarkConfig,
+	l *slog.Logger,
+) error {
+	keyID, keyTz4, created, err := resolveBenchmarkKey(getMgmtBroker(), masterPass, cfg, l)
 	if err != nil {
 		return fmt.Errorf("resolve benchmark key: %w", err)
 	}
@@ -153,13 +215,26 @@ func runLatencyMode(mgmtBroker, signBroker *broker.Broker, masterPass []byte, cf
 			return
 		}
 
-		cleanupBenchmarkKeys(mgmtBroker, []benchmarkKey{key}, masterPass, cfg.cleanup, l)
+		cleanupBenchmarkKeys(getMgmtBroker(), []benchmarkKey{key}, masterPass, cfg.cleanup, l)
 	}()
 
-	if err := unlockBenchmarkKeys(mgmtBroker, []benchmarkKey{key}, masterPass, cfg); err != nil {
+	if err := unlockBenchmarkKeys(getMgmtBroker(), []benchmarkKey{key}, masterPass, cfg); err != nil {
 		return err
 	}
 	unlocked = true
+
+	reconnectAndUnlock := func(cause error) error {
+		if reconnectSessions == nil {
+			return fmt.Errorf("reconnect unavailable: %w", cause)
+		}
+		if err := reconnectSessions(cause); err != nil {
+			return err
+		}
+		if err := unlockBenchmarkKeys(getMgmtBroker(), []benchmarkKey{key}, masterPass, cfg); err != nil {
+			return fmt.Errorf("unlock after reconnect: %w", err)
+		}
+		return nil
+	}
 
 	targets, err := resolveTargets(cfg.kind)
 	if err != nil {
@@ -169,7 +244,7 @@ func runLatencyMode(mgmtBroker, signBroker *broker.Broker, masterPass []byte, cf
 	fmt.Println("== End-to-End")
 	fmt.Printf("benchmark key=%s tz4=%s samples=%d warmup=%d\n", keyID, keyTz4, cfg.samples, cfg.warmup)
 	for _, target := range targets {
-		lastLevel, lastRound, err := benchmarkKindWatermarkFromStatus(mgmtBroker, keyID, target.kind)
+		lastLevel, lastRound, err := benchmarkKindWatermarkFromStatus(getMgmtBroker(), keyID, target.kind)
 		if err != nil {
 			return fmt.Errorf("%s: read current watermark: %w", target.name, err)
 		}
@@ -186,7 +261,7 @@ func runLatencyMode(mgmtBroker, signBroker *broker.Broker, masterPass []byte, cf
 			"start_level", startLevel,
 		)
 
-		result, err := runBenchmark(signBroker, keyTz4, target, startLevel, cfg.samples, cfg.warmup, l)
+		result, err := runBenchmark(getSignBroker, keyTz4, target, startLevel, cfg.samples, cfg.warmup, reconnectAndUnlock, l)
 		if err != nil {
 			return fmt.Errorf("%s: %w", target.name, err)
 		}
@@ -229,6 +304,33 @@ func normalizeBenchmarkMode(mode string) string {
 	default:
 		return mode
 	}
+}
+
+func connectBenchmarkSessions(l *slog.Logger, serial string) (*common.Session, *common.Session, error) {
+	mgmtSession, err := common.Connect(common.ConnectParams{
+		Logger:  l,
+		Channel: common.ChanMgmt,
+		Serial:  serial,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("connect mgmt: %w", err)
+	}
+
+	signSerial := serial
+	if signSerial == "" {
+		signSerial = mgmtSession.Serial
+	}
+	signSession, err := common.Connect(common.ConnectParams{
+		Logger:  l,
+		Channel: common.ChanSign,
+		Serial:  signSerial,
+	})
+	if err != nil {
+		mgmtSession.Close()
+		return nil, nil, fmt.Errorf("connect sign: %w", err)
+	}
+
+	return mgmtSession, signSession, nil
 }
 
 func resolveMasterPass(cfg benchmarkConfig) ([]byte, error) {
@@ -431,7 +533,15 @@ func benchmarkKindWatermarkFromStatus(mgmtBroker *broker.Broker, keyID string, k
 	return 0, 0, fmt.Errorf("status: key %q not found", keyID)
 }
 
-func runBenchmark(b *broker.Broker, tz4 string, target benchmarkTarget, startLevel uint64, samples, warmup int, l *slog.Logger) (benchmarkResult, error) {
+func runBenchmark(
+	getSignBroker brokerGetter,
+	tz4 string,
+	target benchmarkTarget,
+	startLevel uint64,
+	samples, warmup int,
+	reconnect reconnectFn,
+	l *slog.Logger,
+) (benchmarkResult, error) {
 	if samples <= 0 {
 		return benchmarkResult{}, fmt.Errorf("samples must be > 0")
 	}
@@ -444,7 +554,8 @@ func runBenchmark(b *broker.Broker, tz4 string, target benchmarkTarget, startLev
 
 	nextLevel := startLevel
 	for i := 0; i < warmup; i++ {
-		if _, err := common.ReqSign(b, tz4, buildTenderbakePayload(target.kind, nextLevel, 0, nil)); err != nil {
+		payload := buildTenderbakePayload(target.kind, nextLevel, 0, nil)
+		if _, _, err := signWithReconnect(getSignBroker, reconnect, tz4, payload, l, target.name, "warmup", i); err != nil {
 			return benchmarkResult{}, fmt.Errorf("warmup %s[%d]: %w", target.name, i, err)
 		}
 		nextLevel++
@@ -461,9 +572,7 @@ func runBenchmark(b *broker.Broker, tz4 string, target benchmarkTarget, startLev
 	benchStart := time.Now()
 
 	for i := 0; i < samples; i++ {
-		t0 := time.Now()
-		_, err := common.ReqSign(b, tz4, payloads[i])
-		dt := time.Since(t0)
+		dt, recovered, err := signWithReconnect(getSignBroker, reconnect, tz4, payloads[i], l, target.name, "sample", i)
 
 		if err != nil {
 			failures++
@@ -473,6 +582,12 @@ func runBenchmark(b *broker.Broker, tz4 string, target benchmarkTarget, startLev
 				slog.Any("err", err),
 			)
 			continue
+		}
+		if recovered {
+			l.Info("roundtrip recovered after reconnect",
+				slog.String("kind", target.name),
+				slog.Int("i", i),
+			)
 		}
 
 		durations = append(durations, dt)
@@ -505,6 +620,61 @@ func runBenchmark(b *broker.Broker, tz4 string, target benchmarkTarget, startLev
 		p99:       percentileDuration(durations, 99),
 		opsPerSec: float64(successes) / total.Seconds(),
 	}, nil
+}
+
+func signWithReconnect(
+	getSignBroker brokerGetter,
+	reconnect reconnectFn,
+	tz4 string,
+	payload []byte,
+	l *slog.Logger,
+	kind string,
+	phase string,
+	index int,
+) (duration time.Duration, recovered bool, err error) {
+	t0 := time.Now()
+	_, err = common.ReqSign(getSignBroker(), tz4, payload)
+	if err == nil {
+		return time.Since(t0), false, nil
+	}
+	if reconnect == nil || !isReconnectableSignError(err) {
+		return time.Since(t0), false, err
+	}
+
+	l.Warn("sign request failed with transport error; reconnecting",
+		slog.String("kind", kind),
+		slog.String("phase", phase),
+		slog.Int("index", index),
+		slog.Any("err", err),
+	)
+	if recErr := reconnect(err); recErr != nil {
+		return time.Since(t0), false, fmt.Errorf("reconnect failed: %w", recErr)
+	}
+
+	t1 := time.Now()
+	_, err = common.ReqSign(getSignBroker(), tz4, payload)
+	if err != nil {
+		return time.Since(t1), true, err
+	}
+	return time.Since(t1), true, nil
+}
+
+func isReconnectableSignError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, context.Canceled) ||
+		errors.Is(err, io.EOF) ||
+		errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "libusb") ||
+		strings.Contains(msg, "no device") ||
+		strings.Contains(msg, "broken pipe") ||
+		strings.Contains(msg, "connection reset")
 }
 
 func percentileDuration(sorted []time.Duration, percentile int) time.Duration {

@@ -6,9 +6,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/tez-capital/tezsign/broker"
-	"github.com/tez-capital/tezsign/common"
 )
 
 type realLifeResult struct {
@@ -30,7 +27,14 @@ type durationStats struct {
 	p99 time.Duration
 }
 
-func runRealLifeMode(mgmtBroker, signBroker *broker.Broker, masterPass []byte, cfg benchmarkConfig, l *slog.Logger) error {
+func runRealLifeMode(
+	getMgmtBroker brokerGetter,
+	getSignBroker brokerGetter,
+	reconnectSessions reconnectFn,
+	masterPass []byte,
+	cfg benchmarkConfig,
+	l *slog.Logger,
+) error {
 	target, err := resolveRealLifeTarget(cfg.kind)
 	if err != nil {
 		return fmt.Errorf("benchmark config: %w", err)
@@ -42,14 +46,14 @@ func runRealLifeMode(mgmtBroker, signBroker *broker.Broker, masterPass []byte, c
 		return fmt.Errorf("real-life interval must be >= 0")
 	}
 
-	key1, err := resolveBenchmarkKeyByID(mgmtBroker, masterPass, cfg.keyID, "bench-real-life-a", l)
+	key1, err := resolveBenchmarkKeyByID(getMgmtBroker(), masterPass, cfg.keyID, "bench-real-life-a", l)
 	if err != nil {
 		return fmt.Errorf("resolve real-life key1: %w", err)
 	}
-	key2, err := resolveBenchmarkKeyByID(mgmtBroker, masterPass, cfg.keyID2, "bench-real-life-b", l)
+	key2, err := resolveBenchmarkKeyByID(getMgmtBroker(), masterPass, cfg.keyID2, "bench-real-life-b", l)
 	if err != nil {
 		if key1.created && cfg.cleanup {
-			cleanupBenchmarkKeys(mgmtBroker, []benchmarkKey{key1}, masterPass, cfg.cleanup, l)
+			cleanupBenchmarkKeys(getMgmtBroker(), []benchmarkKey{key1}, masterPass, cfg.cleanup, l)
 		}
 		return fmt.Errorf("resolve real-life key2: %w", err)
 	}
@@ -63,21 +67,21 @@ func runRealLifeMode(mgmtBroker, signBroker *broker.Broker, masterPass []byte, c
 		if !unlocked {
 			return
 		}
-		cleanupBenchmarkKeys(mgmtBroker, keys, masterPass, cfg.cleanup, l)
+		cleanupBenchmarkKeys(getMgmtBroker(), keys, masterPass, cfg.cleanup, l)
 	}()
 
-	if err := unlockBenchmarkKeys(mgmtBroker, keys, masterPass, cfg); err != nil {
+	if err := unlockBenchmarkKeys(getMgmtBroker(), keys, masterPass, cfg); err != nil {
 		return err
 	}
 	unlocked = true
 
 	fmt.Println("== Real-Life")
 
-	key1Level, key1Round, err := benchmarkKindWatermarkFromStatus(mgmtBroker, key1.id, target.kind)
+	key1Level, key1Round, err := benchmarkKindWatermarkFromStatus(getMgmtBroker(), key1.id, target.kind)
 	if err != nil {
 		return fmt.Errorf("read current watermark for key1 %q: %w", key1.id, err)
 	}
-	key2Level, key2Round, err := benchmarkKindWatermarkFromStatus(mgmtBroker, key2.id, target.kind)
+	key2Level, key2Round, err := benchmarkKindWatermarkFromStatus(getMgmtBroker(), key2.id, target.kind)
 	if err != nil {
 		return fmt.Errorf("read current watermark for key2 %q: %w", key2.id, err)
 	}
@@ -115,7 +119,20 @@ func runRealLifeMode(mgmtBroker, signBroker *broker.Broker, masterPass []byte, c
 		startLevel,
 	)
 
-	result, err := runRealLifeBenchmark(signBroker, key1, key2, target, startLevel, cfg.realLifePairs, cfg.realLifeInterval, l)
+	reconnectAndUnlock := func(cause error) error {
+		if reconnectSessions == nil {
+			return fmt.Errorf("reconnect unavailable: %w", cause)
+		}
+		if err := reconnectSessions(cause); err != nil {
+			return err
+		}
+		if err := unlockBenchmarkKeys(getMgmtBroker(), keys, masterPass, cfg); err != nil {
+			return fmt.Errorf("unlock after reconnect: %w", err)
+		}
+		return nil
+	}
+
+	result, err := runRealLifeBenchmark(getSignBroker, key1, key2, target, startLevel, cfg.realLifePairs, cfg.realLifeInterval, reconnectAndUnlock, l)
 	if err != nil {
 		return err
 	}
@@ -140,13 +157,14 @@ func resolveRealLifeTarget(kind string) (benchmarkTarget, error) {
 }
 
 func runRealLifeBenchmark(
-	b *broker.Broker,
+	getSignBroker brokerGetter,
 	key1 benchmarkKey,
 	key2 benchmarkKey,
 	target benchmarkTarget,
 	startLevel uint64,
 	pairs int,
 	interval time.Duration,
+	reconnect reconnectFn,
 	l *slog.Logger,
 ) (realLifeResult, error) {
 	if startLevel == 0 {
@@ -168,9 +186,7 @@ func runRealLifeBenchmark(
 
 		pairStart := time.Now()
 		for keyIndex, key := range []benchmarkKey{key1, key2} {
-			t0 := time.Now()
-			_, err := common.ReqSign(b, key.tz4, payload)
-			dt := time.Since(t0)
+			dt, recovered, err := signWithReconnect(getSignBroker, reconnect, key.tz4, payload, l, target.name, "pair", i)
 
 			if err != nil {
 				failures++
@@ -183,6 +199,15 @@ func runRealLifeBenchmark(
 					slog.Any("err", err),
 				)
 				continue
+			}
+			if recovered {
+				l.Info("real-life sign recovered after reconnect",
+					slog.String("kind", target.name),
+					slog.Int("pair", i),
+					slog.Int("key_index", keyIndex+1),
+					slog.String("key", key.id),
+					slog.Uint64("level", level),
+				)
 			}
 
 			durations = append(durations, dt)
