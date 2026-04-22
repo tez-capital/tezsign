@@ -1,6 +1,6 @@
 [Unit]
 Description=Attach gadget to UDC (bind) and fix endpoint perms
-After=setup-gadget.service ffs_registrar.service setup-gadget-dev.service
+After=setup-gadget.service setup-fs.service ffs_registrar.service setup-gadget-dev.service
 Requires=ffs_registrar.service
 
 [Service]

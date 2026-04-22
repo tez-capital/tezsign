@@ -4,6 +4,7 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 
 SRC_URI = " \
     file://setup-gadget.c \
+    file://setup-fs.c \
     file://attach-gadget.c \
     file://99-led-heartbeat.rules \
 "
@@ -12,12 +13,14 @@ S = "${WORKDIR}"
 
 do_compile() {
     ${CC} ${CFLAGS} ${LDFLAGS} setup-gadget.c -o setup-gadget
+    ${CC} ${CFLAGS} ${LDFLAGS} setup-fs.c -o setup-fs
     ${CC} ${CFLAGS} ${LDFLAGS} attach-gadget.c -o attach-gadget
 }
 
 do_install() {
     install -d ${D}${bindir}
     install -m 0755 setup-gadget ${D}${bindir}
+    install -m 0755 setup-fs ${D}${bindir}
     install -m 0755 attach-gadget ${D}${bindir}
 
     install -d ${D}${sysconfdir}/udev/rules.d

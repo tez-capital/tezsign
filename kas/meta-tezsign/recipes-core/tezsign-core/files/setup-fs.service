@@ -1,0 +1,17 @@
+[Unit]
+Description=Fix tezsign filesystem permissions and ownership
+After=setup-gadget.service
+Requires=setup-gadget.service
+RequiresMountsFor=/data
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/setup-fs
+RemainAfterExit=yes
+Restart=on-failure
+RestartSec=1s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

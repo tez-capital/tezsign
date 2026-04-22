@@ -4,6 +4,7 @@ LIC_FILES_CHKSUM = "file://${COREBASE}/meta/files/common-licenses/MIT;md5=0835ad
 
 SRC_URI = " \
     file://setup-gadget.service \
+    file://setup-fs.service \
     file://attach-gadget.service \
     file://generate-serial.service \
     file://tezsign.service \
@@ -17,7 +18,7 @@ inherit systemd useradd
 
 # Systemd configuration
 SYSTEMD_PACKAGES = "${PN}"
-SYSTEMD_SERVICE:${PN} = "setup-gadget.service attach-gadget.service ffs_registrar.service tezsign.service generate-serial.service"
+SYSTEMD_SERVICE:${PN} = "setup-gadget.service setup-fs.service attach-gadget.service ffs_registrar.service tezsign.service generate-serial.service"
 SYSTEMD_AUTO_ENABLE = "enable"
 
 # Create the users and groups your script requires
@@ -43,6 +44,7 @@ do_install() {
     # Install the systemd service file
     install -d ${D}${systemd_system_unitdir}
     install -m 0644 ${WORKDIR}/setup-gadget.service ${D}${systemd_system_unitdir}/
+    install -m 0644 ${WORKDIR}/setup-fs.service ${D}${systemd_system_unitdir}/
     install -m 0644 ${WORKDIR}/attach-gadget.service ${D}${systemd_system_unitdir}/
     install -m 0644 ${WORKDIR}/ffs_registrar.service ${D}${systemd_system_unitdir}/
     install -m 0644 ${WORKDIR}/tezsign.service ${D}${systemd_system_unitdir}/

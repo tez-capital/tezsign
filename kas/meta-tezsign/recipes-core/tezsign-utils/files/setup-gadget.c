@@ -10,16 +10,9 @@
 #include <sys/mount.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <pwd.h>
-#include <grp.h>
-#include <ftw.h>
 
 #define GADGET_BASE "/sys/kernel/config/usb_gadget/g1"
 #define FFS_DIR     "/dev/ffs/tezsign"
-#define DATA_DIR    "/data/tezsign"
-
-static uid_t target_uid;
-static gid_t target_gid;
 
 // Utility to write to ConfigFS attributes
 int write_attr(const char *path, const char *fmt, ...) {
@@ -57,26 +50,6 @@ int mkdir_p(const char *path) {
     }
     if (mkdir(tmp, 0755) != 0 && errno != EEXIST) return -1;
     return 0;
-}
-
-int chown_callback(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf) {
-    (void)sb;
-    (void)tflag;
-    (void)ftwbuf;
-
-    if (lchown(fpath, target_uid, target_gid) != 0) {
-        perror(fpath);
-        return -1;
-    }
-
-    return 0;
-}
-
-int recursive_chown(const char *path, uid_t uid, gid_t gid) {
-    target_uid = uid;
-    target_gid = gid;
-
-    return nftw(path, chown_callback, 20, FTW_PHYS);
 }
 
 int main() {
@@ -126,55 +99,6 @@ int main() {
             perror("FunctionFS mount failed");
             return EXIT_FAILURE;
         }
-    }
-
-    uid_t reg_uid, tez_uid;
-    gid_t dm_gid, reg_gid, tez_gid;
-
-    struct passwd *pw;
-    struct group *gr;
-
-    // Get Registrar User & Group
-    if (!(pw = getpwnam("registrar"))) { fprintf(stderr, "Missing user: registrar\n"); return 1; }
-    reg_uid = pw->pw_uid;
-
-    if (!(gr = getgrnam("registrar"))) { fprintf(stderr, "Missing group: registrar\n"); return 1; }
-    reg_gid = gr->gr_gid;
-
-    // Get Dev Manager Group
-    if (!(gr = getgrnam("dev_manager"))) { fprintf(stderr, "Missing group: dev_manager\n"); return 1; }
-    dm_gid = gr->gr_gid;
-
-    // Get Tezsign User & Group
-    if (!(pw = getpwnam("tezsign"))) { fprintf(stderr, "Missing user: tezsign\n"); return 1; }
-    tez_uid = pw->pw_uid;
-
-    if (!(gr = getgrnam("tezsign"))) { fprintf(stderr, "Missing group: tezsign\n"); return 1; }
-    tez_gid = gr->gr_gid;
-
-    // chmod 770 /dev/ffs/tezsign && chown :dev_manager
-    chmod(FFS_DIR, 0770);
-    if (chown(FFS_DIR, -1, dm_gid) != 0) {
-        fprintf(stderr, "Failed to set group on %s (GID: %u): %s\n", 
-                FFS_DIR, (unsigned int)dm_gid, strerror(errno));
-        return EXIT_FAILURE;
-    }
-
-    // chown registrar:registrar /dev/ffs/tezsign/ep0
-    if (chown(FFS_DIR "/ep0", reg_uid, reg_gid) != 0) {
-        perror("Failed to set ownership on ep0");
-        return EXIT_FAILURE;
-    }
-
-    // Setup /data/tezsign directory
-    if (mkdir_p(DATA_DIR) != 0) {
-        fprintf(stderr, "Error: Failed to create %s\n", DATA_DIR);
-        return EXIT_FAILURE;
-    }
-
-    if (recursive_chown(DATA_DIR, tez_uid, tez_gid) != 0) {
-        perror("Failed to set ownership on " DATA_DIR);
-        return EXIT_FAILURE;
     }
 
     printf("USB Gadget success: %s\n", serial);

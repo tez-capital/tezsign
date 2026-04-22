@@ -1,7 +1,7 @@
 [Unit]
 Description=Registers FFS gadget descriptors (writes to ep0)
-After=setup-gadget.service
-Requires=setup-gadget.service
+After=setup-fs.service
+Requires=setup-fs.service
 
 [Service]
 Type=simple
