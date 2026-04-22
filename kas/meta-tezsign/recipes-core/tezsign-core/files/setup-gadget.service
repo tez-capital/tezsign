@@ -3,11 +3,14 @@ Description=Enable tezsign FFS (create gadget, link functions, mount /dev/ffs/te
 # Ensure the SD card partitions are mounted BEFORE we run
 RequiresMountsFor=/app /data
 After=local-fs.target generate-serial.service
+StartLimitIntervalSec=0
 
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/setup-gadget
 RemainAfterExit=yes
+Restart=on-failure
+RestartSec=1s
 StandardOutput=journal
 StandardError=journal
 

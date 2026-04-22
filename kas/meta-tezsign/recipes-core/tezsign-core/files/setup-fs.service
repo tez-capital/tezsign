@@ -3,6 +3,7 @@ Description=Fix tezsign filesystem permissions and ownership
 After=setup-gadget.service
 Requires=setup-gadget.service
 RequiresMountsFor=/data
+StartLimitIntervalSec=0
 
 [Service]
 Type=oneshot
