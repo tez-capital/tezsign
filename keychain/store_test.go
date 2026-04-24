@@ -3,13 +3,11 @@ package keychain
 import (
 	"os"
 	"testing"
-
-	"google.golang.org/protobuf/proto"
 )
 
 func testKeyState(values map[SIGN_KIND]HighWatermark) *KeyState {
 	ks := newEmptyKeyState()
-	for _, kind := range signKinds() {
+	for _, kind := range allSignKinds {
 		ks.ByKind[int32(kind)] = values[kind].ToKeyState()
 	}
 	return ks
@@ -18,7 +16,7 @@ func testKeyState(values map[SIGN_KIND]HighWatermark) *KeyState {
 func assertKeyStateEqual(t *testing.T, got *KeyState, want map[SIGN_KIND]HighWatermark) {
 	t.Helper()
 
-	for _, kind := range signKinds() {
+	for _, kind := range allSignKinds {
 		state := got.GetByKind()[int32(kind)]
 		if state == nil {
 			t.Fatalf("missing state for kind %v", kind)
@@ -34,32 +32,6 @@ func assertKeyStateEqual(t *testing.T, got *KeyState, want map[SIGN_KIND]HighWat
 				expected.round,
 			)
 		}
-	}
-}
-
-func writeLegacyStateForTest(t *testing.T, path string, dek []byte, id, tz4 string, ks *KeyState) {
-	t.Helper()
-
-	plain, err := proto.Marshal(ks)
-	if err != nil {
-		t.Fatalf("marshal legacy state: %v", err)
-	}
-
-	nonce := randBytes(12)
-	gcm, err := newAESGCM(dek)
-	if err != nil {
-		t.Fatalf("newAESGCM: %v", err)
-	}
-
-	aad := []byte("state|id=" + id + "|tz4=" + tz4)
-	ct := gcm.Seal(nil, nonce, plain, aad)
-
-	out := make([]byte, 12+len(ct))
-	copy(out[:12], nonce)
-	copy(out[12:], ct)
-
-	if err := writeBytesSync(path, out, 0o600); err != nil {
-		t.Fatalf("write legacy state: %v", err)
 	}
 }
 
@@ -80,15 +52,12 @@ func TestDoubleBufferWriteReadRoundTrip(t *testing.T) {
 
 	dek := []byte("0123456789abcdef0123456789abcdef")
 
-	file, ks, seq, missing, corrupted, err := fs.prepareKeyStateFile(id, dek, tz4)
+	file, ks, seq, corrupted, err := openKeyHWMFile(fs.keyStatePath(id), dek, id, tz4)
 	if err != nil {
-		t.Fatalf("prepareKeyStateFile: %v", err)
+		t.Fatalf("openKeyHWMFile: %v", err)
 	}
 	defer file.Close()
 
-	if !missing {
-		t.Fatalf("expected missing state")
-	}
 	if corrupted {
 		t.Fatalf("expected clean state")
 	}
@@ -106,14 +75,14 @@ func TestDoubleBufferWriteReadRoundTrip(t *testing.T) {
 		PREATTESTATION: {level: 39, round: 1},
 		ATTESTATION:    {level: 40, round: 2},
 	}
-	if err := file.writeState(dek, id, tz4, testKeyState(want), 7); err != nil {
-		t.Fatalf("writeState: %v", err)
+	if err := file.persist(dek, id, tz4, testKeyState(want), 7); err != nil {
+		t.Fatalf("persist: %v", err)
 	}
-	file.wait()
+	file.waitIdle()
 
-	got, gotSeq, missing, corrupted, err := file.readState(dek, id, tz4)
+	got, gotSeq, missing, corrupted, err := file.load(dek, id, tz4)
 	if err != nil {
-		t.Fatalf("readState: %v", err)
+		t.Fatalf("load: %v", err)
 	}
 
 	if missing {
@@ -145,9 +114,9 @@ func TestDoubleBufferRecoversFromCorruptedSecondSlot(t *testing.T) {
 
 	dek := []byte("abcdef0123456789abcdef0123456789")
 
-	file, _, _, _, _, err := fs.prepareKeyStateFile(id, dek, tz4)
+	file, _, _, _, err := openKeyHWMFile(fs.keyStatePath(id), dek, id, tz4)
 	if err != nil {
-		t.Fatalf("prepareKeyStateFile: %v", err)
+		t.Fatalf("openKeyHWMFile: %v", err)
 	}
 	defer file.Close()
 
@@ -156,10 +125,10 @@ func TestDoubleBufferRecoversFromCorruptedSecondSlot(t *testing.T) {
 		PREATTESTATION: {level: 12, round: 2},
 		ATTESTATION:    {level: 13, round: 3},
 	}
-	if err := file.writeState(dek, id, tz4, testKeyState(want), 3); err != nil {
-		t.Fatalf("writeState: %v", err)
+	if err := file.persist(dek, id, tz4, testKeyState(want), 3); err != nil {
+		t.Fatalf("persist: %v", err)
 	}
-	file.wait()
+	file.waitIdle()
 
 	var corruptByte [1]byte
 	if _, err := file.file.ReadAt(corruptByte[:], keyStateSlotSize+8); err != nil {
@@ -170,9 +139,9 @@ func TestDoubleBufferRecoversFromCorruptedSecondSlot(t *testing.T) {
 		t.Fatalf("WriteAt: %v", err)
 	}
 
-	got, gotSeq, missing, corrupted, err := file.readState(dek, id, tz4)
+	got, gotSeq, missing, corrupted, err := file.load(dek, id, tz4)
 	if err != nil {
-		t.Fatalf("readState: %v", err)
+		t.Fatalf("load: %v", err)
 	}
 
 	if missing {
@@ -204,9 +173,9 @@ func TestDoubleBufferPrefersNewerSequence(t *testing.T) {
 
 	dek := []byte("fedcba9876543210fedcba9876543210")
 
-	file, _, _, _, _, err := fs.prepareKeyStateFile(id, dek, tz4)
+	file, _, _, _, err := openKeyHWMFile(fs.keyStatePath(id), dek, id, tz4)
 	if err != nil {
-		t.Fatalf("prepareKeyStateFile: %v", err)
+		t.Fatalf("openKeyHWMFile: %v", err)
 	}
 	defer file.Close()
 
@@ -237,9 +206,9 @@ func TestDoubleBufferPrefersNewerSequence(t *testing.T) {
 		t.Fatalf("WriteAt slot B: %v", err)
 	}
 
-	got, gotSeq, missing, corrupted, err := file.readState(dek, id, tz4)
+	got, gotSeq, missing, corrupted, err := file.load(dek, id, tz4)
 	if err != nil {
-		t.Fatalf("readState: %v", err)
+		t.Fatalf("load: %v", err)
 	}
 
 	if missing {
@@ -252,69 +221,4 @@ func TestDoubleBufferPrefersNewerSequence(t *testing.T) {
 		t.Fatalf("expected seq=2, got %d", gotSeq)
 	}
 	assertKeyStateEqual(t, got, newer)
-}
-
-func TestPrepareKeyStateFileMigratesLegacyState(t *testing.T) {
-	fs, err := NewFileStore(t.TempDir())
-	if err != nil {
-		t.Fatalf("NewFileStore: %v", err)
-	}
-
-	const (
-		id  = "legacy-migration"
-		tz4 = "tz4-legacy-migration"
-	)
-
-	if err := os.MkdirAll(fs.keyDir(id), 0o700); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-
-	dek := []byte("00112233445566778899aabbccddeeff")
-	want := map[SIGN_KIND]HighWatermark{
-		BLOCK:          {level: 101, round: 1},
-		PREATTESTATION: {level: 102, round: 2},
-		ATTESTATION:    {level: 103, round: 3},
-	}
-
-	writeLegacyStateForTest(t, fs.keyStatePath(id), dek, id, tz4, testKeyState(want))
-
-	file, ks, seq, missing, corrupted, err := fs.prepareKeyStateFile(id, dek, tz4)
-	if err != nil {
-		t.Fatalf("prepareKeyStateFile: %v", err)
-	}
-	defer file.Close()
-
-	if missing {
-		t.Fatalf("expected migrated state")
-	}
-	if corrupted {
-		t.Fatalf("expected clean legacy read")
-	}
-	if seq != 1 {
-		t.Fatalf("expected migrated seq=1, got %d", seq)
-	}
-	assertKeyStateEqual(t, ks, want)
-
-	info, err := file.file.Stat()
-	if err != nil {
-		t.Fatalf("Stat: %v", err)
-	}
-	if info.Size() != keyStateFileSize {
-		t.Fatalf("expected %d-byte state file, got %d", keyStateFileSize, info.Size())
-	}
-
-	got, gotSeq, missing, corrupted, err := file.readState(dek, id, tz4)
-	if err != nil {
-		t.Fatalf("readState: %v", err)
-	}
-	if missing {
-		t.Fatalf("expected migrated state")
-	}
-	if corrupted {
-		t.Fatalf("expected clean migrated state")
-	}
-	if gotSeq != 1 {
-		t.Fatalf("expected seq=1 after migration, got %d", gotSeq)
-	}
-	assertKeyStateEqual(t, got, want)
 }

@@ -1,13 +1,98 @@
 package keychain
 
 import (
+	"errors"
 	"log/slog"
 	"os"
+	"sync"
 	"syscall"
 	"testing"
 
 	"github.com/tez-capital/tezsign/signer"
 )
+
+func TestSignAndUpdateRejectsCorruptedHWM(t *testing.T) {
+	setup := newBenchmarkSetup(t)
+	setup.key.markHWMCorrupted(true)
+
+	_, err := setup.ring.SignAndUpdate(setup.tz4, buildPreattestationPayload(1, 0))
+	if !errors.Is(err, ErrKeyStateCorrupted) {
+		t.Fatalf("expected ErrKeyStateCorrupted, got %v", err)
+	}
+}
+
+func TestUnlockFailureDoesNotLeaveGhostKey(t *testing.T) {
+	setup := newBenchmarkSetup(t)
+
+	err := setup.ring.Unlock("ghost-key", []byte("wrong-password"))
+	if err == nil {
+		t.Fatalf("expected unlock error for unknown key")
+	}
+	if key := setup.ring.get("ghost-key"); key != nil {
+		t.Fatalf("unlock failure left a ghost key in memory")
+	}
+
+	createdID, _, _, err := setup.ring.CreateKey("ghost-key", []byte("bench-passphrase"))
+	if err != nil {
+		t.Fatalf("CreateKey after failed unlock: %v", err)
+	}
+	if createdID != "ghost-key" {
+		t.Fatalf("expected created key id ghost-key, got %q", createdID)
+	}
+}
+
+func TestSignAndUpdateRejectsConcurrentDuplicateLevel(t *testing.T) {
+	setup := newBenchmarkSetup(t)
+	payload := buildPreattestationPayload(42, 0)
+
+	const workers = 8
+	start := make(chan struct{})
+	errs := make(chan error, workers)
+
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, err := setup.ring.SignAndUpdate(setup.tz4, payload)
+			errs <- err
+		}()
+	}
+
+	close(start)
+	wg.Wait()
+	close(errs)
+
+	var successCount int
+	var staleCount int
+	for err := range errs {
+		switch {
+		case err == nil:
+			successCount++
+		case errors.Is(err, ErrStaleWatermark):
+			staleCount++
+		default:
+			t.Fatalf("unexpected SignAndUpdate error: %v", err)
+		}
+	}
+
+	if successCount != 1 {
+		t.Fatalf("expected exactly one successful signature, got %d", successCount)
+	}
+	if staleCount != workers-1 {
+		t.Fatalf("expected %d stale watermark errors, got %d", workers-1, staleCount)
+	}
+
+	state := setup.key.GetKeyState()
+	pre := state.ByKind[int32(PREATTESTATION)]
+	if pre == nil {
+		t.Fatalf("missing preattestation state after signing")
+	}
+	if pre.Level != 42 || pre.Round != 0 {
+		t.Fatalf("unexpected preattestation watermark: level=%d round=%d", pre.Level, pre.Round)
+	}
+}
 
 func be32(b []byte, v uint32) {
 	b[0] = byte(v >> 24)

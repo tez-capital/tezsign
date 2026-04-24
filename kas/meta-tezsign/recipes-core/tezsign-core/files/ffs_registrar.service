@@ -1,25 +1,19 @@
 [Unit]
 Description=Registers FFS gadget descriptors (writes to ep0)
-After=setup-fs.service
-Requires=setup-fs.service
+After=setup-gadget.service
+Requires=setup-gadget.service
 
 [Service]
 Type=simple
 User=registrar
 Group=registrar
-Environment="LOG_LEVEL=warn"
+Environment="BROKER_LOG=warn"
 ExecStart=/usr/bin/ffs_registrar
 RemainAfterExit=yes
 Restart=always
 RestartSec=1
-CPUSchedulingPolicy=fifo
-CPUSchedulingPriority=50
-LimitRTPRIO=99
-LimitMEMLOCK=infinity
-IOSchedulingClass=best-effort
-IOSchedulingPriority=0
-StandardOutput=journal
-StandardError=journal
+StandardOutput=journal+console
+StandardError=journal+console
 
 [Install]
 WantedBy=multi-user.target

@@ -1,0 +1,15 @@
+{
+  "files.watcherExclude": {
+    "kas/build/**": true,
+    "kas/deploy/**": true,
+    "kas/downloads/**": true,
+    "kas/meta-arm/**": true,
+    "kas/meta-mainline/**": true,
+    "kas/meta-openembedded/**": true,
+    "kas/meta-raspberrypi/**": true,
+    "kas/meta-rockchip/**": true,
+    "kas/poky/**": true,
+    "kas/release/**": true,
+    "kas/sstate-cache/**": true
+  }
+}

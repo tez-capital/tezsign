@@ -446,14 +446,16 @@ func runBrokers(ctx context.Context, fs *keychain.FileStore, kr *keychain.KeyRin
 	default:
 	}
 
-	cleanupSock := serveReadySocket(l)
-	defer cleanupSock()
 	// IF0: sign channel
 	signBroker := broker.New(r0, w0, bLogger, broker.WithHandler(handleSignAndStatus(handleRequestsFactory(fs, kr, l))))
 	defer signBroker.Stop()
 	// IF1: management channel
 	mgmtBroker := broker.New(r1, w1, bLogger, broker.WithHandler(handleMgmtOnly(handleRequestsFactory(fs, kr, l))))
 	defer mgmtBroker.Stop()
+
+	// Advertise readiness only after both broker loops are live.
+	cleanupSock := serveReadySocket(l)
+	defer cleanupSock()
 
 	l.Info("Signer gadget online; awaiting requests.")
 	select {
@@ -463,7 +465,6 @@ func runBrokers(ctx context.Context, fs *keychain.FileStore, kr *keychain.KeyRin
 }
 
 func run(l *slog.Logger) error {
-
 	// Keystore directory: DATA_STORE/keystore when DATA_STORE is set; else next to binary
 	var baseDir string
 	if ds := strings.TrimSpace(os.Getenv("DATA_STORE")); ds != "" {

@@ -21,6 +21,7 @@ func watchLiveness(sockPath string, ready *atomic.Uint32, l *slog.Logger) {
 			continue
 		}
 		l.Info("connected to gadget liveness socket")
+
 		ready.Store(1)
 		// Block until the socket dies, then loop.
 		_, _ = io.Copy(io.Discard, conn)
@@ -77,7 +78,8 @@ func runEnabledWatcher(enabled <-chan bool, sockPath string, l *slog.Logger) {
 	for en := range enabled {
 		if en && !isEnabled {
 			isEnabled = true
-			ctx := context.Background()
+			ctx, cancelFunc := context.WithCancel(context.Background())
+			cancel = cancelFunc
 			closeCompletedChan = serveEnabled(ctx, sockPath, l)
 		} else if !en && isEnabled {
 			if cancel != nil {

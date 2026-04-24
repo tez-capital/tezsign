@@ -40,5 +40,8 @@ local_conf_header:
     DL_DIR = "${TOPDIR}/../downloads"
     SSTATE_DIR = "${TOPDIR}/../sstate-cache"
 
+    # Allow externalsrc recipes to use a repo root supplied by the caller.
+    BB_ENV_PASSTHROUGH_ADDITIONS .= " TEZSIGN_REPO_ROOT"
+
   licenses: |
     LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"
