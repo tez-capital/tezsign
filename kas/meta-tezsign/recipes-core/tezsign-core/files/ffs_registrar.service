@@ -12,8 +12,8 @@ ExecStart=/usr/bin/ffs_registrar
 RemainAfterExit=yes
 Restart=always
 RestartSec=1
-StandardOutput=journal+console
-StandardError=journal+console
+StandardOutput=null
+StandardError=null
 
 [Install]
 WantedBy=multi-user.target

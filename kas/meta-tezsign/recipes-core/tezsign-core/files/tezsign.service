@@ -1,7 +1,7 @@
 [Unit]
 Description=Runs tezsign
-After=attach-gadget.service
-Requires=attach-gadget.service
+After=setup-gadget.service
+Requires=setup-gadget.service
 
 [Service]
 Type=simple
@@ -14,12 +14,6 @@ Restart=on-failure
 RestartSec=2
 StandardOutput=null
 StandardError=null
-CPUSchedulingPolicy=fifo
-CPUSchedulingPriority=50
-LimitRTPRIO=99
-LimitMEMLOCK=infinity
-IOSchedulingClass=best-effort
-IOSchedulingPriority=0
 
 [Install]
 WantedBy=multi-user.target

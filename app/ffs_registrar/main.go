@@ -147,11 +147,11 @@ func main() {
 
 	// Start watching gadget liveness
 	var ready atomic.Uint32
-	go watchLiveness(common.ReadySock, &ready, l)
 	enabled := make(chan bool, 1)
+	go drainEP0Events(ep0, enabled, &ready, l)
+	go watchLiveness(common.ReadySock, &ready, l)
 	go runEnabledWatcher(enabled, common.EnabledSock, l)
 
 	l.Info("FFS registrar online; handling EP0 control & events")
-
-	drainEP0Events(ep0, enabled, &ready, l)
+	select {}
 }

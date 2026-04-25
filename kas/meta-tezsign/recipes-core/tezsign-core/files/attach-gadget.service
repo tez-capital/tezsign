@@ -6,8 +6,6 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=oneshot
-ExecStartPre=/usr/bin/udevadm settle --timeout=5
-ExecStartPre=/usr/bin/sleep 5
 ExecStart=/usr/bin/attach-gadget
 RemainAfterExit=yes
 Restart=on-failure
