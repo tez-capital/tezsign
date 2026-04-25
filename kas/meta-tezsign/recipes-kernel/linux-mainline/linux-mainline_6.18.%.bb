@@ -20,7 +20,7 @@ SRC_URI:append = " \
     file://radxa-dev-common.cfg \
     file://radxa-zero3.cfg \
     file://radxa-zero3-dev.cfg \
-    file://0002-arm64-dts-rockchip-radxa-zero-3w-usb-peripheral-no-wifi-bt.patch \
+    file://0002-arm64-dts-rockchip-radxa-zero-3w-usb-peripheral.patch \
 "
 
 PV = "6.18+git${SRCPV}"

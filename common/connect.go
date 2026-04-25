@@ -318,18 +318,19 @@ func Connect(p ConnectParams) (*Session, error) {
 	}
 
 	openPair := func(ie ifaceEndpoints) (*gousb.Interface, *gousb.InEndpoint, *gousb.OutEndpoint, error) {
-		intf, err := cfg.Interface(ie.ifaceNum, 0)
-		if err != nil {
-			return nil, nil, nil, interfaceClaimError(ie.ifaceNum, err)
-		}
-
-		// vendor ready on that interface
+		// Probe readiness before claiming the interface. Claiming too early can
+		// perturb FunctionFS bring-up on some controllers when an auto-unlock
+		// client connects the moment the device enumerates.
 		if ok, err := VendorReadyInInterface(chosen, VendorReqReady, uint16(ie.ifaceNum), l); !ok {
-			intf.Close()
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("%w: iface %d: %w", ErrVendorProbeFailed, ie.ifaceNum, err)
 			}
 			return nil, nil, nil, fmt.Errorf("%w: iface %d", ErrInterfaceNotReady, ie.ifaceNum)
+		}
+
+		intf, err := cfg.Interface(ie.ifaceNum, 0)
+		if err != nil {
+			return nil, nil, nil, interfaceClaimError(ie.ifaceNum, err)
 		}
 
 		outEp, err := intf.OutEndpoint(int(ie.epOut & 0x0f))

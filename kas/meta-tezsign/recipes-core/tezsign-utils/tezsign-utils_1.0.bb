@@ -10,6 +10,7 @@ SRC_URI = " \
 
 S = "${WORKDIR}"
 
+do_compile[nostamp] = "1"
 do_compile() {
     ${CC} ${CFLAGS} ${LDFLAGS} setup-gadget.c -o setup-gadget
     ${CC} ${CFLAGS} ${LDFLAGS} attach-gadget.c -o attach-gadget

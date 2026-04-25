@@ -7,19 +7,13 @@ Requires=setup-gadget.service
 Type=simple
 User=registrar
 Group=registrar
-Environment="LOG_LEVEL=warn"
+Environment="BROKER_LOG=warn"
 ExecStart=/usr/bin/ffs_registrar
 RemainAfterExit=yes
 Restart=always
 RestartSec=1
-CPUSchedulingPolicy=fifo
-CPUSchedulingPriority=50
-LimitRTPRIO=99
-LimitMEMLOCK=infinity
-IOSchedulingClass=best-effort
-IOSchedulingPriority=0
-StandardOutput=journal
-StandardError=journal
+StandardOutput=null
+StandardError=null
 
 [Install]
 WantedBy=multi-user.target

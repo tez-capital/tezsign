@@ -53,18 +53,8 @@ int main() {
         return EXIT_FAILURE;
     }
 
-    // 2. Wait for FFS descriptors to be written.
-    //    ep1 appears only after ffs_registrar writes both descriptors and
-    //    strings to ep0 (FFS transitions to FFS_ACTIVE).  Without this the
-    //    UDC bind races with ffs_registrar on warm reboots and fails with
-    //    -ENODEV because the FFS function has no descriptors yet.
-    printf("Waiting for FFS descriptors...\n");
-    while (access(FFS_EP1, F_OK) != 0) {
-        usleep(50000); // 50 ms
-    }
-    printf("FFS descriptors ready.\n");
 
-    // 3. Check if already attached
+    // Check if already attached
     char current_udc[256] = {0};
     FILE *fp = fopen(GADGET_UDC_FILE, "r");
     if (fp) {
@@ -77,7 +67,7 @@ int main() {
     if (strlen(current_udc) > 0 && strcmp(current_udc, udc) == 0) {
         printf("UDC is already set to %s.\n", udc);
     } else {
-        // 4. Bind gadget to UDC (with retry — DWC3 PHY may still be settling)
+        // Bind gadget to UDC (with retry — DWC3 PHY may still be settling)
         int bound = 0;
         for (int attempt = 0; attempt < 40; attempt++) { // 40 × 250 ms = 10 s
             int fd = open(GADGET_UDC_FILE, O_WRONLY | O_TRUNC);
@@ -107,7 +97,7 @@ int main() {
         }
     }
 
-    // 5. Handle soft_connect symlink and ownership
+    // Handle soft_connect symlink and ownership
     char target[512], link_path[] = "/tmp/soft_connect";
     snprintf(target, sizeof(target), "/sys/class/udc/%s/soft_connect", udc);
     unlink(link_path);
@@ -115,7 +105,7 @@ int main() {
         change_owner(link_path, "registrar");
     }
 
-    // 6. Fix endpoint ownership (ep1-ep4 already exist from step 2)
+    // Fix endpoint ownership (ep1-ep4 already exist from step 2)
     const char *endpoints[] = {
         "/dev/ffs/tezsign/ep1", "/dev/ffs/tezsign/ep2",
         "/dev/ffs/tezsign/ep3", "/dev/ffs/tezsign/ep4"

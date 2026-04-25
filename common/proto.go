@@ -10,6 +10,25 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const (
+	unlockBaseTimeout   = 5 * time.Second
+	unlockPerKeyTimeout = 1500 * time.Millisecond
+	unlockMaxTimeout    = 30 * time.Second
+)
+
+func unlockTimeout(keyCount int) time.Duration {
+	if keyCount <= 0 {
+		return unlockBaseTimeout
+	}
+
+	timeout := unlockBaseTimeout + time.Duration(keyCount-1)*unlockPerKeyTimeout
+	if timeout > unlockMaxTimeout {
+		return unlockMaxTimeout
+	}
+
+	return timeout
+}
+
 func ReqUnlockKeys(b *broker.Broker, keys []string, pass []byte) ([]*signerpb.PerKeyResult, error) {
 	p := append([]byte(nil), pass...)
 	defer secure.MemoryWipe(p)
@@ -21,7 +40,7 @@ func ReqUnlockKeys(b *broker.Broker, keys []string, pass []byte) ([]*signerpb.Pe
 				Passphrase: p,
 			},
 		},
-	}, 3*time.Second)
+	}, unlockTimeout(len(keys)))
 	if err != nil {
 		return nil, err
 	}

@@ -11,12 +11,6 @@ inputs:
   image-flavour:
     description: 'Image flavour marker written into appfs (.image-flavour)'
     required: true
-  gadget-goarm64:
-    description: 'GOARM64 value for gadget build'
-    required: true
-  gadget-cgo-cflags:
-    description: 'CGO_CFLAGS value for gadget build'
-    required: true
 
 runs:
   using: "composite"
@@ -35,54 +29,12 @@ runs:
         docker system prune -af || true
         df -h
 
-    - name: Build Yocto payload binaries
-      shell: bash
-      working-directory: ${{ github.workspace }}
-      run: |
-        docker build -f tools/Containerfile -t tezsign/builder:latest .
-
-        mkdir -p \
-          kas/meta-tezsign/recipes-core/images/files \
-          kas/meta-tezsign/recipes-core/tezsign-core/files
-
-        docker run --rm \
-          --user "$(id -u):$(id -g)" \
-          -e HOME=/tmp \
-          -e GOCACHE=/tmp/go-cache \
-          -e GOMODCACHE=/tmp/go-mod-cache \
-          -e GOOS=linux \
-          -e GOARCH=arm64 \
-          -e GOARM64="${{ inputs.gadget-goarm64 }}" \
-          -e CGO_ENABLED=1 \
-          -e CGO_CFLAGS="${{ inputs.gadget-cgo-cflags }}" \
-          -v "${PWD}:/work" \
-          --workdir /work \
-          tezsign/builder:latest \
-          go build -v -trimpath -buildvcs=false \
-            -ldflags='-s -w -buildid= -extldflags "-static"' \
-            -o ./kas/meta-tezsign/recipes-core/images/files/tezsign \
-            ./app/gadget
-
-        docker run --rm \
-          --user "$(id -u):$(id -g)" \
-          -e HOME=/tmp \
-          -e GOCACHE=/tmp/go-cache \
-          -e GOMODCACHE=/tmp/go-mod-cache \
-          -e GOOS=linux \
-          -e GOARCH=arm64 \
-          -e CGO_ENABLED=0 \
-          -v "${PWD}:/work" \
-          --workdir /work \
-          tezsign/builder:latest \
-          go build -trimpath -buildvcs=false \
-            -ldflags='-s -w -buildid=' \
-            -o ./kas/meta-tezsign/recipes-core/tezsign-core/files/ffs_registrar \
-            ./app/ffs_registrar
-
     - name: Generate image metadata files
       shell: bash
       working-directory: ${{ github.workspace }}
       run: |
+        mkdir -p ./kas/meta-tezsign/recipes-core/images/files
+
         image_version="${IMAGE_VERSION:-$(git rev-parse --short=12 HEAD)}"
         image_date="${IMAGE_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
         image_flavour="${{ inputs.image-flavour }}"
@@ -109,9 +61,11 @@ runs:
 
     - name: Build Yocto image
       shell: bash
-      working-directory: ${{ github.workspace }}/kas
+      working-directory: ${{ github.workspace }}
       run: |
         echo "Yocto runner CPUs: $(nproc)"
+
+        cd kas
 
         for repo in poky meta-raspberrypi meta-openembedded meta-arm meta-rockchip meta-virtualization; do
           if [ -e "${repo}" ] && [ ! -d "${repo}/.git" ]; then
@@ -125,8 +79,9 @@ runs:
           -e HOME=/tmp \
           -e USER="$(id -un)" \
           -e LOGNAME="$(id -un)" \
-          -v "${PWD}:/work" \
-          --workdir /work \
+          -e TEZSIGN_REPO_ROOT=/work \
+          -v "${{ github.workspace }}:/work" \
+          --workdir /work/kas \
           ghcr.io/siemens/kas/kas:latest \
           build "${{ inputs.kas-file }}"
 
