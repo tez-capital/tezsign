@@ -1,3 +1,4 @@
-# Force 'none' scheduler for the SD card to reduce kernel processing time
-# Only match whole-disk devices (mmcblk0, mmcblk1, ...) — partitions don't have their own scheduler
+# Keep the MMC queue on the 'none' scheduler to reduce per-request overhead.
+# Only match whole-disk devices (mmcblk0, mmcblk1, ...) so partitions are not targeted.
 ACTION=="add|change", KERNEL=="mmcblk[0-9]", ATTR{queue/scheduler}="none"
+SUBSYSTEM=="drivers", KERNEL=="dwc3", ACTION=="add", RUN+="/usr/bin/tune-interrupts @TEZSIGN_USB_IRQ_FIFO_PRIORITY@ @TEZSIGN_USB_IRQ_CPU@ @TEZSIGN_USB_IRQ_TOKENS@"

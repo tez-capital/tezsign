@@ -8,13 +8,13 @@ SRC_URI = " \
     file://generate-serial.service \
     file://tezsign.service \
     file://ffs_registrar.service \
-    file://io-scheduler.conf \
     file://99-io-performance.rules \
 "
 
 inherit externalsrc goarch systemd useradd
 
 DEPENDS += "go-native"
+RDEPENDS:${PN} += "tezsign-utils"
 
 TEZSIGN_REPO_ROOT ?= "${@os.path.abspath(os.path.join(d.getVar('THISDIR'), '../../../..'))}"
 EXTERNALSRC = "${TEZSIGN_REPO_ROOT}/app"
@@ -92,9 +92,11 @@ do_install() {
     install -m 0644 ${WORKDIR}/generate-serial.service ${D}${systemd_system_unitdir}/
 
     install -d ${D}${sysconfdir}/tmpfiles.d
-    install -m 0644 ${WORKDIR}/io-scheduler.conf ${D}${sysconfdir}/tmpfiles.d/
 
-    # Install the UDEV rules
     install -d ${D}${sysconfdir}/udev/rules.d
-    install -m 0644 ${WORKDIR}/99-io-performance.rules ${D}${sysconfdir}/udev/rules.d/
+    sed \
+        -e 's,@TEZSIGN_USB_IRQ_FIFO_PRIORITY@,${TEZSIGN_USB_IRQ_FIFO_PRIORITY},g' \
+        -e 's,@TEZSIGN_USB_IRQ_CPU@,${TEZSIGN_USB_IRQ_CPU},g' \
+        -e 's,@TEZSIGN_USB_IRQ_TOKENS@,${TEZSIGN_USB_IRQ_TOKENS},g' \
+        ${WORKDIR}/99-io-performance.rules > ${D}${sysconfdir}/udev/rules.d/99-io-performance.rules
 }

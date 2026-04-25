@@ -3,6 +3,10 @@ header:
   includes:
     - base.yml
 
+local_conf_header:
+  rpi_cpu_isolation: |
+    CMDLINE:append = " ${TEZSIGN_CPU_ISOLATION_CMDLINE}"
+
 repos:
   meta-raspberrypi:
     url: https://git.yoctoproject.org/meta-raspberrypi

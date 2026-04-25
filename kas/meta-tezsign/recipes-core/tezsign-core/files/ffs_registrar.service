@@ -14,6 +14,7 @@ Restart=always
 RestartSec=1
 StandardOutput=null
 StandardError=null
+AllowedCPUs=0
 
 [Install]
 WantedBy=multi-user.target

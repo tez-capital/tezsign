@@ -110,7 +110,7 @@ prepare_rockchip_bootfs() {
     install -m 0644 ${DEPLOY_DIR_IMAGE}/rk3566-radxa-zero-3w.dtb $BOOTFS/
 
     # Generate extlinux.conf
-    ARGS="root=/dev/ram0 rw rootfstype=ramfs rdinit=/sbin/init"
+    ARGS="root=/dev/ram0 rw rootfstype=ramfs rdinit=/sbin/init ${TEZSIGN_CPU_ISOLATION_CMDLINE}"
     if [ "${TEZSIGN_DEV}" = "1" ]; then
         ARGS="$ARGS earlycon console=tty1 console=ttyS2,1500000n8"
     fi
