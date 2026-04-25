@@ -5,6 +5,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/tez-capital/tezsign/common"
 	"github.com/urfave/cli/v3"
@@ -18,6 +19,8 @@ type HostContext struct {
 }
 
 func main() {
+	args := rewriteVersionAlias(os.Args)
+
 	app := &cli.Command{
 		Name:  "tezsign-host",
 		Usage: "USB host CLI for TezSign gadget (signer)",
@@ -47,7 +50,38 @@ func main() {
 		},
 	}
 
-	if err := app.Run(context.Background(), os.Args); err != nil {
+	if err := app.Run(context.Background(), args); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func rewriteVersionAlias(args []string) []string {
+	if len(args) <= 1 {
+		return args
+	}
+
+	out := make([]string, len(args))
+	copy(out, args)
+
+	for i := 1; i < len(out); i++ {
+		tok := out[i]
+
+		if tok == "--version" {
+			out[i] = "version"
+			return out
+		}
+
+		switch {
+		case tok == "--device" || tok == "-d":
+			if i+1 < len(out) {
+				i++
+			}
+		case strings.HasPrefix(tok, "--device="), strings.HasPrefix(tok, "-d="):
+		case strings.HasPrefix(tok, "-"):
+		default:
+			return args
+		}
+	}
+
+	return args
 }

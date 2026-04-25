@@ -54,8 +54,9 @@ func cmdListDevices() *cli.Command {
 
 func cmdVersion() *cli.Command {
 	return &cli.Command{
-		Name:  "version",
-		Usage: "Show gadget image version and build date",
+		Name:    "version",
+		Aliases: []string{"--version"},
+		Usage:   "Show gadget image version and build date",
 		Action: func(ctx context.Context, c *cli.Command) error {
 			h := mustHost(ctx)
 
@@ -86,7 +87,7 @@ func cmdVersion() *cli.Command {
 				return json.NewEncoder(os.Stdout).Encode(out)
 			}
 
-			fmt.Printf("Version: %s\nBuild date: %s\n", out.Version, out.BuildDate)
+			fmt.Printf("Version: %s | Build date: %s\n", out.Version, out.BuildDate)
 			return nil
 		},
 	}
