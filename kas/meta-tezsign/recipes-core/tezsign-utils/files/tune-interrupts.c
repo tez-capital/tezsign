@@ -14,7 +14,7 @@
 #define WAIT_TIMEOUT_MS 5000
 
 static void usage(const char *argv0) {
-	fprintf(stderr, "usage: %s <fifo-priority-or-0> <irq-cpu> <token> [token ...]\n", argv0);
+	fprintf(stderr, "usage: %s <fifo-priority-or-0> <irq-cpu|irq-cpulist|irq-mask> <token> [token ...]\n", argv0);
 }
 
 static bool is_numeric_name(const char *name) {
@@ -82,12 +82,85 @@ static bool matches_token(const char *text, char *const *tokens, int token_count
 	return false;
 }
 
-static bool make_affinity_mask(long cpu_index, unsigned long long *mask_value, char *mask_text, size_t mask_text_size) {
-	if (cpu_index < 0 || cpu_index >= 64) {
+static bool parse_affinity_hex(const char *text, unsigned long long *mask_value) {
+	char *end = NULL;
+
+	errno = 0;
+	*mask_value = strtoull(text, &end, 16);
+	if (errno != 0 || end == text || *end != '\0' || *mask_value == 0) {
 		return false;
 	}
 
-	*mask_value = 1ULL << cpu_index;
+	return true;
+}
+
+static bool parse_affinity_cpulist(const char *text, unsigned long long *mask_value) {
+	char buffer[128];
+	char *item;
+	char *saveptr = NULL;
+	unsigned long long parsed_mask = 0;
+
+	if (strlen(text) >= sizeof(buffer)) {
+		return false;
+	}
+
+	memcpy(buffer, text, strlen(text) + 1);
+	for (item = strtok_r(buffer, ",", &saveptr); item != NULL; item = strtok_r(NULL, ",", &saveptr)) {
+		char *dash = strchr(item, '-');
+		long start_cpu;
+		long end_cpu;
+		long cpu;
+
+		if (*item == '\0') {
+			return false;
+		}
+		if (dash == item || (dash != NULL && dash[1] == '\0')) {
+			return false;
+		}
+
+		if (dash == NULL) {
+			if (!parse_long(item, 0, 63, &start_cpu)) {
+				return false;
+			}
+			parsed_mask |= 1ULL << start_cpu;
+			continue;
+		}
+
+		*dash = '\0';
+		if (!parse_long(item, 0, 63, &start_cpu) || !parse_long(dash + 1, 0, 63, &end_cpu) || end_cpu < start_cpu) {
+			return false;
+		}
+		for (cpu = start_cpu; cpu <= end_cpu; ++cpu) {
+			parsed_mask |= 1ULL << cpu;
+		}
+	}
+
+	if (parsed_mask == 0) {
+		return false;
+	}
+
+	*mask_value = parsed_mask;
+	return true;
+}
+
+static bool parse_affinity_spec(const char *text, unsigned long long *mask_value, char *mask_text, size_t mask_text_size) {
+	long cpu_index;
+
+	if (strchr(text, ',') != NULL || strchr(text, '-') != NULL) {
+		if (!parse_affinity_cpulist(text, mask_value)) {
+			return false;
+		}
+	} else if ((text[0] == '0' && (text[1] == 'x' || text[1] == 'X')) || strpbrk(text, "abcdefABCDEF") != NULL) {
+		if (!parse_affinity_hex(text, mask_value)) {
+			return false;
+		}
+	} else {
+		if (!parse_long(text, 0, 63, &cpu_index)) {
+			return false;
+		}
+		*mask_value = 1ULL << cpu_index;
+	}
+
 	snprintf(mask_text, mask_text_size, "%llx", (unsigned long long)*mask_value);
 	return true;
 }
@@ -132,7 +205,7 @@ static bool read_hex_mask(const char *path, unsigned long long *value) {
 	return true;
 }
 
-static int set_irq_affinity(const char *irq, long cpu_index, unsigned long long mask_value, const char *mask_text, bool *changed) {
+static int set_irq_affinity(const char *irq, const char *affinity_spec, unsigned long long mask_value, const char *mask_text, bool *changed) {
 	char path[64];
 	unsigned long long current_mask = 0;
 	FILE *file;
@@ -162,12 +235,12 @@ static int set_irq_affinity(const char *irq, long cpu_index, unsigned long long 
 	}
 
 	*changed = true;
-	printf("tune-interrupts: pinned irq %s to cpu %ld\n", irq, cpu_index);
+	printf("tune-interrupts: pinned irq %s to %s\n", irq, affinity_spec);
 	fflush(stdout);
 	return 0;
 }
 
-static int scan_irqs(long cpu_index, char *const *tokens, int token_count, unsigned long long mask_value, const char *mask_text, int *matches, int *changes) {
+static int scan_irqs(const char *affinity_spec, char *const *tokens, int token_count, unsigned long long mask_value, const char *mask_text, int *matches, int *changes) {
 	FILE *file;
 	char line[512];
 	int local_matches = 0;
@@ -206,7 +279,7 @@ static int scan_irqs(long cpu_index, char *const *tokens, int token_count, unsig
 		}
 
 		local_matches++;
-		if (set_irq_affinity(irq, cpu_index, mask_value, mask_text, &changed) != 0) {
+		if (set_irq_affinity(irq, affinity_spec, mask_value, mask_text, &changed) != 0) {
 			fclose(file);
 			return -1;
 		}
@@ -317,7 +390,6 @@ static int scan_threads(int priority, char *const *tokens, int token_count, int 
 
 int main(int argc, char **argv) {
 	long priority;
-	long cpu_index;
 	bool tune_threads;
 	int elapsed_ms = 0;
 	int max_irq_matches = 0;
@@ -332,11 +404,11 @@ int main(int argc, char **argv) {
 		usage(argv[0]);
 		return EXIT_FAILURE;
 	}
-	if (!parse_long(argv[1], 0, 99, &priority) || !parse_long(argv[2], 0, 63, &cpu_index)) {
+	if (!parse_long(argv[1], 0, 99, &priority)) {
 		usage(argv[0]);
 		return EXIT_FAILURE;
 	}
-	if (!make_affinity_mask(cpu_index, &mask_value, mask_text, sizeof(mask_text))) {
+	if (!parse_affinity_spec(argv[2], &mask_value, mask_text, sizeof(mask_text))) {
 		usage(argv[0]);
 		return EXIT_FAILURE;
 	}
@@ -351,7 +423,7 @@ int main(int argc, char **argv) {
 		int thread_matches = 0;
 		int thread_changes = 0;
 
-		if (scan_irqs(cpu_index, &argv[3], argc - 3, mask_value, mask_text, &irq_matches, &irq_changes) != 0) {
+		if (scan_irqs(argv[2], &argv[3], argc - 3, mask_value, mask_text, &irq_matches, &irq_changes) != 0) {
 			return EXIT_FAILURE;
 		}
 		if (tune_threads) {

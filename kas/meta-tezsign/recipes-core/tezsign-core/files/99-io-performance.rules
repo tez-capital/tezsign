@@ -2,3 +2,4 @@
 # Only match whole-disk devices (mmcblk0, mmcblk1, ...) so partitions are not targeted.
 ACTION=="add|change", KERNEL=="mmcblk[0-9]", ATTR{queue/scheduler}="none"
 SUBSYSTEM=="drivers", KERNEL=="dwc3", ACTION=="add", RUN+="/usr/bin/tune-interrupts @TEZSIGN_USB_IRQ_FIFO_PRIORITY@ @TEZSIGN_USB_IRQ_CPU@ @TEZSIGN_USB_IRQ_TOKENS@"
+SUBSYSTEM=="drivers", KERNEL=="dwc2", ACTION=="add", RUN+="/usr/bin/tune-interrupts @TEZSIGN_USB_IRQ_FIFO_PRIORITY@ @TEZSIGN_USB_IRQ_CPU@ @TEZSIGN_USB_IRQ_TOKENS@"

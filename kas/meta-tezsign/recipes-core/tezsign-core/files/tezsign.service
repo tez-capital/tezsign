@@ -19,8 +19,8 @@ RestartSec=2
 CPUSchedulingPolicy=fifo
 CPUSchedulingPriority=80
 
-# Core Pinning: CPU 0 is for system/USB, 1-3 are for the app
-AllowedCPUs=1-3
+# Core Pinning: CPUs 0-1 are for system/USB, 2-3 are for the app
+AllowedCPUs=2-3
 
 # Resources
 LimitRTPRIO=99
