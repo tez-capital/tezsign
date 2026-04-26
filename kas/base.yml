@@ -44,10 +44,10 @@ local_conf_header:
     BB_ENV_PASSTHROUGH_ADDITIONS .= " TEZSIGN_REPO_ROOT"
 
   cpu_isolation: |
-    TEZSIGN_ISOLATED_CPUS ?= "2,3"
-    TEZSIGN_IRQ_AFFINITY_CPULIST ?= "0-1"
+    TEZSIGN_ISOLATED_CPUS ?= "1,2,3"
+    TEZSIGN_IRQ_AFFINITY_CPULIST ?= "0"
     # tune-interrupts accepts a single CPU, a CPU list like 0-1, or a hex mask.
-    TEZSIGN_USB_IRQ_CPU ?= "0-1"
+    TEZSIGN_USB_IRQ_CPU ?= "0"
     TEZSIGN_USB_IRQ_FIFO_PRIORITY ?= "98"
     TEZSIGN_USB_IRQ_TOKENS ?= "dwc3 xhci dwc2 usb_gadget udc otg_irq"
     TEZSIGN_CPU_ISOLATION_CMDLINE ?= "isolcpus=${TEZSIGN_ISOLATED_CPUS} nohz_full=${TEZSIGN_ISOLATED_CPUS} rcu_nocbs=${TEZSIGN_ISOLATED_CPUS} irqaffinity=${TEZSIGN_IRQ_AFFINITY_CPULIST}"
