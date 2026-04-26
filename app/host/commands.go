@@ -544,28 +544,56 @@ func cmdUnlockKeys() *cli.Command {
 
 			res, err := common.ReqUnlockKeys(b, keys, pass)
 			if err != nil {
+				if errors.Is(err, context.DeadlineExceeded) {
+					return fmt.Errorf("unlock keys: context deadline exceeded: %w", err)
+				}
 				return err
+			}
+			if len(res) == 0 {
+				return fmt.Errorf("unlock keys: empty response")
 			}
 
 			if !isTTY(os.Stdout) {
 				out := make([]keyStateJSON, 0, len(res))
+				allFailed := true
+				hasDeadlineExceeded := false
 				for _, r := range res {
 					o := keyStateJSON{ID: r.GetKeyId(), OK: r.GetOk()}
-					if !r.GetOk() {
+					if r.GetOk() {
+						allFailed = false
+					} else {
 						o.Err = r.GetError()
+						if strings.Contains(strings.ToLower(o.Err), context.DeadlineExceeded.Error()) {
+							hasDeadlineExceeded = true
+						}
 					}
 					out = append(out, o)
 				}
-				return json.NewEncoder(os.Stdout).Encode(out)
+				if err := json.NewEncoder(os.Stdout).Encode(out); err != nil {
+					return err
+				}
+				if hasDeadlineExceeded {
+					return fmt.Errorf("unlock keys: context deadline exceeded")
+				}
+				if allFailed {
+					return fmt.Errorf("unlock keys: failed for all %d keys", len(res))
+				}
+				return nil
 			}
 
 			okLabels := make([]string, 0, len(res))
 			errLabels := make([]string, 0)
+			allFailed := true
+			hasDeadlineExceeded := false
 			for _, r := range res {
 				if r.GetOk() {
+					allFailed = false
 					okLabels = append(okLabels, r.GetKeyId()+" ✓")
 				} else {
 					errLabels = append(errLabels, r.GetKeyId()+" ✗")
+					if strings.Contains(strings.ToLower(r.GetError()), context.DeadlineExceeded.Error()) {
+						hasDeadlineExceeded = true
+					}
 				}
 			}
 
@@ -578,6 +606,12 @@ func cmdUnlockKeys() *cli.Command {
 					fmt.Println()
 				}
 				fmt.Println(renderChips(errLabels, chipErrStyle, w))
+			}
+			if hasDeadlineExceeded {
+				return fmt.Errorf("unlock keys: context deadline exceeded")
+			}
+			if allFailed {
+				return fmt.Errorf("unlock keys: failed for all %d keys", len(res))
 			}
 
 			return nil

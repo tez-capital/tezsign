@@ -8,10 +8,11 @@ Use this command for any Yocto build:
 
 ```sh
 podman run --privileged --rm -it \
-    -v .:/work:Z \
+    -v "$(pwd)/..:/work:Z \
+    -e TEZSIGN_REPO_ROOT=/work \
     --userns=keep-id \
     --user "$(id -u):$(id -g)" \
-    --workdir /work \
+    --workdir /work/kas \
     ghcr.io/siemens/kas/kas:latest \
     build <kas-file>
 ```
@@ -37,60 +38,66 @@ Typical commands:
 
 ```sh
 podman run --privileged --rm -it \
-    -v .:/work:Z \
+    -v "$(pwd)/..:/work:Z \
+    -e TEZSIGN_REPO_ROOT=/work \
     --userns=keep-id \
     --user "$(id -u):$(id -g)" \
-    --workdir /work \
+    --workdir /work/kas \
     ghcr.io/siemens/kas/kas:latest \
     build rpi4.yml
 ```
 
 ```sh
 podman run --privileged --rm -it \
-    -v .:/work:Z \
+    -v "$(pwd)/..:/work:Z \
+    -e TEZSIGN_REPO_ROOT=/work \
     --userns=keep-id \
     --user "$(id -u):$(id -g)" \
-    --workdir /work \
+    --workdir /work/kas \
     ghcr.io/siemens/kas/kas:latest \
     build rpi4-dev.yml
 ```
 
 ```sh
 podman run --privileged --rm -it \
-    -v .:/work:Z \
+    -v "$(pwd)/..:/work:Z \
+    -e TEZSIGN_REPO_ROOT=/work \
     --userns=keep-id \
     --user "$(id -u):$(id -g)" \
-    --workdir /work \
+    --workdir /work/kas \
     ghcr.io/siemens/kas/kas:latest \
     build rpi0-2w.yml
 ```
 
 ```sh
 podman run --privileged --rm -it \
-    -v .:/work:Z \
+    -v "$(pwd)/..:/work:Z \
+    -e TEZSIGN_REPO_ROOT=/work \
     --userns=keep-id \
     --user "$(id -u):$(id -g)" \
-    --workdir /work \
+    --workdir /work/kas \
     ghcr.io/siemens/kas/kas:latest \
     build rpi0-2w-dev.yml
 ```
 
 ```sh
 podman run --privileged --rm -it \
-    -v .:/work:Z \
+    -v "$(pwd)/..:/work:Z \
+    -e TEZSIGN_REPO_ROOT=/work \
     --userns=keep-id \
     --user "$(id -u):$(id -g)" \
-    --workdir /work \
+    --workdir /work/kas \
     ghcr.io/siemens/kas/kas:latest \
     build radxa-zero3.yml
 ```
 
 ```sh
 podman run --privileged --rm -it \
-    -v .:/work:Z \
+    -v "$(pwd)/..:/work:Z \
+    -e TEZSIGN_REPO_ROOT=/work \
     --userns=keep-id \
     --user "$(id -u):$(id -g)" \
-    --workdir /work \
+    --workdir /work/kas \
     ghcr.io/siemens/kas/kas:latest \
     build radxa-zero3-dev.yml
 ```
@@ -105,17 +112,18 @@ To clean state before any rebuild:
 
 ```sh
 podman run --privileged --rm -it \
-    -v .:/work:Z \
+    -v "$(pwd)/..:/work:Z \
+    -e TEZSIGN_REPO_ROOT=/work \
     --userns=keep-id \
     --user "$(id -u):$(id -g)" \
-    --workdir /work \
+    --workdir /work/kas \
     ghcr.io/siemens/kas/kas:latest \
-    shell -c "bitbake -c cleansstate virtual/kernel minimal-image" <kas-file>
+    shell -c "bitbake -c cleansstate tezsign-initramfs virtual/kernel minimal-image linux-mainline" <kas-file>
 ```
 
 If cleaning image does not work.... try deleting the cache. This will mean redownloading everything.
 ```sh
-sudo rm -rf poky meta-raspberrypi meta-openembedded downloads build
+sudo rm -rf sstate-cache poky meta-raspberrypi meta-openembedded meta-arm downloads build
 ```
 
 

@@ -1,7 +1,7 @@
 header:
   version: 14
   includes:
-    - rpi4.yml
+    - kas/rpi4.yml
 
 local_conf_header:
   release: |

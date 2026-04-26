@@ -1,5 +1,8 @@
-part /boot --source bootimg-partition --ondisk mmcblk0 --fstype=vfat --label boot --active --align 4096 --fixed-size 64M --no-fstab-update
+# Partitions are pinned to exact 512-byte sector boundaries:
+#   /boot -> 8192s   (4 MiB)
+#   /app  -> 139264s (68 MiB)
+#   /data -> 188416s (92 MiB)
 
-part /app  --source rootfs --rootfs-dir=${DEPLOY_DIR_IMAGE}/appfs --ondisk mmcblk0 --fstype=ext4 --label app --align 4096 --fixed-size 24M --fsoptions="ro,exec,noatime" --no-fstab-update
-
-part /data --ondisk mmcblk0 --fstype=ext4 --label data --align 4096 --fixed-size 128M --mkfs-extraopts="-J size=8 -m 0 -O has_journal,extents,sparse_super,metadata_csum,inline_data,fast_commit" --fsoptions="rw,noatime,nodiratime,data=journal,barrier=1,commit=30,errors=remount-ro" --no-fstab-update
+part /boot --offset 8192s --source bootimg-partition --ondisk mmcblk0 --fstype=vfat --label boot --active --fixed-size 64M --no-fstab-update
+part /app  --offset 139264s --source rootfs --rootfs-dir=${DEPLOY_DIR_IMAGE}/appfs --ondisk mmcblk0 --fstype=ext4 --label app --fixed-size 24M --fsoptions="ro,exec,noatime" --no-fstab-update
+part /data --offset 188416s --ondisk mmcblk0 --fstype=ext4 --label data --fixed-size 128M --mkfs-extraopts="-I 1024 -J size=8 -m 0 -O has_journal,extents,sparse_super,metadata_csum,inline_data,fast_commit" --no-fstab-update

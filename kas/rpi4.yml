@@ -1,7 +1,7 @@
 header:
   version: 14
   includes:
-    - rpi-base.yml
+    - kas/rpi-base.yml
 
 machine: raspberrypi4-tezsign
 

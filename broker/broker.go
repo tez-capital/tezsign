@@ -13,6 +13,8 @@ import (
 	"github.com/tez-capital/tezsign/logging"
 )
 
+const maxRetryableWriteRetries = 1
+
 // Optional capabilities (used via type assertions).
 type ReadContexter interface {
 	ReadContext(ctx context.Context, p []byte) (int, error)
@@ -174,6 +176,7 @@ func (b *Broker) writerLoop() <-chan struct{} {
 		keepAliveFrame, err := newMessage(payloadTypeKeepAlive, [16]byte{}, nil)
 		if err != nil {
 			b.logger.Error("failed to create keep-alive frame", slog.Any("err", err))
+			b.cancel()
 			return
 		}
 
@@ -187,13 +190,24 @@ func (b *Broker) writerLoop() <-chan struct{} {
 			case <-b.ctx.Done():
 				return
 			}
+			retries := 0
 			for {
 				if _, err := b.w.WriteContext(b.ctx, data); err != nil {
+					if b.ctx.Err() != nil {
+						return
+					}
 					if isRetryable(err) {
-						b.logger.Debug("write retryable error", slog.Any("err", err))
-						continue
+						if retries < maxRetryableWriteRetries {
+							retries++
+							b.logger.Debug("write retryable error", slog.Int("retry", retries), slog.Any("err", err))
+							continue
+						}
+						b.logger.Error("write retry limit reached", slog.Int("retries", retries), slog.Any("err", err))
+						b.cancel()
+						return
 					}
 					b.logger.Error("write loop exit", slog.Any("err", err))
+					b.cancel()
 					return
 				}
 
@@ -225,7 +239,11 @@ func (b *Broker) readLoop() <-chan struct{} {
 					b.logger.Debug("read retryable error", slog.Any("err", err))
 					continue
 				}
+				if b.ctx.Err() != nil {
+					return
+				}
 				b.logger.Debug("read loop exit", slog.Any("err", err))
+				b.cancel()
 				return
 			}
 		}
@@ -309,9 +327,21 @@ func (b *Broker) writeFrame(ctx context.Context, msgType payloadType, id [16]byt
 		b.logger.Error("failed to create message frame", slog.Any("error", err))
 		return err
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if b.ctx.Err() != nil {
+		return io.EOF
+	}
 
-	b.writeChan <- frame
-	return nil
+	select {
+	case b.writeChan <- frame:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-b.ctx.Done():
+		return io.EOF
+	}
 }
 
 func (b *Broker) Stop() {

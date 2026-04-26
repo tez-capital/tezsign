@@ -12,8 +12,31 @@ Environment="LOG_LEVEL=warn"
 ExecStart=/app/tezsign
 Restart=on-failure
 RestartSec=2
+
+# STABILITY & RT TUNING
+# Use SCHED_RR instead of FIFO if your app has long spin-loops
+# Set priority to 80 (high, but below kernel IRQ threads which we'll set to 90+)
+CPUSchedulingPolicy=fifo
+CPUSchedulingPriority=80
+
+# Core Pinning: CPU 0 is for system/USB, 1-3 are for the app
+AllowedCPUs=1-3
+
+# Resources
+LimitRTPRIO=99
+LimitMEMLOCK=infinity
+
+# IO Tuning: Use Real-time IO class to prevent disk-write stalls
+IOSchedulingClass=realtime
+IOSchedulingPriority=0
+IOWeight=10
+
+# Hardware handling
 StandardOutput=null
 StandardError=null
+
+ControlGroup=yes
+Delegate=yes
 
 [Install]
 WantedBy=multi-user.target
