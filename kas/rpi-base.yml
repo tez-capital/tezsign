@@ -1,7 +1,7 @@
 header:
   version: 14
   includes:
-    - base.yml
+    - kas/base.yml
 
 local_conf_header:
   rpi_cpu_isolation: |

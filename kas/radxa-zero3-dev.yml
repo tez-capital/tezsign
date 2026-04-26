@@ -1,7 +1,7 @@
 header:
   version: 14
   includes:
-    - radxa-zero3.yml
+    - kas/radxa-zero3.yml
 
 local_conf_header:
   release: |
