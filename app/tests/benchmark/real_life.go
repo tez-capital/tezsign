@@ -132,7 +132,30 @@ func runRealLifeMode(
 		return nil
 	}
 
-	result, err := runRealLifeBenchmark(getSignBroker, key1, key2, target, startLevel, cfg.realLifePairs, cfg.realLifeInterval, reconnectAndUnlock, l)
+	lastSignedByKey := map[string]struct {
+		level uint64
+		round uint32
+	}{
+		key1.id: {level: key1Level, round: key1Round},
+		key2.id: {level: key2Level, round: key2Round},
+	}
+	readStorageHWMByKey := func(keyID string) (uint64, uint32, error) {
+		return benchmarkKindWatermarkFromStatus(getMgmtBroker(), keyID, target.kind)
+	}
+
+	result, err := runRealLifeBenchmark(
+		getSignBroker,
+		key1,
+		key2,
+		target,
+		startLevel,
+		cfg.realLifePairs,
+		cfg.realLifeInterval,
+		lastSignedByKey,
+		readStorageHWMByKey,
+		reconnectAndUnlock,
+		l,
+	)
 	if err != nil {
 		return err
 	}
@@ -164,6 +187,11 @@ func runRealLifeBenchmark(
 	startLevel uint64,
 	pairs int,
 	interval time.Duration,
+	lastSignedByKey map[string]struct {
+		level uint64
+		round uint32
+	},
+	readStorageHWMByKey func(keyID string) (uint64, uint32, error),
 	reconnect reconnectFn,
 	l *slog.Logger,
 ) (realLifeResult, error) {
@@ -186,7 +214,27 @@ func runRealLifeBenchmark(
 
 		pairStart := time.Now()
 		for keyIndex, key := range []benchmarkKey{key1, key2} {
-			dt, recovered, err := signWithReconnect(getSignBroker, reconnect, key.tz4, payload, l, target.name, "pair", i)
+			lastSigned, ok := lastSignedByKey[key.id]
+			if !ok {
+				lastSigned = struct {
+					level uint64
+					round uint32
+				}{}
+			}
+			attempt := signAttemptState{
+				keyID:                    key.id,
+				attemptLevel:             level,
+				attemptRound:             0,
+				benchmarkLastSignedLevel: lastSigned.level,
+				benchmarkLastSignedRound: lastSigned.round,
+			}
+			if readStorageHWMByKey != nil {
+				keyID := key.id
+				attempt.readStorageHWM = func() (uint64, uint32, error) {
+					return readStorageHWMByKey(keyID)
+				}
+			}
+			dt, recovered, err := signWithReconnect(getSignBroker, reconnect, key.tz4, payload, l, target.name, "pair", i, attempt)
 
 			if err != nil {
 				failures++
@@ -196,6 +244,8 @@ func runRealLifeBenchmark(
 					slog.Int("key_index", keyIndex+1),
 					slog.String("key", key.id),
 					slog.Uint64("level", level),
+					slog.Uint64("benchmark_last_signed_level", lastSigned.level),
+					slog.Int("benchmark_last_signed_round", int(lastSigned.round)),
 					slog.Any("err", err),
 				)
 				continue
@@ -207,10 +257,16 @@ func runRealLifeBenchmark(
 					slog.Int("key_index", keyIndex+1),
 					slog.String("key", key.id),
 					slog.Uint64("level", level),
+					slog.Uint64("benchmark_last_signed_level_before_disconnect", lastSigned.level),
+					slog.Int("benchmark_last_signed_round_before_disconnect", int(lastSigned.round)),
 				)
 			}
 
 			durations = append(durations, dt)
+			lastSignedByKey[key.id] = struct {
+				level uint64
+				round uint32
+			}{level: level, round: 0}
 			l.Info("real-life sign",
 				slog.String("kind", target.name),
 				slog.Int("pair", i),

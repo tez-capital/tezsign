@@ -62,6 +62,16 @@ type benchmarkKey struct {
 
 type brokerGetter func() *broker.Broker
 type reconnectFn func(cause error) error
+type watermarkReaderFn func() (level uint64, round uint32, err error)
+
+type signAttemptState struct {
+	keyID                    string
+	attemptLevel             uint64
+	attemptRound             uint32
+	benchmarkLastSignedLevel uint64
+	benchmarkLastSignedRound uint32
+	readStorageHWM           watermarkReaderFn
+}
 
 const (
 	benchmarkReconnectMaxAttempts = 60
@@ -261,7 +271,10 @@ func runLatencyMode(
 			"start_level", startLevel,
 		)
 
-		result, err := runBenchmark(getSignBroker, keyTz4, target, startLevel, cfg.samples, cfg.warmup, reconnectAndUnlock, l)
+		readStorageHWM := func() (uint64, uint32, error) {
+			return benchmarkKindWatermarkFromStatus(getMgmtBroker(), keyID, target.kind)
+		}
+		result, err := runBenchmark(getSignBroker, keyID, keyTz4, target, startLevel, cfg.samples, cfg.warmup, readStorageHWM, reconnectAndUnlock, l)
 		if err != nil {
 			return fmt.Errorf("%s: %w", target.name, err)
 		}
@@ -535,10 +548,12 @@ func benchmarkKindWatermarkFromStatus(mgmtBroker *broker.Broker, keyID string, k
 
 func runBenchmark(
 	getSignBroker brokerGetter,
+	keyID string,
 	tz4 string,
 	target benchmarkTarget,
 	startLevel uint64,
 	samples, warmup int,
+	readStorageHWM watermarkReaderFn,
 	reconnect reconnectFn,
 	l *slog.Logger,
 ) (benchmarkResult, error) {
@@ -553,17 +568,43 @@ func runBenchmark(
 	}
 
 	nextLevel := startLevel
+	lastSignedLevel := startLevel - 1
+	lastSignedRound := uint32(0)
 	for i := 0; i < warmup; i++ {
-		payload := buildTenderbakePayload(target.kind, nextLevel, 0, nil)
-		if _, _, err := signWithReconnect(getSignBroker, reconnect, tz4, payload, l, target.name, "warmup", i); err != nil {
+		level := nextLevel
+		round := uint32(0)
+		payload := buildTenderbakePayload(target.kind, level, round, nil)
+		attempt := signAttemptState{
+			keyID:                    keyID,
+			attemptLevel:             level,
+			attemptRound:             round,
+			benchmarkLastSignedLevel: lastSignedLevel,
+			benchmarkLastSignedRound: lastSignedRound,
+			readStorageHWM:           readStorageHWM,
+		}
+		if _, _, err := signWithReconnect(getSignBroker, reconnect, tz4, payload, l, target.name, "warmup", i, attempt); err != nil {
 			return benchmarkResult{}, fmt.Errorf("warmup %s[%d]: %w", target.name, i, err)
 		}
+		lastSignedLevel = level
+		lastSignedRound = round
 		nextLevel++
 	}
 
-	payloads := make([][]byte, 0, samples)
+	type samplePayload struct {
+		raw   []byte
+		level uint64
+		round uint32
+	}
+
+	payloads := make([]samplePayload, 0, samples)
 	for i := 0; i < samples; i++ {
-		payloads = append(payloads, buildTenderbakePayload(target.kind, nextLevel, 0, nil))
+		level := nextLevel
+		round := uint32(0)
+		payloads = append(payloads, samplePayload{
+			raw:   buildTenderbakePayload(target.kind, level, round, nil),
+			level: level,
+			round: round,
+		})
 		nextLevel++
 	}
 
@@ -572,13 +613,26 @@ func runBenchmark(
 	benchStart := time.Now()
 
 	for i := 0; i < samples; i++ {
-		dt, recovered, err := signWithReconnect(getSignBroker, reconnect, tz4, payloads[i], l, target.name, "sample", i)
+		sample := payloads[i]
+		attempt := signAttemptState{
+			keyID:                    keyID,
+			attemptLevel:             sample.level,
+			attemptRound:             sample.round,
+			benchmarkLastSignedLevel: lastSignedLevel,
+			benchmarkLastSignedRound: lastSignedRound,
+			readStorageHWM:           readStorageHWM,
+		}
+		dt, recovered, err := signWithReconnect(getSignBroker, reconnect, tz4, sample.raw, l, target.name, "sample", i, attempt)
 
 		if err != nil {
 			failures++
 			l.Error("roundtrip failed",
 				slog.String("kind", target.name),
 				slog.Int("i", i),
+				slog.Uint64("level", sample.level),
+				slog.Int("round", int(sample.round)),
+				slog.Uint64("benchmark_last_signed_level", lastSignedLevel),
+				slog.Int("benchmark_last_signed_round", int(lastSignedRound)),
 				slog.Any("err", err),
 			)
 			continue
@@ -587,10 +641,16 @@ func runBenchmark(
 			l.Info("roundtrip recovered after reconnect",
 				slog.String("kind", target.name),
 				slog.Int("i", i),
+				slog.Uint64("level", sample.level),
+				slog.Int("round", int(sample.round)),
+				slog.Uint64("benchmark_last_signed_level_before_disconnect", lastSignedLevel),
+				slog.Int("benchmark_last_signed_round_before_disconnect", int(lastSignedRound)),
 			)
 		}
 
 		durations = append(durations, dt)
+		lastSignedLevel = sample.level
+		lastSignedRound = sample.round
 	}
 
 	if len(durations) == 0 {
@@ -631,6 +691,7 @@ func signWithReconnect(
 	kind string,
 	phase string,
 	index int,
+	attempt signAttemptState,
 ) (duration time.Duration, recovered bool, err error) {
 	t0 := time.Now()
 	_, err = common.ReqSign(getSignBroker(), tz4, payload)
@@ -645,11 +706,19 @@ func signWithReconnect(
 		slog.String("kind", kind),
 		slog.String("phase", phase),
 		slog.Int("index", index),
+		slog.String("key", attempt.keyID),
+		slog.Uint64("inflight_level", attempt.attemptLevel),
+		slog.Int("inflight_round", int(attempt.attemptRound)),
+		slog.Uint64("benchmark_last_signed_level", attempt.benchmarkLastSignedLevel),
+		slog.Int("benchmark_last_signed_round", int(attempt.benchmarkLastSignedRound)),
+		slog.String("benchmark_last_signed_meaning", "last successful sign response before disconnect"),
 		slog.Any("err", err),
 	)
+	logDisconnectSnapshot(l, kind, attempt, "before_reconnect")
 	if recErr := reconnect(err); recErr != nil {
 		return time.Since(t0), false, fmt.Errorf("reconnect failed: %w", recErr)
 	}
+	logDisconnectSnapshot(l, kind, attempt, "after_reconnect")
 
 	t1 := time.Now()
 	_, err = common.ReqSign(getSignBroker(), tz4, payload)
@@ -657,6 +726,35 @@ func signWithReconnect(
 		return time.Since(t1), true, err
 	}
 	return time.Since(t1), true, nil
+}
+
+func logDisconnectSnapshot(l *slog.Logger, kind string, attempt signAttemptState, stage string) {
+	if attempt.readStorageHWM == nil || attempt.keyID == "" {
+		return
+	}
+
+	storageLevel, storageRound, err := attempt.readStorageHWM()
+	if err != nil {
+		l.Warn("disconnect state snapshot unavailable",
+			slog.String("stage", stage),
+			slog.String("kind", kind),
+			slog.String("key", attempt.keyID),
+			slog.Any("err", err),
+		)
+		return
+	}
+
+	l.Warn("disconnect state snapshot",
+		slog.String("stage", stage),
+		slog.String("kind", kind),
+		slog.String("key", attempt.keyID),
+		slog.Uint64("inflight_level", attempt.attemptLevel),
+		slog.Int("inflight_round", int(attempt.attemptRound)),
+		slog.Uint64("benchmark_last_signed_level", attempt.benchmarkLastSignedLevel),
+		slog.Int("benchmark_last_signed_round", int(attempt.benchmarkLastSignedRound)),
+		slog.Uint64("storage_hwm_level", storageLevel),
+		slog.Int("storage_hwm_round", int(storageRound)),
+	)
 }
 
 func isReconnectableSignError(err error) bool {
