@@ -14,16 +14,28 @@ const (
 	unlockBaseTimeout   = 5 * time.Second
 	unlockPerKeyTimeout = 1500 * time.Millisecond
 	unlockMaxTimeout    = 30 * time.Second
+
+	newKeysBaseTimeout   = 10 * time.Second
+	newKeysPerKeyTimeout = 1500 * time.Millisecond
+	newKeysMaxTimeout    = 30 * time.Second
 )
 
 func unlockTimeout(keyCount int) time.Duration {
+	return perKeyTimeout(keyCount, unlockBaseTimeout, unlockPerKeyTimeout, unlockMaxTimeout)
+}
+
+func newKeysTimeout(keyCount int) time.Duration {
+	return perKeyTimeout(keyCount, newKeysBaseTimeout, newKeysPerKeyTimeout, newKeysMaxTimeout)
+}
+
+func perKeyTimeout(keyCount int, base, perKey, max time.Duration) time.Duration {
 	if keyCount <= 0 {
-		return unlockBaseTimeout
+		return base
 	}
 
-	timeout := unlockBaseTimeout + time.Duration(keyCount-1)*unlockPerKeyTimeout
-	if timeout > unlockMaxTimeout {
-		return unlockMaxTimeout
+	timeout := base + time.Duration(keyCount-1)*perKey
+	if timeout > max {
+		return max
 	}
 
 	return timeout
@@ -105,7 +117,7 @@ func ReqNewKeys(b *broker.Broker, keyIDs []string, pass []byte) ([]*signerpb.New
 				Passphrase: p,
 			},
 		},
-	}, 10*time.Second)
+	}, newKeysTimeout(len(keyIDs)))
 	if err != nil {
 		return nil, err
 	}
