@@ -2,7 +2,6 @@ package broker
 
 import (
 	"context"
-	"errors"
 	"io"
 	"log/slog"
 	"sync"
@@ -83,8 +82,14 @@ func TestWriterLoopRetriesOnceOnRetryableError(t *testing.T) {
 	}
 }
 
-func TestWriterLoopStopsAfterRetryLimit(t *testing.T) {
-	writer := &scriptedWriter{errOn: []error{syscall.EAGAIN, syscall.EAGAIN}}
+func TestWriterLoopDropsFrameAfterRetryLimit(t *testing.T) {
+	writer := &scriptedWriter{
+		errOn: []error{
+			syscall.EAGAIN,
+			syscall.EAGAIN,
+			nil,
+		},
+	}
 	b := newTestBroker(t, writer)
 	defer b.Stop()
 
@@ -92,15 +97,27 @@ func TestWriterLoopStopsAfterRetryLimit(t *testing.T) {
 		t.Fatalf("writeFrame failed: %v", err)
 	}
 
-	select {
-	case <-b.ctx.Done():
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for broker cancellation")
-	}
+	waitForCondition(t, func() bool { return writer.Calls() >= 2 })
+
 	if got := writer.Calls(); got != 2 {
-		t.Fatalf("expected 2 write attempts before cancellation, got %d", got)
+		t.Fatalf("expected 2 write attempts before dropping frame, got %d", got)
 	}
-	if err := b.writeFrame(context.Background(), payloadTypeRequest, [16]byte{3}, []byte("next")); !errors.Is(err, io.EOF) {
-		t.Fatalf("expected io.EOF after writer loop exit, got %v", err)
+
+	if err := b.ctx.Err(); err != nil {
+		t.Fatalf("broker canceled unexpectedly after dropped frame: %v", err)
+	}
+
+	if err := b.writeFrame(context.Background(), payloadTypeRequest, [16]byte{3}, []byte("next")); err != nil {
+		t.Fatalf("writeFrame for next frame failed: %v", err)
+	}
+
+	waitForCondition(t, func() bool { return writer.Calls() >= 3 })
+
+	if got := writer.Calls(); got != 3 {
+		t.Fatalf("expected next frame to be written after drop, got %d calls", got)
+	}
+
+	if err := b.ctx.Err(); err != nil {
+		t.Fatalf("broker canceled unexpectedly after next frame: %v", err)
 	}
 }

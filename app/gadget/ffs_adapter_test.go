@@ -15,7 +15,7 @@ func newPipeFiles(t *testing.T) (*os.File, *os.File) {
 	t.Helper()
 
 	var fds [2]int
-	if err := unix.Pipe2(fds[:], unix.O_CLOEXEC|unix.O_NONBLOCK); err != nil {
+	if err := unix.Pipe2(fds[:], unix.O_CLOEXEC); err != nil {
 		t.Fatalf("unix.Pipe2: %v", err)
 	}
 
@@ -147,6 +147,21 @@ func TestWriterWriteContextWritesAfterPeerDrains(t *testing.T) {
 
 func fillPipe(t *testing.T, fd int) {
 	t.Helper()
+
+	flags, err := unix.FcntlInt(uintptr(fd), unix.F_GETFL, 0)
+	if err != nil {
+		t.Fatalf("get fd flags: %v", err)
+	}
+
+	if _, err := unix.FcntlInt(uintptr(fd), unix.F_SETFL, flags|unix.O_NONBLOCK); err != nil {
+		t.Fatalf("set nonblock: %v", err)
+	}
+
+	defer func() {
+		if _, err := unix.FcntlInt(uintptr(fd), unix.F_SETFL, flags); err != nil {
+			t.Fatalf("restore fd flags: %v", err)
+		}
+	}()
 
 	chunk := make([]byte, 4096)
 	for {

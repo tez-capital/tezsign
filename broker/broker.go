@@ -191,6 +191,8 @@ func (b *Broker) writerLoop() <-chan struct{} {
 				return
 			}
 			retries := 0
+
+		writeAttempt:
 			for {
 				if _, err := b.w.WriteContext(b.ctx, data); err != nil {
 					if b.ctx.Err() != nil {
@@ -200,11 +202,10 @@ func (b *Broker) writerLoop() <-chan struct{} {
 						if retries < maxRetryableWriteRetries {
 							retries++
 							b.logger.Debug("write retryable error", slog.Int("retry", retries), slog.Any("err", err))
-							continue
+							continue writeAttempt
 						}
-						b.logger.Error("write retry limit reached", slog.Int("retries", retries), slog.Any("err", err))
-						b.cancel()
-						return
+						b.logger.Error("write retry limit reached; dropping frame", slog.Int("retries", retries), slog.Any("err", err))
+						break writeAttempt
 					}
 					b.logger.Error("write loop exit", slog.Any("err", err))
 					b.cancel()
@@ -212,7 +213,7 @@ func (b *Broker) writerLoop() <-chan struct{} {
 				}
 
 				b.resetKeepAliveTimerAfterSuccessfulWrite()
-				break
+				break writeAttempt
 			}
 		}
 	}()
