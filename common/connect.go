@@ -245,7 +245,7 @@ func Connect(p ConnectParams) (*Session, error) {
 		}
 	} else {
 		if len(devs) > 1 {
-			l.Warn("multiple devices found; picking the first (override with --serial)", slog.Any("serials", alts))
+			l.Warn("multiple devices found; picking the first (override with --device)", slog.Any("serials", alts))
 		}
 		chosen = devs[0]
 		chosenSerial, _ = chosen.SerialNumber()

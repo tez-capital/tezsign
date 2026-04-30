@@ -27,6 +27,7 @@ type benchmarkConfig struct {
 	warmup           int
 	kind             string
 	pass             string
+	device           string
 	keyID            string
 	keyID2           string
 	mode             string
@@ -96,6 +97,7 @@ func main() {
 		"samples", cfg.samples,
 		"warmup", cfg.warmup,
 		"kind", cfg.kind,
+		"device", cfg.device,
 		"key_id", cfg.keyID,
 		"key_id_2", cfg.keyID2,
 		"mode", cfg.mode,
@@ -104,7 +106,7 @@ func main() {
 		"cleanup", cfg.cleanup,
 	)
 
-	mgmtSession, signSession, err := connectBenchmarkSessions(l, "")
+	mgmtSession, signSession, err := connectBenchmarkSessions(l, cfg.device)
 	if err != nil {
 		l.Error("connect", slog.Any("err", err))
 		os.Exit(1)
@@ -297,6 +299,7 @@ func parseConfig() benchmarkConfig {
 	flag.IntVar(&cfg.warmup, "warmup", 50, "number of warmup sign requests per kind")
 	flag.StringVar(&cfg.kind, "kind", "all", "kind to benchmark: block, preattestation, attestation, or all")
 	flag.StringVar(&cfg.pass, "pass", "", "master password used for init/unlock; falls back to TEZSIGN_BENCH_PASS or an interactive prompt")
+	flag.StringVar(&cfg.device, "device", "", "target device serial; if empty, auto-select the first available device")
 	flag.StringVar(&cfg.keyID, "key", "", "existing key id to reuse; if empty a fresh benchmark key is created")
 	flag.StringVar(&cfg.keyID2, "key2", "", "second existing key id for -mode real-life; if empty a fresh key is created")
 	flag.StringVar(&cfg.mode, "mode", "latency", "benchmark mode: latency or real-life")
@@ -719,6 +722,19 @@ func signWithReconnect(
 		return time.Since(t0), false, fmt.Errorf("reconnect failed: %w", recErr)
 	}
 	logDisconnectSnapshot(l, kind, attempt, "after_reconnect")
+	if err := verifyPersistedLastSignedHWM(l, kind, phase, index, attempt); err != nil {
+		return time.Since(t0), true, err
+	}
+	l.Info("-------------------------")
+	l.Info("HWM PERSISTED ON RECONNECT",
+		slog.String("kind", kind),
+		slog.String("phase", phase),
+		slog.Int("index", index),
+		slog.String("key", attempt.keyID),
+		slog.Uint64("benchmark_last_signed_level", attempt.benchmarkLastSignedLevel),
+		slog.Int("benchmark_last_signed_round", int(attempt.benchmarkLastSignedRound)),
+	)
+	l.Info("-------------------------")
 
 	t1 := time.Now()
 	_, err = common.ReqSign(getSignBroker(), tz4, payload)
@@ -755,6 +771,52 @@ func logDisconnectSnapshot(l *slog.Logger, kind string, attempt signAttemptState
 		slog.Uint64("storage_hwm_level", storageLevel),
 		slog.Int("storage_hwm_round", int(storageRound)),
 	)
+}
+
+func verifyPersistedLastSignedHWM(
+	l *slog.Logger,
+	kind string,
+	phase string,
+	index int,
+	attempt signAttemptState,
+) error {
+	if attempt.readStorageHWM == nil || attempt.keyID == "" || attempt.benchmarkLastSignedLevel == 0 {
+		return nil
+	}
+
+	storageLevel, storageRound, err := attempt.readStorageHWM()
+	if err != nil {
+		return fmt.Errorf("read storage hwm after reconnect: %w", err)
+	}
+
+	if watermarkLess(storageLevel, storageRound, attempt.benchmarkLastSignedLevel, attempt.benchmarkLastSignedRound) {
+		l.Error("persisted hwm is behind last successful sign after reconnect",
+			slog.String("kind", kind),
+			slog.String("phase", phase),
+			slog.Int("index", index),
+			slog.String("key", attempt.keyID),
+			slog.Uint64("benchmark_last_signed_level", attempt.benchmarkLastSignedLevel),
+			slog.Int("benchmark_last_signed_round", int(attempt.benchmarkLastSignedRound)),
+			slog.Uint64("storage_hwm_level", storageLevel),
+			slog.Int("storage_hwm_round", int(storageRound)),
+		)
+		return fmt.Errorf(
+			"persisted hwm regressed after reconnect: storage (%d,%d) < benchmark_last_signed (%d,%d)",
+			storageLevel,
+			storageRound,
+			attempt.benchmarkLastSignedLevel,
+			attempt.benchmarkLastSignedRound,
+		)
+	}
+
+	return nil
+}
+
+func watermarkLess(levelA uint64, roundA uint32, levelB uint64, roundB uint32) bool {
+	if levelA != levelB {
+		return levelA < levelB
+	}
+	return roundA < roundB
 }
 
 func isReconnectableSignError(err error) bool {
