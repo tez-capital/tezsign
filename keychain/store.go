@@ -480,6 +480,7 @@ func (fs *FileStore) WriteSeed(masterPassword []byte, enabled bool) error {
 	defer secure.MemoryWipe(kek)
 
 	seed := randBytes(32)
+	defer secure.MemoryWipe(seed)
 
 	nonce := randBytes(12)
 	gcm, err := newAESGCM(kek)
