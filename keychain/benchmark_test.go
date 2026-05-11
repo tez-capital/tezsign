@@ -73,7 +73,13 @@ func BenchmarkStatePersist(b *testing.B) {
 		state := key.keyStateSnapshot()
 		file := key.hwmFile
 		seq := key.hwmSeq
-		dek := append([]byte(nil), key.dek...)
+		var dek []byte
+		if err := key.withDEK(func(plainDEK []byte) error {
+			dek = append([]byte(nil), plainDEK...)
+			return nil
+		}); err != nil {
+			b.Fatalf("withDEK: %v", err)
+		}
 		tz4 := key.tz4
 		unlock()
 		defer secure.MemoryWipe(dek)
