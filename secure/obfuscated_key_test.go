@@ -6,7 +6,7 @@ import (
 )
 
 func TestObfuscatedKeyWithPlaintext(t *testing.T) {
-	key := []byte("0123456789abcdef0123456789abcdef")
+	key := [32]byte([]byte("0123456789abcdef0123456789abcdef"))
 
 	obfuscated, err := NewObfuscatedKey(key)
 	if err != nil {
@@ -14,8 +14,8 @@ func TestObfuscatedKeyWithPlaintext(t *testing.T) {
 	}
 	defer obfuscated.Clear()
 
-	if err := obfuscated.WithPlaintext(func(plain []byte) error {
-		if !bytes.Equal(plain, key) {
+	if err := obfuscated.WithPlaintext(func(plain *[32]byte) error {
+		if !bytes.Equal(plain[:], key[:]) {
 			t.Fatalf("plain mismatch")
 		}
 		return nil
@@ -25,22 +25,30 @@ func TestObfuscatedKeyWithPlaintext(t *testing.T) {
 }
 
 func TestObfuscatedKeyClear(t *testing.T) {
-	key := []byte("0123456789abcdef0123456789abcdef")
+	key := [32]byte([]byte("0123456789abcdef0123456789abcdef"))
 
 	obfuscated, err := NewObfuscatedKey(key)
 	if err != nil {
 		t.Fatalf("NewObfuscatedKey: %v", err)
 	}
 
+	bufferA := obfuscated.bufferA
+	bufferB := obfuscated.bufferB
 	obfuscated.Clear()
 
-	if !allZero(obfuscated.obfuscated[:]) {
-		t.Fatalf("obfuscated buffer not cleared")
+	if !allZero(bufferA) {
+		t.Fatalf("bufferA not cleared")
 	}
-	if !allZero(obfuscated.xorPad[:]) {
-		t.Fatalf("xor pad buffer not cleared")
+	if !allZero(bufferB) {
+		t.Fatalf("bufferB not cleared")
 	}
-	if obfuscated.keyOffset != 0 || obfuscated.padOffset != 0 {
+	if obfuscated.bufferA != nil {
+		t.Fatalf("bufferA reference not cleared")
+	}
+	if obfuscated.bufferB != nil {
+		t.Fatalf("bufferB reference not cleared")
+	}
+	if obfuscated.headA != 0 || obfuscated.headB != 0 {
 		t.Fatalf("metadata not cleared")
 	}
 }

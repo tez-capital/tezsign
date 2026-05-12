@@ -75,9 +75,9 @@ type gKey struct {
 	mu sync.Mutex // per-key lock
 
 	// in-memory working material (present only while "unlocked")
-	dek       *secure.ObfuscatedKey // 32B per-key data encryption key, obfuscated in memory
-	encSecret []byte                // ciphertext of 32B LE scalar (AES-GCM with DEK)
-	dataNonce []byte                // 12B AES-GCM nonce for encSecret
+	dek       *secure.ObfuscatedState // 32B per-key data encryption key, obfuscated in memory
+	encSecret []byte                  // ciphertext of 32B LE scalar (AES-GCM with DEK)
+	dataNonce []byte                  // 12B AES-GCM nonce for encSecret
 
 	// AAD binding (needed at decrypt time to authenticate metadata)
 	blPubkey string
@@ -143,7 +143,10 @@ func (k *gKey) unlock(log *slog.Logger, store *FileStore, id string, masterPassw
 		}
 		return fmt.Errorf("load state: %w", err)
 	}
-	obfuscatedDEK, err := secure.NewObfuscatedKey(dek)
+	var dek32 [32]byte
+	copy(dek32[:], dek)
+	defer secure.MemoryWipe(dek32[:])
+	obfuscatedDEK, err := secure.NewObfuscatedKey(dek32)
 	if err != nil {
 		hwmFile.Close()
 		return fmt.Errorf("load state: obfuscate DEK: %w", err)
@@ -271,10 +274,10 @@ func (k *gKey) signAndUpdate(keyID string, raw []byte) ([]byte, error) {
 	nextSeq := k.hwmSeq + 1
 
 	var le []byte
-	if err := k.withDEK(func(dek []byte) error {
-		k.hwmFile.persistAsync(dek, keyID, k.tz4, nextState, nextSeq)
+	if err := k.withDEK(func(dek *[32]byte) error {
+		k.hwmFile.persistAsync(dek[:], keyID, k.tz4, nextState, nextSeq)
 
-		gcmDEK, err := newAESGCM(dek)
+		gcmDEK, err := newAESGCM(dek[:])
 		if err != nil {
 			return err
 		}
@@ -340,8 +343,8 @@ func (k *gKey) setLevel(id string, level uint64) error {
 	}
 	nextSeq := k.hwmSeq + 1
 
-	if err := k.withDEK(func(dek []byte) error {
-		return k.hwmFile.persist(dek, id, k.tz4, nextState, nextSeq)
+	if err := k.withDEK(func(dek *[32]byte) error {
+		return k.hwmFile.persist(dek[:], id, k.tz4, nextState, nextSeq)
 	}); err != nil {
 		return err
 	}
@@ -391,7 +394,7 @@ func (k *gKey) isUnlocked() bool {
 	return k.dek != nil && k.encSecret != nil && k.dataNonce != nil && k.hwmFile != nil
 }
 
-func (k *gKey) withDEK(fn func([]byte) error) error {
+func (k *gKey) withDEK(fn func(*[32]byte) error) error {
 	if k.dek == nil {
 		return ErrKeyLocked
 	}
@@ -405,9 +408,9 @@ func (k *gKey) loadHWMWithDEK(id string) (*KeyState, uint64, bool, bool, error) 
 		missing   bool
 		corrupted bool
 	)
-	err := k.withDEK(func(dek []byte) error {
+	err := k.withDEK(func(dek *[32]byte) error {
 		var err error
-		ks, seq, missing, corrupted, err = k.hwmFile.load(dek, id, k.tz4)
+		ks, seq, missing, corrupted, err = k.hwmFile.load(dek[:], id, k.tz4)
 		return err
 	})
 	return ks, seq, missing, corrupted, err

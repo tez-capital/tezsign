@@ -8,55 +8,81 @@ import (
 )
 
 const (
-	obfuscatedKeyBufferSize = 1024
-	obfuscatedKeyLength     = 32
+	obfuscatedKeyMinBufferSize = 800
+	obfuscatedKeySizeJitter    = 400
+	obfuscatedKeyLength        = 32
 )
 
-// ObfuscatedKey stores short key material split across two random 1 KiB buffers.
+// ObfuscatedState stores a 32-byte key split across two random-sized haystacks.
 // One buffer contains key bytes XORed with a pad; the other contains the pad.
-type ObfuscatedKey struct {
-	obfuscated [obfuscatedKeyBufferSize]byte
-	xorPad     [obfuscatedKeyBufferSize]byte
-	keyOffset  int
-	padOffset  int
+type ObfuscatedState struct {
+	bufferA []byte
+	bufferB []byte
+	headA   uintptr // offset into bufferA; not a raw memory address
+	headB   uintptr // offset into bufferB; not a raw memory address
 }
 
-func NewObfuscatedKey(key []byte) (*ObfuscatedKey, error) {
-	if len(key) != obfuscatedKeyLength {
-		return nil, fmt.Errorf("invalid key length %d", len(key))
-	}
-
-	k := &ObfuscatedKey{}
-	if _, err := io.ReadFull(crypto_rand.Reader, k.obfuscated[:]); err != nil {
+func NewObfuscatedKey(key [obfuscatedKeyLength]byte) (*ObfuscatedState, error) {
+	sizeA, err := randomBufferSize()
+	if err != nil {
 		return nil, err
 	}
-	if _, err := io.ReadFull(crypto_rand.Reader, k.xorPad[:]); err != nil {
+	sizeB, err := randomBufferSize()
+	if err != nil {
+		return nil, err
+	}
+
+	k := &ObfuscatedState{
+		bufferA: make([]byte, sizeA),
+		bufferB: make([]byte, sizeB),
+	}
+	if _, err := io.ReadFull(crypto_rand.Reader, k.bufferA); err != nil {
+		k.Clear()
+		return nil, err
+	}
+	if _, err := io.ReadFull(crypto_rand.Reader, k.bufferB); err != nil {
 		k.Clear()
 		return nil, err
 	}
 
-	keyOffset, err := randomOffset()
+	headA, err := randomOffset(sizeA)
 	if err != nil {
 		k.Clear()
 		return nil, err
 	}
-	padOffset, err := randomOffset()
+	headB, err := randomOffset(sizeB)
 	if err != nil {
 		k.Clear()
 		return nil, err
 	}
 
-	k.keyOffset = keyOffset
-	k.padOffset = padOffset
+	k.headA = headA
+	k.headB = headB
 	for i := range key {
-		k.obfuscated[k.keyOffset+i] = key[i] ^ k.xorPad[k.padOffset+i]
+		k.bufferA[int(k.headA)+i] = k.bufferB[int(k.headB)+i] ^ key[i]
 	}
 
 	return k, nil
 }
 
-func randomOffset() (int, error) {
-	limit := obfuscatedKeyBufferSize - obfuscatedKeyLength + 1
+func randomBufferSize() (int, error) {
+	n, err := randomInt(obfuscatedKeySizeJitter)
+	if err != nil {
+		return 0, err
+	}
+	return obfuscatedKeyMinBufferSize + n, nil
+}
+
+func randomOffset(bufferSize int) (uintptr, error) {
+	limit := bufferSize - obfuscatedKeyLength + 1
+	n, err := randomInt(limit)
+	if err != nil {
+		return 0, err
+	}
+	return uintptr(n), nil
+}
+
+func randomInt(limit int) (int, error) {
 	n, err := crypto_rand.Int(crypto_rand.Reader, big.NewInt(int64(limit)))
 	if err != nil {
 		return 0, err
@@ -64,26 +90,28 @@ func randomOffset() (int, error) {
 	return int(n.Int64()), nil
 }
 
-func (k *ObfuscatedKey) WithPlaintext(fn func([]byte) error) error {
+func (k *ObfuscatedState) WithPlaintext(fn func(*[obfuscatedKeyLength]byte) error) error {
 	if k == nil {
 		return fmt.Errorf("missing obfuscated key")
 	}
 
-	plain := make([]byte, obfuscatedKeyLength)
-	defer MemoryWipe(plain)
+	var plain [obfuscatedKeyLength]byte
+	defer MemoryWipe(plain[:])
 	for i := range plain {
-		plain[i] = k.obfuscated[k.keyOffset+i] ^ k.xorPad[k.padOffset+i]
+		plain[i] = k.bufferA[int(k.headA)+i] ^ k.bufferB[int(k.headB)+i]
 	}
 
-	return fn(plain)
+	return fn(&plain)
 }
 
-func (k *ObfuscatedKey) Clear() {
+func (k *ObfuscatedState) Clear() {
 	if k == nil {
 		return
 	}
-	MemoryWipe(k.obfuscated[:])
-	MemoryWipe(k.xorPad[:])
-	k.keyOffset = 0
-	k.padOffset = 0
+	MemoryWipe(k.bufferA)
+	MemoryWipe(k.bufferB)
+	k.bufferA = nil
+	k.bufferB = nil
+	k.headA = 0
+	k.headB = 0
 }

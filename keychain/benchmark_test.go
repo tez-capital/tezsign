@@ -74,8 +74,8 @@ func BenchmarkStatePersist(b *testing.B) {
 		file := key.hwmFile
 		seq := key.hwmSeq
 		var dek []byte
-		if err := key.withDEK(func(plainDEK []byte) error {
-			dek = append([]byte(nil), plainDEK...)
+		if err := key.withDEK(func(plainDEK *[32]byte) error {
+			dek = append([]byte(nil), plainDEK[:]...)
 			return nil
 		}); err != nil {
 			b.Fatalf("withDEK: %v", err)
