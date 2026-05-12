@@ -7,7 +7,10 @@ import (
 	"math/big"
 )
 
-const obfuscatedKeyBufferSize = 1024
+const (
+	obfuscatedKeyBufferSize = 1024
+	obfuscatedKeyLength     = 32
+)
 
 // ObfuscatedKey stores short key material split across two random 1 KiB buffers.
 // One buffer contains key bytes XORed with a pad; the other contains the pad.
@@ -16,18 +19,14 @@ type ObfuscatedKey struct {
 	xorPad     [obfuscatedKeyBufferSize]byte
 	keyOffset  int
 	padOffset  int
-	length     int
 }
 
 func NewObfuscatedKey(key []byte) (*ObfuscatedKey, error) {
-	if len(key) == 0 {
-		return nil, fmt.Errorf("empty key")
-	}
-	if len(key) > obfuscatedKeyBufferSize {
-		return nil, fmt.Errorf("key too large for obfuscated storage")
+	if len(key) != obfuscatedKeyLength {
+		return nil, fmt.Errorf("invalid key length %d", len(key))
 	}
 
-	k := &ObfuscatedKey{length: len(key)}
+	k := &ObfuscatedKey{}
 	if _, err := io.ReadFull(crypto_rand.Reader, k.obfuscated[:]); err != nil {
 		return nil, err
 	}
@@ -36,12 +35,12 @@ func NewObfuscatedKey(key []byte) (*ObfuscatedKey, error) {
 		return nil, err
 	}
 
-	keyOffset, err := randomOffset(len(key))
+	keyOffset, err := randomOffset()
 	if err != nil {
 		k.Clear()
 		return nil, err
 	}
-	padOffset, err := randomOffset(len(key))
+	padOffset, err := randomOffset()
 	if err != nil {
 		k.Clear()
 		return nil, err
@@ -56,8 +55,8 @@ func NewObfuscatedKey(key []byte) (*ObfuscatedKey, error) {
 	return k, nil
 }
 
-func randomOffset(length int) (int, error) {
-	limit := obfuscatedKeyBufferSize - length + 1
+func randomOffset() (int, error) {
+	limit := obfuscatedKeyBufferSize - obfuscatedKeyLength + 1
 	n, err := crypto_rand.Int(crypto_rand.Reader, big.NewInt(int64(limit)))
 	if err != nil {
 		return 0, err
@@ -70,7 +69,7 @@ func (k *ObfuscatedKey) WithPlaintext(fn func([]byte) error) error {
 		return fmt.Errorf("missing obfuscated key")
 	}
 
-	plain := make([]byte, k.length)
+	plain := make([]byte, obfuscatedKeyLength)
 	defer MemoryWipe(plain)
 	for i := range plain {
 		plain[i] = k.obfuscated[k.keyOffset+i] ^ k.xorPad[k.padOffset+i]
@@ -87,5 +86,4 @@ func (k *ObfuscatedKey) Clear() {
 	MemoryWipe(k.xorPad[:])
 	k.keyOffset = 0
 	k.padOffset = 0
-	k.length = 0
 }

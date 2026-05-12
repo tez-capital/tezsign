@@ -40,7 +40,7 @@ func TestObfuscatedKeyClear(t *testing.T) {
 	if !allZero(obfuscated.xorPad[:]) {
 		t.Fatalf("xor pad buffer not cleared")
 	}
-	if obfuscated.length != 0 || obfuscated.keyOffset != 0 || obfuscated.padOffset != 0 {
+	if obfuscated.keyOffset != 0 || obfuscated.padOffset != 0 {
 		t.Fatalf("metadata not cleared")
 	}
 }
