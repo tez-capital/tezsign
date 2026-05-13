@@ -407,14 +407,11 @@ func (file *keyHWMFile) worker(nextSlot int) {
 			if !ok {
 				return
 			}
-			dek := req.dek
 			var slot [keyStateSlotSize]byte
-			if err := encodeKeyStateSlot(slot[:], dek, req.id, req.tz4, req.ks, req.seq); err != nil {
-				secure.MemoryWipe(dek)
+			if err := encodeKeyStateSlot(slot[:], req.dek, req.id, req.tz4, req.ks, req.seq); err != nil {
 				file.respCh <- err
 				continue
 			}
-			secure.MemoryWipe(dek)
 			offset := int64(nextSlot) * keyStateSlotSize
 			_, err := file.file.WriteAt(slot[:], offset)
 			file.respCh <- err
@@ -455,8 +452,7 @@ func chooseNextKeyHWMFileSlot(reader io.ReaderAt, dek []byte, id, tz4 string) in
 }
 
 func (file *keyHWMFile) persistAsync(dek []byte, id, tz4 string, ks *KeyState, seq uint64) {
-	dekCopy := append([]byte(nil), dek...)
-	file.workCh <- keyHWMWriteRequest{dek: dekCopy, id: id, tz4: tz4, ks: ks, seq: seq}
+	file.workCh <- keyHWMWriteRequest{dek: dek, id: id, tz4: tz4, ks: ks, seq: seq}
 }
 
 func (file *keyHWMFile) waitPersist() error {

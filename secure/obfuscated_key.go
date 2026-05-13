@@ -13,16 +13,16 @@ const (
 	obfuscatedKeyLength        = 32
 )
 
-// ObfuscatedState stores a 32-byte key split across two random-sized haystacks.
+// State stores a 32-byte key split across two random-sized haystacks.
 // One buffer contains key bytes XORed with a pad; the other contains the pad.
-type ObfuscatedState struct {
+type State struct {
 	bufferA []byte
 	bufferB []byte
 	headA   uintptr // offset into bufferA; not a raw memory address
 	headB   uintptr // offset into bufferB; not a raw memory address
 }
 
-func NewObfuscatedKey(key [obfuscatedKeyLength]byte) (*ObfuscatedState, error) {
+func NewObfuscatedKey(key [obfuscatedKeyLength]byte) (*State, error) {
 	sizeA, err := randomBufferSize()
 	if err != nil {
 		return nil, err
@@ -32,7 +32,7 @@ func NewObfuscatedKey(key [obfuscatedKeyLength]byte) (*ObfuscatedState, error) {
 		return nil, err
 	}
 
-	k := &ObfuscatedState{
+	k := &State{
 		bufferA: make([]byte, sizeA),
 		bufferB: make([]byte, sizeB),
 	}
@@ -91,13 +91,13 @@ func randomInt(limit int) (int, error) {
 }
 
 func isValidObfuscatedBuffer(head int, buffer []byte) bool {
-	if buffer == nil || len(buffer) < obfuscatedKeyLength {
+	if len(buffer) < obfuscatedKeyLength {
 		return false
 	}
 	return head >= 0 && head <= len(buffer)-obfuscatedKeyLength
 }
 
-func (k *ObfuscatedState) WithPlaintext(fn func(*[obfuscatedKeyLength]byte) error) error {
+func (k *State) WithPlaintext(fn func(*[obfuscatedKeyLength]byte) error) error {
 	if k == nil {
 		return fmt.Errorf("missing obfuscated key")
 	}
@@ -115,7 +115,7 @@ func (k *ObfuscatedState) WithPlaintext(fn func(*[obfuscatedKeyLength]byte) erro
 	return fn(&plain)
 }
 
-func (k *ObfuscatedState) Clear() {
+func (k *State) Clear() {
 	if k == nil {
 		return
 	}

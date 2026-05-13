@@ -75,9 +75,9 @@ type gKey struct {
 	mu sync.Mutex // per-key lock
 
 	// in-memory working material (present only while "unlocked")
-	dek       *secure.ObfuscatedState // 32B per-key data encryption key, obfuscated in memory
-	encSecret []byte                  // ciphertext of 32B LE scalar (AES-GCM with DEK)
-	dataNonce []byte                  // 12B AES-GCM nonce for encSecret
+	dek       *secure.State // 32B per-key data encryption key, obfuscated in memory
+	encSecret []byte        // ciphertext of 32B LE scalar (AES-GCM with DEK)
+	dataNonce []byte        // 12B AES-GCM nonce for encSecret
 
 	// AAD binding (needed at decrypt time to authenticate metadata)
 	blPubkey string
@@ -255,7 +255,7 @@ func (k *gKey) signAndUpdate(keyID string, raw []byte) ([]byte, error) {
 		return nil, ErrKeyLocked
 	}
 	if k.hwmFile == nil {
-		return nil, fmt.Errorf("high-watermark file is not open")
+		return nil, ErrHighWatermarkFileIsNotOpen
 	}
 	if k.hwmCorrupted {
 		return nil, ErrKeyStateCorrupted
@@ -274,35 +274,38 @@ func (k *gKey) signAndUpdate(keyID string, raw []byte) ([]byte, error) {
 	nextSeq := k.hwmSeq + 1
 
 	var le []byte
-	if err := k.withDEK(func(dek *[32]byte) error {
-		k.hwmFile.persistAsync(dek[:], keyID, k.tz4, nextState, nextSeq)
+	defer secure.MemoryWipe(le)
+	var dek [32]byte
+	defer secure.MemoryWipe(dek[:])
 
-		gcmDEK, err := newAESGCM(dek[:])
-		if err != nil {
-			return err
-		}
-		aad := []byte("bl=" + k.blPubkey + "|tz4=" + k.tz4)
-
-		le, err = gcmDEK.Open(nil, k.dataNonce, k.encSecret, aad)
-		if err != nil {
-			return fmt.Errorf("corrupted key (secret)")
-		}
+	if err := k.withDEK(func(unobfuscatedDek *[32]byte) error {
+		// we need to copy key out so it wont get cleared during async persist
+		copy(dek[:], unobfuscatedDek[:])
 		return nil
 	}); err != nil {
 		return nil, err
 	}
 
+	k.hwmFile.persistAsync(dek[:], keyID, k.tz4, nextState, nextSeq)
+	gcmDEK, err := newAESGCM(dek[:])
+	if err != nil {
+		return nil, err
+	}
+	aad := []byte("bl=" + k.blPubkey + "|tz4=" + k.tz4)
+	le, err = gcmDEK.Open(nil, k.dataNonce, k.encSecret, aad)
+	if err != nil {
+		return nil, ErrCorruptedSecretKey
+	}
 	if len(le) != 32 {
-		secure.MemoryWipe(le)
 		return nil, fmt.Errorf("secret length invalid")
 	}
+
 	var sk signer.SecretKey
 	if sk.FromLEndian(le) == nil {
-		secure.MemoryWipe(le)
 		return nil, fmt.Errorf("invalid scalar")
 	}
+
 	sig, _ := signer.SignCompressed(&sk, signBytes)
-	secure.MemoryWipe(le)
 	sk.Zeroize()
 
 	if err := k.hwmFile.waitPersist(); err != nil {

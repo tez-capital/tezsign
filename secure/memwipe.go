@@ -1,7 +1,6 @@
 package secure
 
 import (
-	"runtime"
 	unsafe "unsafe"
 )
 
@@ -18,5 +17,4 @@ func MemoryWipe(b []byte) {
 	}
 
 	memclrNoHeapPointers(unsafe.Pointer(&b[0]), uintptr(len(b)))
-	runtime.KeepAlive(b)
 }
