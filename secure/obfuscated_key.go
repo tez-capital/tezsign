@@ -94,14 +94,16 @@ func (k *ObfuscatedState) WithPlaintext(fn func(*[obfuscatedKeyLength]byte) erro
 	if k == nil {
 		return fmt.Errorf("missing obfuscated key")
 	}
-	if len(k.bufferA) < int(k.headA)+obfuscatedKeyLength || len(k.bufferB) < int(k.headB)+obfuscatedKeyLength {
+	headA, headB := int(k.headA), int(k.headB)
+	if headA < 0 || len(k.bufferA) < obfuscatedKeyLength || headA > len(k.bufferA)-obfuscatedKeyLength ||
+		headB < 0 || len(k.bufferB) < obfuscatedKeyLength || headB > len(k.bufferB)-obfuscatedKeyLength {
 		return fmt.Errorf("obfuscated key has been cleared or is invalid")
 	}
 
 	var plain [obfuscatedKeyLength]byte
 	defer MemoryWipe(plain[:])
 	for i := range plain {
-		plain[i] = k.bufferA[int(k.headA)+i] ^ k.bufferB[int(k.headB)+i]
+		plain[i] = k.bufferA[headA+i] ^ k.bufferB[headB+i]
 	}
 
 	return fn(&plain)
