@@ -149,10 +149,10 @@ func deriveChildSK(parent *blst.SecretKey, index uint32, params hdParams) (*blst
 
 	ikm := make([]byte, 0, 36)
 	ikm = append(ikm, be...)
-	defer secure.MemoryWipe(ikm)
 	var idx [4]byte
 	binary.BigEndian.PutUint32(idx[:], index)
 	ikm = append(ikm, idx[:]...)
+	defer secure.MemoryWipe(ikm)
 
 	return hkdfModR(ikm, params)
 }

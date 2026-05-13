@@ -274,28 +274,27 @@ func (k *gKey) signAndUpdate(keyID string, raw []byte) ([]byte, error) {
 	nextSeq := k.hwmSeq + 1
 
 	var le []byte
-	defer secure.MemoryWipe(le)
-	var dek [32]byte
-	defer secure.MemoryWipe(dek[:])
+	defer func() {
+		secure.MemoryWipe(le)
+	}()
 
-	if err := k.withDEK(func(unobfuscatedDek *[32]byte) error {
-		// we need to copy key out so it wont get cleared during async persist
-		copy(dek[:], unobfuscatedDek[:])
+	if err := k.withDEK(func(dek *[32]byte) error {
+		k.hwmFile.persistAsync(dek[:], keyID, k.tz4, nextState, nextSeq)
+
+		gcmDEK, err := newAESGCM(dek[:])
+		if err != nil {
+			return err
+		}
+		aad := []byte("bl=" + k.blPubkey + "|tz4=" + k.tz4)
+		le, err = gcmDEK.Open(nil, k.dataNonce, k.encSecret, aad)
+		if err != nil {
+			return ErrCorruptedSecretKey
+		}
 		return nil
 	}); err != nil {
 		return nil, err
 	}
 
-	k.hwmFile.persistAsync(dek[:], keyID, k.tz4, nextState, nextSeq)
-	gcmDEK, err := newAESGCM(dek[:])
-	if err != nil {
-		return nil, err
-	}
-	aad := []byte("bl=" + k.blPubkey + "|tz4=" + k.tz4)
-	le, err = gcmDEK.Open(nil, k.dataNonce, k.encSecret, aad)
-	if err != nil {
-		return nil, ErrCorruptedSecretKey
-	}
 	if len(le) != 32 {
 		return nil, fmt.Errorf("secret length invalid")
 	}
