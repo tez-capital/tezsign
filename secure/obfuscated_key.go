@@ -91,7 +91,10 @@ func randomInt(limit int) (int, error) {
 }
 
 func isValidObfuscatedBuffer(head int, buffer []byte) bool {
-	return head >= 0 && len(buffer) >= obfuscatedKeyLength && head <= len(buffer)-obfuscatedKeyLength
+	if buffer == nil || len(buffer) < obfuscatedKeyLength {
+		return false
+	}
+	return head >= 0 && head <= len(buffer)-obfuscatedKeyLength
 }
 
 func (k *ObfuscatedState) WithPlaintext(fn func(*[obfuscatedKeyLength]byte) error) error {
