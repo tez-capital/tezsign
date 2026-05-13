@@ -94,6 +94,9 @@ func (k *ObfuscatedState) WithPlaintext(fn func(*[obfuscatedKeyLength]byte) erro
 	if k == nil {
 		return fmt.Errorf("missing obfuscated key")
 	}
+	if len(k.bufferA) < int(k.headA)+obfuscatedKeyLength || len(k.bufferB) < int(k.headB)+obfuscatedKeyLength {
+		return fmt.Errorf("obfuscated key has been cleared or is invalid")
+	}
 
 	var plain [obfuscatedKeyLength]byte
 	defer MemoryWipe(plain[:])
