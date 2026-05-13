@@ -90,13 +90,16 @@ func randomInt(limit int) (int, error) {
 	return int(n.Int64()), nil
 }
 
+func isValidObfuscatedBuffer(head int, buffer []byte) bool {
+	return head >= 0 && len(buffer) >= obfuscatedKeyLength && head <= len(buffer)-obfuscatedKeyLength
+}
+
 func (k *ObfuscatedState) WithPlaintext(fn func(*[obfuscatedKeyLength]byte) error) error {
 	if k == nil {
 		return fmt.Errorf("missing obfuscated key")
 	}
 	headA, headB := int(k.headA), int(k.headB)
-	if headA < 0 || len(k.bufferA) < obfuscatedKeyLength || headA > len(k.bufferA)-obfuscatedKeyLength ||
-		headB < 0 || len(k.bufferB) < obfuscatedKeyLength || headB > len(k.bufferB)-obfuscatedKeyLength {
+	if !isValidObfuscatedBuffer(headA, k.bufferA) || !isValidObfuscatedBuffer(headB, k.bufferB) {
 		return fmt.Errorf("obfuscated key has been cleared or is invalid")
 	}
 
