@@ -153,7 +153,11 @@ func TestDoubleBufferRecoversFromCorruptedSecondSlot(t *testing.T) {
 	if gotSeq != 3 {
 		t.Fatalf("expected seq=3, got %d", gotSeq)
 	}
-	assertKeyStateEqual(t, got, want)
+	assertKeyStateEqual(t, got, map[SIGN_KIND]HighWatermark{
+		BLOCK:          {level: 12, round: 0},
+		PREATTESTATION: {level: 13, round: 0},
+		ATTESTATION:    {level: 14, round: 0},
+	})
 }
 
 func TestDoubleBufferPrefersNewerSequence(t *testing.T) {

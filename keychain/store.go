@@ -34,6 +34,8 @@ var (
 	ErrKeyExists                    = errors.New("key_id already exists")
 	ErrMasterJSONAlreadyInitialized = errors.New("master json already initialized")
 	ErrKeyStateCorrupted            = errors.New("state corrupted")
+	ErrHighWatermarkFileIsNotOpen   = errors.New("high-watermark file is not open")
+	ErrCorruptedSecretKey           = errors.New("corrupted secret key")
 )
 
 type FileStore struct {
@@ -480,6 +482,7 @@ func (fs *FileStore) WriteSeed(masterPassword []byte, enabled bool) error {
 	defer secure.MemoryWipe(kek)
 
 	seed := randBytes(32)
+	defer secure.MemoryWipe(seed)
 
 	nonce := randBytes(12)
 	gcm, err := newAESGCM(kek)

@@ -8,6 +8,8 @@ import (
 	"hash"
 	"math/big"
 
+	"github.com/tez-capital/tezsign/secure"
+
 	blst "github.com/supranational/blst/bindings/go"
 )
 
@@ -137,17 +139,20 @@ func deriveChildSK(parent *blst.SecretKey, index uint32, params hdParams) (*blst
 	// Try to get parent scalar as big-endian 32 bytes.
 	// The Go blst binding reliably exposes LE; fall back via LE->BE conversion when needed.
 	le := parent.ToLEndian()
+	defer secure.MemoryWipe(le)
 	if len(le) != 32 {
 		return nil, errParentScalarSizeInvalid
 	}
 	// LE->BE
 	be := beToLE32(le)
+	defer secure.MemoryWipe(be)
 
 	ikm := make([]byte, 0, 36)
 	ikm = append(ikm, be...)
 	var idx [4]byte
 	binary.BigEndian.PutUint32(idx[:], index)
 	ikm = append(ikm, idx[:]...)
+	defer secure.MemoryWipe(ikm)
 
 	return hkdfModR(ikm, params)
 }
@@ -160,7 +165,11 @@ func derivePathSK(master *blst.SecretKey, path []uint32, params hdParams) (*blst
 	sk := master
 	var err error
 	for _, i := range path {
-		sk, err = deriveChildSK(sk, i, params)
+		parent := sk
+		sk, err = deriveChildSK(parent, i, params)
+		if parent != master {
+			parent.Zeroize()
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -177,6 +186,7 @@ func GenerateHDKey(masterSalt []byte, seed []byte, index uint32) (*blst.SecretKe
 	if err != nil {
 		return nil, nil, "", err
 	}
+	defer masterSK.Zeroize()
 	path := []uint32{12381, 1729, 0, 0, index}
 	childSK, err := derivePathSK(masterSK, path, params)
 	if err != nil {

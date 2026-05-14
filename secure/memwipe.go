@@ -1,6 +1,8 @@
 package secure
 
-import unsafe "unsafe"
+import (
+	unsafe "unsafe"
+)
 
 //go:linkname memclrNoHeapPointers runtime.memclrNoHeapPointers
 //go:noescape
@@ -16,4 +18,3 @@ func MemoryWipe(b []byte) {
 
 	memclrNoHeapPointers(unsafe.Pointer(&b[0]), uintptr(len(b)))
 }
-

@@ -137,9 +137,9 @@ func (kr *KeyRing) CreateKey(wanted string, masterPassword []byte) (id, blPubkey
 			secretKey, pubkeyBytes, blPubkey = signer.GenerateRandomKey()
 			tz4, _ = signer.Tz4FromBLPubkeyBytes(pubkeyBytes)
 		}
-
 		_, popBLsig, err = signer.SignPoPCompressed(secretKey, pubkeyBytes)
 		if err != nil {
+			secretKey.Zeroize()
 			return "", "", "", err
 		}
 
@@ -162,6 +162,7 @@ func (kr *KeyRing) CreateKey(wanted string, masterPassword []byte) (id, blPubkey
 
 			err = pErr
 		}()
+		secretKey.Zeroize()
 
 		if err != nil {
 			if id != "" {
