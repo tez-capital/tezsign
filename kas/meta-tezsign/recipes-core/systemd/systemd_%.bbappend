@@ -9,10 +9,18 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 SRC_URI_MUSL:remove = "file://0003-src-basic-missing.h-check-for-missing-strndupa.patch"
 SRC_URI_MUSL:append = " file://0003-src-basic-missing.h-check-for-missing-strndupa-no-net-id.patch"
 
-do_patch:append:libc-musl() {
-    if ! grep -q '#include "missing_stdlib.h"' ${S}/src/udev/udev-builtin-net_id.c; then
-        sed -i '/#include "udev-builtin.h"/a #include "missing_stdlib.h"' ${S}/src/udev/udev-builtin-net_id.c
-    fi
+python do_patch:append:libc-musl() {
+    from pathlib import Path
+
+    path = Path(d.getVar("S")) / "src/udev/udev-builtin-net_id.c"
+    include = '#include "missing_stdlib.h"'
+    anchor = '#include "udev-builtin.h"'
+    text = path.read_text()
+
+    if include not in text:
+        if anchor not in text:
+            bb.fatal(f"Could not add {include} to {path}: missing anchor {anchor}")
+        path.write_text(text.replace(anchor, f"{anchor}\n{include}", 1))
 }
 
 # Remove all default PACKAGECONFIG values and set only the bare minimum
