@@ -116,7 +116,6 @@ do_compile() {
 
 do_install[noexec] = "1"
 do_unpack[nostamp] = "1"
-do_deploy[depends] += "virtual/${TARGET_PREFIX}binutils:do_populate_sysroot"
 
 do_deploy() {
     install -d ${DEPLOYDIR}/appfs
