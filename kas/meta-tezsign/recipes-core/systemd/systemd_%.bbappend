@@ -1,6 +1,20 @@
 # Production images are fully headless; keep login/getty tooling only in dev builds.
 RDEPENDS:${PN}:remove = "${@bb.utils.contains('TEZSIGN_DEV', '1', '', 'shadow util-linux-agetty', d)}"
 
+FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
+
+# Poky's scarthgap musl strndupa patch can fail on udev-builtin-net_id.c
+# during GitHub clean builds. Keep the patch's other musl fixes and add the
+# net_id include idempotently below.
+SRC_URI_MUSL:remove = "file://0003-src-basic-missing.h-check-for-missing-strndupa.patch"
+SRC_URI_MUSL:append = " file://0003-src-basic-missing.h-check-for-missing-strndupa-no-net-id.patch"
+
+do_patch:append:libc-musl() {
+    if ! grep -q '#include "missing_stdlib.h"' ${S}/src/udev/udev-builtin-net_id.c; then
+        sed -i '/#include "udev-builtin.h"/a #include "missing_stdlib.h"' ${S}/src/udev/udev-builtin-net_id.c
+    fi
+}
+
 # Remove all default PACKAGECONFIG values and set only the bare minimum
 # kmod: Required for loading kernel modules (essential for many services)
 # logind: Basic session management (dev only)
