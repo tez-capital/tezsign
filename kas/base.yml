@@ -11,23 +11,23 @@ repos:
     layers: {}
   openembedded-core:
     url: https://git.openembedded.org/openembedded-core
-    branch: "scarthgap"
+    branch: "wrynose"
     layers:
       meta:
   meta-yocto:
     url: https://git.yoctoproject.org/meta-yocto
-    branch: "scarthgap"
+    branch: "wrynose"
     layers:
       meta-yocto-bsp:
   meta-arm:
     url: https://git.yoctoproject.org/meta-arm
-    branch: "scarthgap"
+    branch: "wrynose"
     layers:
       meta-arm:
       meta-arm-toolchain:
   meta-openembedded:
     url: https://github.com/openembedded/meta-openembedded.git
-    branch: "scarthgap"
+    branch: "wrynose"
     layers:
       meta-oe: # This is where 'dash' lives
       meta-python:

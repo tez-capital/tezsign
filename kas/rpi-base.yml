@@ -10,4 +10,4 @@ local_conf_header:
 repos:
   meta-raspberrypi:
     url: https://git.yoctoproject.org/meta-raspberrypi
-    branch: "scarthgap"
+    branch: "master"
