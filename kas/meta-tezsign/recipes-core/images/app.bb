@@ -39,7 +39,7 @@ TEZSIGN_GADGET_GOARM64:radxa-zero3-tezsign = "v8.2"
 TEZSIGN_GADGET_CGO_CFLAGS = ""
 TEZSIGN_GADGET_CGO_CFLAGS:raspberrypi0-2w-tezsign = "-march=armv8-a -mcpu=cortex_a53 -D__BLST_PORTABLE__ -O2"
 TEZSIGN_GADGET_CGO_CFLAGS:raspberrypi4-tezsign = "-march=armv8-a -mcpu=cortex_a72 -D__BLST_PORTABLE__ -O2"
-TEZSIGN_GADGET_CGO_CFLAGS:radxa-zero3-tezsign = "-march=armv8.2-a+crypto -mcpu=cortex_a55 -O2"
+TEZSIGN_GADGET_CGO_CFLAGS:radxa-zero3-tezsign = "-mcpu=cortex-a55+crypto -O2"
 
 do_configure() {
     :

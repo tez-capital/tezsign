@@ -11,6 +11,7 @@ SRC_URI = " \
     file://99-io-performance.rules \
 "
 
+# Inherit goarch for cross-compiling environment variables without class interference
 inherit externalsrc goarch systemd useradd
 
 DEPENDS += "go-native"
@@ -19,6 +20,9 @@ RDEPENDS:${PN} += "tezsign-utils"
 TEZSIGN_REPO_ROOT ?= "${@os.path.abspath(os.path.join(d.getVar('THISDIR'), '../../../..'))}"
 EXTERNALSRC = "${TEZSIGN_REPO_ROOT}/app"
 EXTERNALSRC_BUILD = "${WORKDIR}/build"
+
+# Isolate local systemd/udev files cleanly from the external application source
+UNPACKDIR = "${WORKDIR}/sources-unpack"
 
 python () {
     import os
@@ -52,7 +56,6 @@ USERADD_PARAM:${PN} = " \
 INHIBIT_PACKAGE_STRIP = "1"
 INHIBIT_PACKAGE_DEBUG_SPLIT = "1"
 do_unpack[nostamp] = "1"
-do_install[depends] += "virtual/${TARGET_PREFIX}binutils:do_populate_sysroot"
 
 do_configure() {
     :
@@ -81,22 +84,21 @@ do_compile() {
 do_install() {
     install -d ${D}${bindir}
     install -m 0755 ${B}/ffs_registrar ${D}${bindir}/ffs_registrar
-    ${STRIP} --strip-all ${D}${bindir}/ffs_registrar
 
-    # Install the systemd service file
+    # Install the systemd service files safely from UNPACKDIR
     install -d ${D}${systemd_system_unitdir}
-    install -m 0644 ${WORKDIR}/setup-gadget.service ${D}${systemd_system_unitdir}/
-    install -m 0644 ${WORKDIR}/attach-gadget.service ${D}${systemd_system_unitdir}/
-    install -m 0644 ${WORKDIR}/ffs_registrar.service ${D}${systemd_system_unitdir}/
-    install -m 0644 ${WORKDIR}/tezsign.service ${D}${systemd_system_unitdir}/
-    install -m 0644 ${WORKDIR}/generate-serial.service ${D}${systemd_system_unitdir}/
+    install -m 0644 ${UNPACKDIR}/setup-gadget.service ${D}${systemd_system_unitdir}/
+    install -m 0644 ${UNPACKDIR}/attach-gadget.service ${D}${systemd_system_unitdir}/
+    install -m 0644 ${UNPACKDIR}/ffs_registrar.service ${D}${systemd_system_unitdir}/
+    install -m 0644 ${UNPACKDIR}/tezsign.service ${D}${systemd_system_unitdir}/
+    install -m 0644 ${UNPACKDIR}/generate-serial.service ${D}${systemd_system_unitdir}/
 
     install -d ${D}${sysconfdir}/tmpfiles.d
-
     install -d ${D}${sysconfdir}/udev/rules.d
+    
     sed \
         -e 's,@TEZSIGN_USB_IRQ_FIFO_PRIORITY@,${TEZSIGN_USB_IRQ_FIFO_PRIORITY},g' \
         -e 's,@TEZSIGN_USB_IRQ_CPU@,${TEZSIGN_USB_IRQ_CPU},g' \
         -e 's,@TEZSIGN_USB_IRQ_TOKENS@,${TEZSIGN_USB_IRQ_TOKENS},g' \
-        ${WORKDIR}/99-io-performance.rules > ${D}${sysconfdir}/udev/rules.d/99-io-performance.rules
+        ${UNPACKDIR}/99-io-performance.rules > ${D}${sysconfdir}/udev/rules.d/99-io-performance.rules
 }

@@ -7,7 +7,7 @@ target: minimal-image
 repos:
   bitbake:
     url: https://git.openembedded.org/bitbake
-    branch: "2.8"
+    branch: "2.18"
     layers: {}
   openembedded-core:
     url: https://git.openembedded.org/openembedded-core
