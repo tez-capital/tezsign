@@ -5,5 +5,5 @@ header:
 
 repos:
   meta-rockchip:
-    url: https://github.com/radxa/meta-rockchip.git
+    url: https://git.yoctoproject.org/meta-rockchip
     branch: "wrynose"
