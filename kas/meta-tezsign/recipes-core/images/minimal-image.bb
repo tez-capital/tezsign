@@ -85,7 +85,7 @@ prune_prod_systemd_userland() {
 
 do_image_wic[depends] += "app:do_deploy"
 do_image_wic[depends] += "linux-mainline:do_deploy"
-WKS_FILE = "${THISDIR}/files/storage.wks.in"
+WKS_FILE = "${@d.getVar('THISDIR') + '/files/storage-dev.wks.in' if d.getVar('TEZSIGN_DEV') == '1' else d.getVar('THISDIR') + '/files/storage.wks.in'}"
 WKS_FILE:radxa-zero3-tezsign = "${THISDIR}/files/storage-rockchip.wks.in"
 
 # Rockchip: stage boot files (kernel Image w/ embedded initramfs, DTB, extlinux.conf)
@@ -140,4 +140,3 @@ rockchip_dd_bootloader() {
     bbnote "Writing u-boot.itb to sector 16384"
     dd if=${DEPLOY_DIR_IMAGE}/u-boot.${UBOOT_SUFFIX} of=$IMG seek=16384 conv=notrunc bs=512
 }
-
