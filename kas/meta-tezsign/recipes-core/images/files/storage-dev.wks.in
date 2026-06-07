@@ -1,8 +1,0 @@
-# Partitions are pinned to exact 512-byte sector boundaries:
-#   /boot -> 8192s   (4 MiB)
-#   /app  -> 401408s (196 MiB)
-#   /data -> 450560s (220 MiB)
-
-part /boot --offset 8192s --source bootimg-partition --ondisk mmcblk0 --fstype=vfat --label boot --active --fixed-size 192M --no-fstab-update
-part /app  --offset 401408s --source rootfs --rootfs-dir=${DEPLOY_DIR_IMAGE}/appfs --ondisk mmcblk0 --fstype=ext4 --label app --fixed-size 24M --fsoptions="ro,exec,noatime" --no-fstab-update
-part /data --offset 450560s --ondisk mmcblk0 --fstype=ext4 --label data --fixed-size 128M --mkfs-extraopts="-I 1024 -J size=8 -m 0 -O has_journal,extents,sparse_super,metadata_csum,inline_data,fast_commit" --no-fstab-update
