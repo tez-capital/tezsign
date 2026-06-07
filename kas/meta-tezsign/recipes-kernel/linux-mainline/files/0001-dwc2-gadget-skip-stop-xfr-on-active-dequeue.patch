@@ -1,3 +1,5 @@
+Upstream-Status: Inappropriate [TezSign-specific USB gadget stability workaround]
+
 diff --git a/drivers/usb/dwc2/gadget.c b/drivers/usb/dwc2/gadget.c
 index 834fc0261..5df5085b7 100644
 --- a/drivers/usb/dwc2/gadget.c
