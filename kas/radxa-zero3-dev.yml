@@ -9,4 +9,4 @@ local_conf_header:
 
   settings: |
     TEZSIGN_DEV = "1"
-    VOLATILE_LOG_DIR = "no"
+    FILESYSTEM_PERMS_TABLES:remove = "files/fs-perms-volatile-log.txt"
