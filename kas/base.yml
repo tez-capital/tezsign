@@ -8,26 +8,31 @@ repos:
   bitbake:
     url: https://git.openembedded.org/bitbake
     branch: "2.18"
+    commit: 294074e65f37822a0f31bb11eb968d311b54a66a
     layers: {}
   openembedded-core:
     url: https://git.openembedded.org/openembedded-core
     branch: "wrynose"
+    commit: 06dd66e6220e5ce4ed4b9af4d8231ae5f0a8ce80
     layers:
       meta:
   meta-yocto:
     url: https://git.yoctoproject.org/meta-yocto
     branch: "wrynose"
+    commit: 8251bdad5fda780a000fb41e6eda82eadf0fa39e
     layers:
       meta-yocto-bsp:
   meta-arm:
     url: https://git.yoctoproject.org/meta-arm
     branch: "wrynose"
+    commit: d3b55902fb9963978be90d6f283296de456b4b63
     layers:
       meta-arm:
       meta-arm-toolchain:
   meta-openembedded:
     url: https://github.com/openembedded/meta-openembedded.git
     branch: "wrynose"
+    commit: 9af4488d46cb4fd4c0d2d64820c86225ebd6ac71
     layers:
       meta-oe: # This is where 'dash' lives
       meta-python:
