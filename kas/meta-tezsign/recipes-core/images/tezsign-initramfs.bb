@@ -6,6 +6,7 @@ require minimal-image.bb
 PACKAGE_INSTALL = "${TEZSIGN_COMMON_IMAGE_INSTALL}"
 IMAGE_FEATURES = ""
 IMAGE_FSTYPES = "${INITRAMFS_FSTYPES}"
+IMAGE_BASENAME = "${PN}"
 IMAGE_NAME_SUFFIX = ""
 
 # The initramfs is the rootfs; do not try to carry separate kernel packages in it.

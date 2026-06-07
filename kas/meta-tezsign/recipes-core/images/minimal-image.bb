@@ -25,6 +25,8 @@ IMAGE_FEATURES = ""
 IMAGE_FEATURES += "${@'ssh-server-dropbear' if d.getVar('TEZSIGN_DEV') == '1' else ''}"
 
 IMAGE_FSTYPES = "wic wic.bmap"
+TEZSIGN_RELEASE_NAME ?= "${MACHINE}"
+IMAGE_BASENAME = "${TEZSIGN_RELEASE_NAME}"
 
 # Post-process to move the image
 IMAGE_POSTPROCESS_COMMAND += "extract_final_image;"
