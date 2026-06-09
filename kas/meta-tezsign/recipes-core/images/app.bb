@@ -69,7 +69,7 @@ do_compile() {
         local flag
         for flag in "$@"; do
             case "$flag" in
-                -static|-static-pie|--static|-Wl,-static)
+                -static|-static-pie|--static|-Wl,-static|-pie|-fPIE|-fpie|-Wl,-pie)
                     continue
                     ;;
             esac
@@ -90,7 +90,7 @@ do_compile() {
     cgo_cflags="$(normalize_cpu_flags ${CFLAGS} ${TEZSIGN_GADGET_CGO_CFLAGS})"
     cgo_cxxflags="$(normalize_cpu_flags ${CXXFLAGS} ${TEZSIGN_GADGET_CGO_CFLAGS})"
     cgo_ldflags="$(normalize_dynamic_ldflags ${LDFLAGS})"
-    cgo_ldflags="${cgo_ldflags} -Wl,--build-id=none -Wl,-Bdynamic"
+    cgo_ldflags="${cgo_ldflags} -Wl,--build-id=none -Wl,-Bdynamic -no-pie"
     go_ldflags="-s -w -buildid= -linkmode=external -extldflags '${cgo_ldflags}'"
     export CGO_CFLAGS="${cgo_cflags}"
     export CGO_CPPFLAGS="${CPPFLAGS}"
