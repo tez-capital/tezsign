@@ -25,6 +25,8 @@ IMAGE_FEATURES = ""
 IMAGE_FEATURES += "${@'ssh-server-dropbear' if d.getVar('TEZSIGN_DEV') == '1' else ''}"
 
 IMAGE_FSTYPES = "wic wic.bmap"
+TEZSIGN_RELEASE_NAME ?= "${MACHINE}"
+IMAGE_BASENAME = "${TEZSIGN_RELEASE_NAME}"
 
 # Post-process to move the image
 IMAGE_POSTPROCESS_COMMAND += "extract_final_image;"
@@ -140,4 +142,3 @@ rockchip_dd_bootloader() {
     bbnote "Writing u-boot.itb to sector 16384"
     dd if=${DEPLOY_DIR_IMAGE}/u-boot.${UBOOT_SUFFIX} of=$IMG seek=16384 conv=notrunc bs=512
 }
-

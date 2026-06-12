@@ -67,7 +67,7 @@ runs:
 
         cd kas
 
-        for repo in poky meta-raspberrypi meta-openembedded meta-arm meta-rockchip meta-virtualization; do
+        for repo in bitbake openembedded-core meta-yocto meta-raspberrypi meta-openembedded meta-arm meta-rockchip meta-virtualization poky; do
           if [ -e "${repo}" ] && [ ! -d "${repo}/.git" ]; then
             rm -rf "${repo}"
           fi
@@ -83,7 +83,7 @@ runs:
           -v "${{ github.workspace }}:/work" \
           --workdir /work/kas \
           ghcr.io/siemens/kas/kas:latest \
-          build "${{ inputs.kas-file }}"
+          build --force-checkout "${{ inputs.kas-file }}"
 
     - name: Compress image
       shell: bash

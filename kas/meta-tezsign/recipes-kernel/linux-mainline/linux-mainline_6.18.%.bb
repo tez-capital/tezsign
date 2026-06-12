@@ -1,10 +1,16 @@
-require linux-mainline.inc
+DESCRIPTION = "Mainline Linux kernel"
+LICENSE = "GPL-2.0-only"
+LIC_FILES_CHKSUM = "file://COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
+inherit kernel
+
+S = "${UNPACKDIR}/${BP}"
+PROVIDES = "virtual/kernel"
+
 SRC_URI = "git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git;protocol=https;branch=linux-6.18.y"
 SRCREV = "${AUTOREV}"
 
-# Keep the current Raspberry Pi family on a shared base defconfig, then layer
-# family and board-specific fragments on top. Dev builds append dedicated dev-only
-# fragments so production images can stay aggressively minimal.
+# Keep all fragments in UNPACKDIR, then explicitly merge only the fragments for
+# the active machine/dev variant. This matches the last known booting Poky flow.
 SRC_URI:append = " \
     file://defconfig \
     file://0001-dwc2-gadget-skip-stop-xfr-on-active-dequeue.patch \
@@ -37,18 +43,18 @@ do_configure:append() {
     fragments=""
 
     for fragment in ${TEZSIGN_KERNEL_CONFIG_FRAGMENTS}; do
-        if [ -f "${WORKDIR}/${fragment}" ]; then
-            fragments="${fragments} ${WORKDIR}/${fragment}"
+        if [ -f "${UNPACKDIR}/${fragment}" ]; then
+            fragments="${fragments} ${UNPACKDIR}/${fragment}"
         fi
     done
 
     if [ -n "${fragments}" ]; then
         # Start from allnoconfig so only options explicitly listed in
-        # defconfig + fragments are enabled.  The default kernel class
-        # expands defconfig via olddefconfig filling thousands of
-        # unspecified options with kernel defaults (often =y).
+        # defconfig + fragments are enabled. The default kernel class expands
+        # defconfig via olddefconfig and fills unspecified options with kernel
+        # defaults, which is not the intended tezsign kernel shape.
         oe_runmake -C ${S} O=${B} allnoconfig
-        ${S}/scripts/kconfig/merge_config.sh -m -O ${B} ${B}/.config ${WORKDIR}/defconfig ${fragments}
+        ${S}/scripts/kconfig/merge_config.sh -m -O ${B} ${B}/.config ${UNPACKDIR}/defconfig ${fragments}
         oe_runmake -C ${S} O=${B} olddefconfig
     fi
 }

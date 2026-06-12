@@ -39,7 +39,7 @@ TEZSIGN_GADGET_GOARM64:radxa-zero3-tezsign = "v8.2"
 TEZSIGN_GADGET_CGO_CFLAGS = ""
 TEZSIGN_GADGET_CGO_CFLAGS:raspberrypi0-2w-tezsign = "-march=armv8-a -mcpu=cortex_a53 -D__BLST_PORTABLE__ -O2"
 TEZSIGN_GADGET_CGO_CFLAGS:raspberrypi4-tezsign = "-march=armv8-a -mcpu=cortex_a72 -D__BLST_PORTABLE__ -O2"
-TEZSIGN_GADGET_CGO_CFLAGS:radxa-zero3-tezsign = "-march=armv8.2-a+crypto -mcpu=cortex_a55 -O2"
+TEZSIGN_GADGET_CGO_CFLAGS:radxa-zero3-tezsign = "-mcpu=cortex-a55+crypto -O2"
 
 do_configure() {
     :
@@ -69,7 +69,7 @@ do_compile() {
         local flag
         for flag in "$@"; do
             case "$flag" in
-                -static|-static-pie|--static|-Wl,-static)
+                -static|-static-pie|--static|-Wl,-static|-pie|-fPIE|-fpie|-Wl,-pie)
                     continue
                     ;;
             esac
@@ -90,7 +90,7 @@ do_compile() {
     cgo_cflags="$(normalize_cpu_flags ${CFLAGS} ${TEZSIGN_GADGET_CGO_CFLAGS})"
     cgo_cxxflags="$(normalize_cpu_flags ${CXXFLAGS} ${TEZSIGN_GADGET_CGO_CFLAGS})"
     cgo_ldflags="$(normalize_dynamic_ldflags ${LDFLAGS})"
-    cgo_ldflags="${cgo_ldflags} -Wl,--build-id=none -Wl,-Bdynamic"
+    cgo_ldflags="${cgo_ldflags} -Wl,--build-id=none -Wl,-Bdynamic -no-pie"
     go_ldflags="-s -w -buildid= -linkmode=external -extldflags '${cgo_ldflags}'"
     export CGO_CFLAGS="${cgo_cflags}"
     export CGO_CPPFLAGS="${CPPFLAGS}"
@@ -116,7 +116,6 @@ do_compile() {
 
 do_install[noexec] = "1"
 do_unpack[nostamp] = "1"
-do_deploy[depends] += "virtual/${TARGET_PREFIX}binutils:do_populate_sysroot"
 
 do_deploy() {
     install -d ${DEPLOYDIR}/appfs

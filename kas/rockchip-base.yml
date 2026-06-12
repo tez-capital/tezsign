@@ -5,5 +5,6 @@ header:
 
 repos:
   meta-rockchip:
-    url: https://github.com/radxa/meta-rockchip.git
-    branch: "scarthgap"
+    url: https://git.yoctoproject.org/meta-rockchip
+    branch: "wrynose"
+    commit: 9d02575bfd9ca5e87c394f593f2bbdbdee914d4e

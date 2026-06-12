@@ -7,15 +7,15 @@ SRC_URI = " \
     file://setup-gadget-dev.c \
 "
 
-S = "${WORKDIR}"
+S = "${UNPACKDIR}"
 
 do_compile() {
-    ${CC} ${CFLAGS} ${LDFLAGS} setup-gadget-dev.c -o setup-gadget-dev
-    ${CC} ${CFLAGS} ${LDFLAGS} attach-gadget-dev.c -o attach-gadget-dev
+    ${CC} ${CFLAGS} ${LDFLAGS} ${S}/setup-gadget-dev.c -o ${B}/setup-gadget-dev
+    ${CC} ${CFLAGS} ${LDFLAGS} ${S}/attach-gadget-dev.c -o ${B}/attach-gadget-dev
 }
 
 do_install() {
     install -d ${D}${bindir}
-    install -m 0755 setup-gadget-dev ${D}${bindir}
-    install -m 0755 attach-gadget-dev ${D}${bindir}
+    install -m 0755 ${B}/setup-gadget-dev ${D}${bindir}
+    install -m 0755 ${B}/attach-gadget-dev ${D}${bindir}
 }

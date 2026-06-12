@@ -12,6 +12,8 @@ SRC_URI = " \
 
 inherit systemd useradd
 
+S = "${UNPACKDIR}"
+
 # Ensure the base core recipe is installed if this is installed
 RDEPENDS:${PN} = "tezsign-core tezsign-dev-utils sudo"
 
@@ -31,8 +33,8 @@ USERADD_PARAM:${PN} = "-m -d /home/dev -s /bin/sh -p '\$6\$NnguhG1R1YiWk3Ry\$A0e
 do_install() {
      # Install your services
     install -d ${D}${systemd_system_unitdir}
-    install -m 0644 ${WORKDIR}/setup-gadget-dev.service ${D}${systemd_system_unitdir}/
-    install -m 0644 ${WORKDIR}/attach-gadget-dev.service ${D}${systemd_system_unitdir}/
+    install -m 0644 ${UNPACKDIR}/setup-gadget-dev.service ${D}${systemd_system_unitdir}/
+    install -m 0644 ${UNPACKDIR}/attach-gadget-dev.service ${D}${systemd_system_unitdir}/
 
     # 4. Install the sudoers drop-in file
     install -d ${D}${sysconfdir}/sudoers.d
@@ -50,17 +52,17 @@ FILES:${PN} += "${sysconfdir}/sudoers.d/01_dev"
 do_install:append() {
     # Install the journald override
     install -d ${D}${sysconfdir}/systemd/journald.conf.d/
-    install -m 0644 ${WORKDIR}/10-persistent.conf ${D}${sysconfdir}/systemd/journald.conf.d/
+    install -m 0644 ${UNPACKDIR}/10-persistent.conf ${D}${sysconfdir}/systemd/journald.conf.d/
 
     # Dash does not expand the Bash-style prompt escapes from base-files.
     install -d ${D}${sysconfdir}/profile.d/
-    install -m 0644 ${WORKDIR}/dev-prompt.sh ${D}${sysconfdir}/profile.d/
+    install -m 0644 ${UNPACKDIR}/dev-prompt.sh ${D}${sysconfdir}/profile.d/
     install -d ${D}/home/dev
-    install -m 0644 ${WORKDIR}/dev-prompt.sh ${D}/home/dev/.profile
-    install -m 0644 ${WORKDIR}/dev-prompt.sh ${D}/home/dev/.bashrc
+    install -m 0644 ${UNPACKDIR}/dev-prompt.sh ${D}/home/dev/.profile
+    install -m 0644 ${UNPACKDIR}/dev-prompt.sh ${D}/home/dev/.bashrc
 
     install -d ${D}${sysconfdir}/systemd/system/getty@tty1.service.d/
-    install -m 0644 ${WORKDIR}/tty1-getty.conf ${D}${sysconfdir}/systemd/system/getty@tty1.service.d/10-visible-login.conf
+    install -m 0644 ${UNPACKDIR}/tty1-getty.conf ${D}${sysconfdir}/systemd/system/getty@tty1.service.d/10-visible-login.conf
 }
 
 # Ensure the directory gets packaged
