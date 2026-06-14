@@ -43,6 +43,11 @@ runs:
         printf '%s\n' "${image_date}" > ./kas/meta-tezsign/recipes-core/images/files/.image-date
         printf '%s\n' "${image_flavour}" > ./kas/meta-tezsign/recipes-core/images/files/.image-flavour
 
+        {
+          printf 'IMAGE_VERSION=%s\n' "${image_version}"
+          printf 'IMAGE_DATE=%s\n' "${image_date}"
+        } >> "${GITHUB_ENV}"
+
         chmod 0644 \
           ./kas/meta-tezsign/recipes-core/images/files/.image-version \
           ./kas/meta-tezsign/recipes-core/images/files/.image-date \
@@ -80,6 +85,8 @@ runs:
           -e USER="$(id -un)" \
           -e LOGNAME="$(id -un)" \
           -e TEZSIGN_REPO_ROOT=/work \
+          -e IMAGE_VERSION="${IMAGE_VERSION}" \
+          -e IMAGE_DATE="${IMAGE_DATE}" \
           -v "${{ github.workspace }}:/work" \
           --workdir /work/kas \
           ghcr.io/siemens/kas/kas:latest \
