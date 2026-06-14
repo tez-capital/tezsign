@@ -8,14 +8,19 @@ Use this command for any Yocto build:
 
 ```sh
 podman run --privileged --rm -it \
-    -v "$(pwd)/..:/work:Z \
+    -v "$(pwd)/..:/work:Z" \
+    -e BB_ENV_PASSTHROUGH_ADDITIONS="TEZSIGN_REPO_ROOT IMAGE_VERSION IMAGE_DATE" \
     -e TEZSIGN_REPO_ROOT=/work \
+    -e IMAGE_VERSION="$(git -C .. rev-parse --short=12 HEAD)" \
+    -e IMAGE_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --userns=keep-id \
     --user "$(id -u):$(id -g)" \
     --workdir /work/kas \
     ghcr.io/siemens/kas/kas:latest \
     build <kas-file>
 ```
+
+`IMAGE_VERSION` becomes the `.image-version` value embedded in the app partition and shown by `tezsign-host version`. `IMAGE_DATE` becomes `.image-date`. The recipe can derive the git version from `TEZSIGN_REPO_ROOT`, but passing both values explicitly keeps local builds aligned with GitHub Actions.
 
 Available KAS files:
 
@@ -38,8 +43,11 @@ Typical commands:
 
 ```sh
 podman run --privileged --rm -it \
-    -v "$(pwd)/..:/work:Z \
+    -v "$(pwd)/..:/work:Z" \
+    -e BB_ENV_PASSTHROUGH_ADDITIONS="TEZSIGN_REPO_ROOT IMAGE_VERSION IMAGE_DATE" \
     -e TEZSIGN_REPO_ROOT=/work \
+    -e IMAGE_VERSION="$(git -C .. rev-parse --short=12 HEAD)" \
+    -e IMAGE_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --userns=keep-id \
     --user "$(id -u):$(id -g)" \
     --workdir /work/kas \
@@ -49,8 +57,11 @@ podman run --privileged --rm -it \
 
 ```sh
 podman run --privileged --rm -it \
-    -v "$(pwd)/..:/work:Z \
+    -v "$(pwd)/..:/work:Z" \
+    -e BB_ENV_PASSTHROUGH_ADDITIONS="TEZSIGN_REPO_ROOT IMAGE_VERSION IMAGE_DATE" \
     -e TEZSIGN_REPO_ROOT=/work \
+    -e IMAGE_VERSION="$(git -C .. rev-parse --short=12 HEAD)" \
+    -e IMAGE_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --userns=keep-id \
     --user "$(id -u):$(id -g)" \
     --workdir /work/kas \
@@ -60,8 +71,11 @@ podman run --privileged --rm -it \
 
 ```sh
 podman run --privileged --rm -it \
-    -v "$(pwd)/..:/work:Z \
+    -v "$(pwd)/..:/work:Z" \
+    -e BB_ENV_PASSTHROUGH_ADDITIONS="TEZSIGN_REPO_ROOT IMAGE_VERSION IMAGE_DATE" \
     -e TEZSIGN_REPO_ROOT=/work \
+    -e IMAGE_VERSION="$(git -C .. rev-parse --short=12 HEAD)" \
+    -e IMAGE_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --userns=keep-id \
     --user "$(id -u):$(id -g)" \
     --workdir /work/kas \
@@ -71,8 +85,11 @@ podman run --privileged --rm -it \
 
 ```sh
 podman run --privileged --rm -it \
-    -v "$(pwd)/..:/work:Z \
+    -v "$(pwd)/..:/work:Z" \
+    -e BB_ENV_PASSTHROUGH_ADDITIONS="TEZSIGN_REPO_ROOT IMAGE_VERSION IMAGE_DATE" \
     -e TEZSIGN_REPO_ROOT=/work \
+    -e IMAGE_VERSION="$(git -C .. rev-parse --short=12 HEAD)" \
+    -e IMAGE_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --userns=keep-id \
     --user "$(id -u):$(id -g)" \
     --workdir /work/kas \
@@ -82,8 +99,11 @@ podman run --privileged --rm -it \
 
 ```sh
 podman run --privileged --rm -it \
-    -v "$(pwd)/..:/work:Z \
+    -v "$(pwd)/..:/work:Z" \
+    -e BB_ENV_PASSTHROUGH_ADDITIONS="TEZSIGN_REPO_ROOT IMAGE_VERSION IMAGE_DATE" \
     -e TEZSIGN_REPO_ROOT=/work \
+    -e IMAGE_VERSION="$(git -C .. rev-parse --short=12 HEAD)" \
+    -e IMAGE_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --userns=keep-id \
     --user "$(id -u):$(id -g)" \
     --workdir /work/kas \
@@ -93,8 +113,11 @@ podman run --privileged --rm -it \
 
 ```sh
 podman run --privileged --rm -it \
-    -v "$(pwd)/..:/work:Z \
+    -v "$(pwd)/..:/work:Z" \
+    -e BB_ENV_PASSTHROUGH_ADDITIONS="TEZSIGN_REPO_ROOT IMAGE_VERSION IMAGE_DATE" \
     -e TEZSIGN_REPO_ROOT=/work \
+    -e IMAGE_VERSION="$(git -C .. rev-parse --short=12 HEAD)" \
+    -e IMAGE_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --userns=keep-id \
     --user "$(id -u):$(id -g)" \
     --workdir /work/kas \
@@ -112,8 +135,11 @@ To clean state before any rebuild:
 
 ```sh
 podman run --privileged --rm -it \
-    -v "$(pwd)/..:/work:Z \
+    -v "$(pwd)/..:/work:Z" \
+    -e BB_ENV_PASSTHROUGH_ADDITIONS="TEZSIGN_REPO_ROOT IMAGE_VERSION IMAGE_DATE" \
     -e TEZSIGN_REPO_ROOT=/work \
+    -e IMAGE_VERSION="$(git -C .. rev-parse --short=12 HEAD)" \
+    -e IMAGE_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --userns=keep-id \
     --user "$(id -u):$(id -g)" \
     --workdir /work/kas \

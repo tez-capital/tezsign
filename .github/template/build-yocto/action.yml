@@ -84,6 +84,7 @@ runs:
           -e HOME=/tmp \
           -e USER="$(id -un)" \
           -e LOGNAME="$(id -un)" \
+          -e BB_ENV_PASSTHROUGH_ADDITIONS="TEZSIGN_REPO_ROOT IMAGE_VERSION IMAGE_DATE" \
           -e TEZSIGN_REPO_ROOT=/work \
           -e IMAGE_VERSION="${IMAGE_VERSION}" \
           -e IMAGE_DATE="${IMAGE_DATE}" \
