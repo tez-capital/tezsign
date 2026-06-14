@@ -35,7 +35,11 @@ runs:
       run: |
         mkdir -p ./kas/meta-tezsign/recipes-core/images/files
 
-        image_version="${IMAGE_VERSION:-$(git rev-parse --short=12 HEAD)}"
+        github_version="${{ github.event.pull_request.head.sha || github.sha }}"
+        image_version="${IMAGE_VERSION:-${github_version:0:12}}"
+        if [ -z "${image_version}" ]; then
+          image_version="$(git rev-parse --short=12 HEAD)"
+        fi
         image_date="${IMAGE_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
         image_flavour="${{ inputs.image-flavour }}"
 
