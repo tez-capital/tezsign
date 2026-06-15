@@ -54,8 +54,8 @@ local_conf_header:
     DL_DIR = "${TOPDIR}/../downloads"
     SSTATE_DIR = "${TOPDIR}/../sstate-cache"
 
-    # Allow externalsrc recipes to use a repo root supplied by the caller.
-    BB_ENV_PASSTHROUGH_ADDITIONS .= " TEZSIGN_REPO_ROOT"
+    # Allow externalsrc recipes to use metadata supplied by the caller.
+    BB_ENV_PASSTHROUGH_ADDITIONS .= " TEZSIGN_REPO_ROOT IMAGE_VERSION IMAGE_DATE"
 
   cpu_isolation: |
     TEZSIGN_IRQ_AFFINITY_CPULIST ?= "0"

@@ -15,6 +15,24 @@ TEZSIGN_REPO_ROOT ?= "${@os.path.abspath(os.path.join(d.getVar('THISDIR'), '../.
 EXTERNALSRC = "${TEZSIGN_REPO_ROOT}/app"
 EXTERNALSRC_BUILD = "${WORKDIR}/build"
 
+def tezsign_git_version(d):
+    import subprocess
+
+    repo_root = d.getVar("TEZSIGN_REPO_ROOT")
+    if not repo_root:
+        return ""
+
+    try:
+        return subprocess.check_output(
+            ["git", "-C", repo_root, "rev-parse", "--short=12", "HEAD"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+    except Exception:
+        return ""
+
+TEZSIGN_GIT_VERSION ?= "${@tezsign_git_version(d)}"
+
 python () {
     import os
 
@@ -127,6 +145,8 @@ do_deploy() {
     if [ -z "$image_version" ] || [ "$image_version" = "unknown" ]; then
         if [ -n "${IMAGE_VERSION}" ]; then
             image_version="${IMAGE_VERSION}"
+        elif [ -n "${TEZSIGN_GIT_VERSION}" ]; then
+            image_version="${TEZSIGN_GIT_VERSION}"
         elif [ -n "${TEZSIGN_RELEASE_NAME}" ]; then
             image_version="${TEZSIGN_RELEASE_NAME}"
         elif [ -n "${PV}" ]; then

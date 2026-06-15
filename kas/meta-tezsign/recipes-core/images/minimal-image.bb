@@ -32,7 +32,7 @@ IMAGE_BASENAME = "${TEZSIGN_RELEASE_NAME}"
 IMAGE_POSTPROCESS_COMMAND += "extract_final_image;"
 
 # Rootfs cleanup — runs for both WIC and initramfs (cpio)
-ROOTFS_POSTPROCESS_COMMAND:append = " enable_dev_local_getty; prune_prod_console_bits; prune_prod_systemd_userland;"
+ROOTFS_POSTPROCESS_COMMAND:append = " enable_dev_local_getty; prune_prod_console_bits; prune_prod_systemd_userland; prune_unused_udev_helpers;"
 
 extract_final_image() {
     mkdir -p ${TOPDIR}/../release
@@ -83,6 +83,23 @@ prune_prod_systemd_userland() {
         ${IMAGE_ROOTFS}${bindir}/varlinkctl
 
     rm -rf ${IMAGE_ROOTFS}${nonarch_libdir}/systemd/catalog
+}
+
+# Drop udev hardware probers that have no matching hardware on the rk3566
+# mmc + USB-gadget appliance. Each is ~1.4 MiB (systemd 259 builds them large),
+# ~10.5 MiB total raw / ~1.8 MiB compressed. udev never invokes them here, so
+# removing the binaries is safe (their rules simply never match). Unconditional:
+# useless in both dev and prod.
+prune_unused_udev_helpers() {
+    rm -f \
+        ${IMAGE_ROOTFS}${nonarch_libdir}/udev/ata_id \
+        ${IMAGE_ROOTFS}${nonarch_libdir}/udev/cdrom_id \
+        ${IMAGE_ROOTFS}${nonarch_libdir}/udev/scsi_id \
+        ${IMAGE_ROOTFS}${nonarch_libdir}/udev/v4l_id \
+        ${IMAGE_ROOTFS}${nonarch_libdir}/udev/fido_id \
+        ${IMAGE_ROOTFS}${nonarch_libdir}/udev/mtd_probe \
+        ${IMAGE_ROOTFS}${nonarch_libdir}/udev/iocost \
+        ${IMAGE_ROOTFS}${nonarch_libdir}/udev/dmi_memory_id
 }
 
 do_image_wic[depends] += "app:do_deploy"

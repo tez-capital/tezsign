@@ -1,1 +1,1 @@
-PACKAGECONFIG:remove:rpi = "egl glesv2"
+PACKAGECONFIG:remove = "egl glesv2"
