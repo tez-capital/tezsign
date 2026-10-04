@@ -8,9 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/charmbracelet/bubbles/table"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/table"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 type selectionStage int
@@ -89,28 +89,28 @@ func (m selectionModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m selectionModel) View() string {
+func (m selectionModel) View() tea.View {
 	if m.err != nil {
-		return fmt.Sprintf("Error: %v\n", m.err)
+		return tea.NewView(fmt.Sprintf("Error: %v\n", m.err))
 	}
 
 	switch m.stage {
 	case stageDevice:
 		if len(m.devices) == 0 {
-			return "No TezSign SD cards detected. Press q to exit."
+			return tea.NewView("No TezSign SD cards detected. Press q to exit.")
 		}
-		return fmt.Sprintf(
+		return tea.NewView(fmt.Sprintf(
 			"Select a device (↑/↓ to navigate, enter to start full update)\n\n%s\n\nPress enter to continue or q to cancel.",
 			m.table.View(),
-		)
+		))
 	default:
-		return ""
+		return tea.NewView("")
 	}
 }
 
 func (m selectionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "q", "esc":
 			m.err = errors.New("update cancelled")
@@ -202,7 +202,7 @@ func (m progressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.done = true
 		m.err = msg.err
 		return m, tea.Quit
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "q", "esc":
 			if !m.done && m.cancel != nil {
@@ -230,7 +230,7 @@ func renderProgressBar(pct float64, width int) string {
 	return fmt.Sprintf("[%s%s] %5.1f%%", strings.Repeat("█", fill), strings.Repeat("░", width-fill), pct)
 }
 
-func (m progressModel) View() string {
+func (m progressModel) View() tea.View {
 	read := m.counter.Count()
 	var pct float64 = -1
 	if m.total > 0 {
@@ -255,7 +255,7 @@ func (m progressModel) View() string {
 	} else {
 		builder.WriteString("\nPress q to cancel.")
 	}
-	return builder.String()
+	return tea.NewView(builder.String())
 }
 
 type countingReader struct {

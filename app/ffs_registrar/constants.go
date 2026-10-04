@@ -15,7 +15,8 @@ const (
 	evTypeSuspend     = 5
 	evTypeResume      = 6
 	vendorReqReady    = 0x5A
-	bmReqTypeVendorIn = 0x81
+	bmReqTypeVendorIn = 0xC1 // IN | vendor | interface
+	bmReqTypeLegacyIn = 0x81 // Older hosts used standard | interface | IN.
 	protoVersion      = 0x0001
 )
 

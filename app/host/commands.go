@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	"charm.land/lipgloss/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/samber/lo"
 	"github.com/tez-capital/tezsign/broker"
 	"github.com/tez-capital/tezsign/common"
@@ -264,7 +266,7 @@ func cmdRun() *cli.Command {
 			httpErrCh := make(chan error, 1)
 			go func() {
 				l.Debug("HTTP server listening", slog.String("addr", addr))
-				if err := app.Listen(addr); err != nil {
+				if err := app.Listen(addr, fiber.ListenConfig{DisableStartupMessage: true}); err != nil {
 					httpErrCh <- err
 				}
 			}()
@@ -337,7 +339,7 @@ func cmdList() *cli.Command {
 			if w <= 0 {
 				w = 80
 			}
-			fmt.Println(renderAliasChips(lo.Keys(keys), w))
+			lipgloss.Println(renderAliasChips(lo.Keys(keys), w))
 
 			return nil
 		},
@@ -452,7 +454,7 @@ func cmdStatus() *cli.Command {
 			}
 
 			// TTY: bordered table with fixed-width columns
-			fmt.Println(renderStatusTable(statusRows(st.GetKeys()), statusTableOpts{Selectable: false, Cursor: -1}))
+			lipgloss.Println(renderStatusTable(statusRows(st.GetKeys()), statusTableOpts{Selectable: false, Cursor: -1}))
 			return nil
 		},
 	}
@@ -597,15 +599,16 @@ func cmdUnlockKeys() *cli.Command {
 				}
 			}
 
+			initStyles()
 			w, _, _ := term.GetSize(int(os.Stdout.Fd()))
 			if len(okLabels) > 0 {
-				fmt.Println(renderChips(okLabels, chipOkStyle, w))
+				lipgloss.Println(renderChips(okLabels, chipOkStyle, w))
 			}
 			if len(errLabels) > 0 {
 				if len(okLabels) > 0 {
 					fmt.Println()
 				}
-				fmt.Println(renderChips(errLabels, chipErrStyle, w))
+				lipgloss.Println(renderChips(errLabels, chipErrStyle, w))
 			}
 			if hasDeadlineExceeded {
 				return fmt.Errorf("unlock keys: context deadline exceeded")
@@ -685,15 +688,16 @@ func cmdLockKeys() *cli.Command {
 				}
 			}
 
+			initStyles()
 			w, _, _ := term.GetSize(int(os.Stdout.Fd()))
 			if len(okLabels) > 0 {
-				fmt.Println(renderChips(okLabels, chipOkStyle, w))
+				lipgloss.Println(renderChips(okLabels, chipOkStyle, w))
 			}
 			if len(errLabels) > 0 {
 				if len(okLabels) > 0 {
 					fmt.Println()
 				}
-				fmt.Println(renderChips(errLabels, chipErrStyle, w))
+				lipgloss.Println(renderChips(errLabels, chipErrStyle, w))
 			}
 
 			return nil
@@ -764,15 +768,16 @@ func cmdDeleteKeys() *cli.Command {
 				}
 			}
 
+			initStyles()
 			w, _, _ := term.GetSize(int(os.Stdout.Fd()))
 			if len(okLabels) > 0 {
-				fmt.Println(renderChips(okLabels, chipOkStyle, w))
+				lipgloss.Println(renderChips(okLabels, chipOkStyle, w))
 			}
 			if len(errLabels) > 0 {
 				if len(okLabels) > 0 {
 					fmt.Println()
 				}
-				fmt.Println(renderChips(errLabels, chipErrStyle, w))
+				lipgloss.Println(renderChips(errLabels, chipErrStyle, w))
 			}
 
 			return nil

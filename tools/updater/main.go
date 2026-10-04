@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/diskfs/go-diskfs"
 	"github.com/diskfs/go-diskfs/disk"
 	"github.com/tez-capital/tezsign/logging"

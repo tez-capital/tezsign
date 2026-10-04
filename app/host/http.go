@@ -6,9 +6,9 @@ import (
 	"path"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/logger"
+	"github.com/gofiber/fiber/v3/middleware/recover"
 
 	"github.com/tez-capital/tezsign/broker"
 	"github.com/tez-capital/tezsign/common"
@@ -25,10 +25,9 @@ type tz4CacheEntry struct {
 
 func buildFiberApp(getB func() *broker.Broker, allowedTZ4 map[string]struct{}, cache map[string]tz4CacheEntry) *fiber.App {
 	app := fiber.New(fiber.Config{
-		DisableStartupMessage: true,
-		ReadTimeout:           10 * time.Second,
-		WriteTimeout:          10 * time.Second,
-		IdleTimeout:           60 * time.Second,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
 
 		// BodyLimit: 1<<20, // 1MB; uncomment if you want a hard cap
 	})
@@ -39,7 +38,7 @@ func buildFiberApp(getB func() *broker.Broker, allowedTZ4 map[string]struct{}, c
 		// Keep logs short; you already have slog for app logs.
 		Format: "${time} ${method} ${path} ${status} ${latency}\n",
 	}))
-	app.Use(func(c *fiber.Ctx) error {
+	app.Use(func(c fiber.Ctx) error {
 		c.Path(path.Clean(c.Path()))
 		return c.Next()
 	})
@@ -48,14 +47,14 @@ func buildFiberApp(getB func() *broker.Broker, allowedTZ4 map[string]struct{}, c
 	// GET /authorized_keys
 	// DO NOT TOUCH - octez wants it like this
 	// -------------------------------------------------------------------------
-	app.Get("/authorized_keys", func(c *fiber.Ctx) error {
+	app.Get("/authorized_keys", func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{})
 	})
 
 	// -------------------------------------------------------------------------
 	// GET /keys/:tz4 → return {"public_key":"BLpk..."}
 	// -------------------------------------------------------------------------
-	app.Get("/keys/:tz4", func(c *fiber.Ctx) error {
+	app.Get("/keys/:tz4", func(c fiber.Ctx) error {
 		tz4 := c.Params("tz4")
 		if tz4 == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "missing PKH"})
@@ -75,7 +74,7 @@ func buildFiberApp(getB func() *broker.Broker, allowedTZ4 map[string]struct{}, c
 	// -------------------------------------------------------------------------
 	// GET /bls_prove_possession/:tz4 → return {"bls_prove_possession":"BLsig..."}
 	// -------------------------------------------------------------------------
-	app.Get("/bls_prove_possession/:tz4", func(c *fiber.Ctx) error {
+	app.Get("/bls_prove_possession/:tz4", func(c fiber.Ctx) error {
 		tz4 := c.Params("tz4")
 		if tz4 == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "missing PKH"})
@@ -96,14 +95,14 @@ func buildFiberApp(getB func() *broker.Broker, allowedTZ4 map[string]struct{}, c
 	// -------------------------------------------------------------------------
 	// POST /keys/:tz4 → return {"signature":"BLsig..."}
 	// -------------------------------------------------------------------------
-	app.Post("/keys/:tz4", func(c *fiber.Ctx) error {
+	app.Post("/keys/:tz4", func(c fiber.Ctx) error {
 		tz4 := c.Params("tz4")
 		if tz4 == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "missing PKH"})
 		}
 
 		var payloadHex string
-		if err := c.BodyParser(&payloadHex); err != nil {
+		if err := c.Bind().Body(&payloadHex); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		}
 		raw, err := hex.DecodeString(payloadHex)
@@ -145,12 +144,12 @@ func buildFiberApp(getB func() *broker.Broker, allowedTZ4 map[string]struct{}, c
 	// -------------------------------------------------------------------------
 	// POST /sign → sign payloads
 	// -------------------------------------------------------------------------
-	app.Post("/sign", func(c *fiber.Ctx) error {
+	app.Post("/sign", func(c fiber.Ctx) error {
 		// TODO: remove if not needed
 		return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{"error": "not implemented"})
 
 		// var req signReq
-		// if err := c.BodyParser(&req); err != nil {
+		// if err := c.Bind().Body(&req); err != nil {
 		// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		// }
 		// if req.KeyID == "" || req.PayloadHex == "" {

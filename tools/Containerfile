@@ -1,4 +1,4 @@
-FROM golang:1.26-trixie
+FROM golang:1.27.1-trixie
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -8,12 +8,13 @@ RUN apt-get update && \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-RUN export ZIG_VERSION=0.15.2 && \
+RUN export ZIG_VERSION=0.17.0 && \
 	wget https://ziglang.org/download/$ZIG_VERSION/zig-x86_64-linux-$ZIG_VERSION.tar.xz && \
 	mkdir -p zig /usr/local/zig && tar --xz -xf zig-x86_64-linux-$ZIG_VERSION.tar.xz --directory zig && \
 	cp -rf zig/zig*/* --target-directory=/usr/local/zig
 
 ENV PATH="/usr/local/go/bin:/usr/local/zig:${PATH}"
+ENV ZIG_LOCAL_CACHE_DIR="/tmp/zig-cache"
 ENV CC="zig cc -target aarch64-linux-musl -O3 -flto"
 ENV CXX="zig c++ -target aarch64-linux-musl -O3 -flto"
 

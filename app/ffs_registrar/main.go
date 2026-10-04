@@ -60,6 +60,7 @@ func drainEP0Events(ep0 *os.File, enabled chan<- bool, ready *atomic.Uint32, l *
 			continue
 		}
 
+		// The event type follows the 8-byte USB control request.
 		// [65 90 0 0 0 0 8 0 | 4 | 0 0 0]
 		//                      ^ evType
 		evType := int(buf[8])
@@ -93,12 +94,13 @@ func drainEP0Events(ep0 *os.File, enabled chan<- bool, ready *atomic.Uint32, l *
 			continue
 		}
 
+		// Parse the 8-byte USB control request at the start of the event.
 		// [65 90 0 0 0 0 8 0 | 4 | 0 0 0]
 		// ^____ request ____^
 		req := parseCtrlReq(buf[0:8])
 		l.Info("parsed", "type", req.bmRequestType, "request", req.bRequest, "length", req.wLength)
-		// Handle our vendor IN request
-		if req.bmRequestType == bmReqTypeVendorIn && req.bRequest == vendorReqReady {
+		// Accept the legacy encoding so the gadget can be upgraded before hosts.
+		if (req.bmRequestType == bmReqTypeVendorIn || req.bmRequestType == bmReqTypeLegacyIn) && req.bRequest == vendorReqReady {
 			// Prepare reply
 			reply := [8]byte{}
 			copy(reply[:4], []byte("TZSG"))

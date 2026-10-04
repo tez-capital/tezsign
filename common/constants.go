@@ -5,7 +5,7 @@ const (
 	PID = 0x0001
 
 	VendorReqReady    = 0x5A
-	bmReqTypeVendorIn = 0x81
+	bmReqTypeVendorIn = 0xC1 // IN | vendor | interface
 
 	// error codes from rpc
 	RpcKeyNotFound    uint32 = 31

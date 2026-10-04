@@ -165,7 +165,7 @@ func ResetDevice(serial string, l *slog.Logger) error {
 	return nil
 }
 
-// VendorReadyInInterface: IN | vendor | interface = 0x81; pass wIndex = interface number
+// VendorReadyInInterface: IN | vendor | interface = 0xC1; pass wIndex = interface number
 func VendorReadyInInterface(d *gousb.Device, bRequest byte, iface uint16, l *slog.Logger) (bool, error) {
 	n, buf, err := ctrlIn(l, d, bmReqTypeVendorIn, bRequest, 0, iface, 8)
 	if err != nil {

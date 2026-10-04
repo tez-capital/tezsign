@@ -5,11 +5,12 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/table"
 	"github.com/charmbracelet/x/term"
 	"github.com/tez-capital/tezsign/broker"
 	"github.com/tez-capital/tezsign/common"
@@ -55,21 +56,27 @@ func getKeysStatusJSON(ks *signerpb.KeyStatus) keyStatusJSON {
 }
 
 var (
-	// adaptive colors look good in light/dark terminals
-	borderColor = lipgloss.AdaptiveColor{Light: "#6C6CFF", Dark: "#6C6CFF"}
-	chipColor   = lipgloss.AdaptiveColor{Light: "#000000", Dark: "#FFFFFF"}
-	okColor     = lipgloss.AdaptiveColor{Light: "#006400", Dark: "#9FF29A"}
-	errColor    = lipgloss.AdaptiveColor{Light: "#8B0000", Dark: "#FF6B6B"}
+	borderColor = lipgloss.Color("#6C6CFF")
+	baseCell    = lipgloss.NewStyle().Padding(0, 1)
+	headerStyle = lipgloss.NewStyle().Bold(true)
 
-	baseCell     = lipgloss.NewStyle().Padding(0, 1)
-	chipStyle    = baseCell.MarginRight(1).Border(lipgloss.RoundedBorder()).BorderForeground(borderColor).Bold(true).Foreground(chipColor)
-	chipOkStyle  = chipStyle.Foreground(okColor)
-	chipErrStyle = chipStyle.Foreground(errColor)
+	chipStyle, chipOkStyle, chipErrStyle       lipgloss.Style
+	stateUnlocked, stateLocked, stateCorrupted lipgloss.Style
 
-	headerStyle    = lipgloss.NewStyle().Bold(true)
-	stateUnlocked  = lipgloss.NewStyle().Foreground(okColor).Bold(true)
-	stateLocked    = lipgloss.NewStyle().Foreground(errColor).Bold(true)
-	stateCorrupted = lipgloss.NewStyle().Foreground(errColor).Bold(true)
+	// Query terminal colors only when styled output is actually needed.
+	initStyles = sync.OnceFunc(func() {
+		lightDark := lipgloss.LightDark(lipgloss.HasDarkBackground(os.Stdin, os.Stdout))
+		chipColor := lightDark(lipgloss.Color("#000000"), lipgloss.Color("#FFFFFF"))
+		okColor := lightDark(lipgloss.Color("#006400"), lipgloss.Color("#9FF29A"))
+		errColor := lightDark(lipgloss.Color("#8B0000"), lipgloss.Color("#FF6B6B"))
+
+		chipStyle = baseCell.MarginRight(1).Border(lipgloss.RoundedBorder()).BorderForeground(borderColor).Bold(true).Foreground(chipColor)
+		chipOkStyle = chipStyle.Foreground(okColor)
+		chipErrStyle = chipStyle.Foreground(errColor)
+		stateUnlocked = lipgloss.NewStyle().Foreground(okColor).Bold(true)
+		stateLocked = lipgloss.NewStyle().Foreground(errColor).Bold(true)
+		stateCorrupted = stateLocked
+	})
 )
 
 // --- Bubble Tea password prompt ---
@@ -94,12 +101,12 @@ func (m passModel) Init() tea.Cmd { return textinput.Blink }
 
 func (m passModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyEnter:
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "enter":
 			m.done = true
 			return m, tea.Quit
-		case tea.KeyCtrlC, tea.KeyEsc:
+		case "ctrl+c", "esc":
 			m.aborted = true
 			return m, tea.Quit
 		}
@@ -109,11 +116,11 @@ func (m passModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m passModel) View() string {
+func (m passModel) View() tea.View {
 	if m.done || m.aborted {
-		return ""
+		return tea.NewView("")
 	}
-	return "\n" + m.ti.View() + "\n"
+	return tea.NewView("\n" + m.ti.View() + "\n")
 }
 
 func isTTY(f *os.File) bool {
@@ -197,6 +204,7 @@ func renderChips(labels []string, style lipgloss.Style, maxWidth int) string {
 }
 
 func renderAliasChips(ids []string, maxWidth int) string {
+	initStyles()
 	return renderChips(ids, chipStyle, maxWidth)
 }
 
@@ -232,6 +240,7 @@ type statusTableOpts struct {
 }
 
 func renderStatusTable(rows []statusRow, opts statusTableOpts) string {
+	initStyles()
 	// Build data rows
 	data := make([][]string, 0, len(rows))
 	for i, r := range rows {
@@ -330,7 +339,7 @@ func (m *keyPickerModel) Init() tea.Cmd { return nil }
 
 func (m *keyPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "q", "esc":
 			m.aborted = true
@@ -343,7 +352,7 @@ func (m *keyPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < len(m.rows)-1 {
 				m.cursor++
 			}
-		case " ":
+		case "space":
 			if len(m.rows) > 0 {
 				if m.selected[m.cursor] {
 					// Keep map sparse: selected keys exist, deselected keys are removed.
@@ -369,9 +378,12 @@ func (m *keyPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *keyPickerModel) View() string {
+func (m *keyPickerModel) View() tea.View {
+	v := tea.NewView("")
+	v.AltScreen = true
 	if len(m.rows) == 0 {
-		return "No keys found.\n\nPress Esc to exit."
+		v.SetContent("No keys found.\n\nPress Esc to exit.")
+		return v
 	}
 	body := renderStatusTable(m.rows, statusTableOpts{
 		Selectable: true,
@@ -380,7 +392,8 @@ func (m *keyPickerModel) View() string {
 	})
 	help := "\n↑/↓ or j/k move • space toggle • a all/none • enter confirm • esc cancel\n"
 	border := lipgloss.NewStyle().BorderForeground(borderColor)
-	return border.Render(body) + help
+	v.SetContent(border.Render(body) + help)
+	return v
 }
 
 func runKeyPicker(b *broker.Broker) (selectedIDs []string, aborted bool, err error) {
@@ -390,8 +403,9 @@ func runKeyPicker(b *broker.Broker) (selectedIDs []string, aborted bool, err err
 	}
 	rows := statusRows(st.GetKeys())
 
+	initStyles()
 	m := newKeyPickerFromRows(rows, 80)
-	res, err := tea.NewProgram(m, tea.WithAltScreen()).Run()
+	res, err := tea.NewProgram(m).Run()
 	if err != nil {
 		return nil, false, err
 	}
