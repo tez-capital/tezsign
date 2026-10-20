@@ -47,6 +47,9 @@ jobs:
 
     build-updater:
         runs-on: ubuntu-26.04
+        env:
+            # updater has no C deps; cgo off gives fully static binaries (amd64 was dynamic)
+            CGO_ENABLED: "0"
         steps:
             - uses: actions/checkout@v7
               with:
@@ -65,21 +68,21 @@ jobs:
                 GOOS: linux
                 GOARCH: arm64
               run: |
-                  go build -ldflags='-s -w -extldflags "-static"' -trimpath -o ./build/tezsign_updater_linux_arm64 ./tools/updater
+                  go build -ldflags='-s -w' -trimpath -o ./build/tezsign_updater_linux_arm64 ./tools/updater
             
             - name: Build tezsign updater (Linux amd64)
               env:
                 GOOS: linux
                 GOARCH: amd64
               run: |
-                  go build -ldflags='-s -w -extldflags "-static"' -trimpath -o ./build/tezsign_updater_linux_amd64 ./tools/updater
+                  go build -ldflags='-s -w' -trimpath -o ./build/tezsign_updater_linux_amd64 ./tools/updater
 
             - name: Build tezsign updater (macos arm64)
               env:
                 GOOS: darwin
                 GOARCH: arm64
               run: |
-                  go build -ldflags='-s -w -extldflags "-static"' -trimpath -o ./build/tezsign_updater_macos_arm64 ./tools/updater
+                  go build -ldflags='-s -w' -trimpath -o ./build/tezsign_updater_macos_arm64 ./tools/updater
 
             - name: Upload tezsign_updater artifact
               uses: actions/upload-artifact@v7
