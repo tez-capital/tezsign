@@ -179,24 +179,28 @@ func discoverTezsignDevices(logger *slog.Logger) ([]deviceCandidate, error) {
 
 	var devices []deviceCandidate
 	for _, removablePath := range paths {
-		flag, err := os.ReadFile(removablePath)
-		if err != nil || strings.TrimSpace(string(flag)) != "1" {
+		name := filepath.Base(filepath.Dir(removablePath))
+		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") ||
+			strings.HasPrefix(name, "zram") || strings.HasPrefix(name, "sr") ||
+			strings.HasPrefix(name, "nbd") || strings.HasPrefix(name, "dm-") || strings.HasPrefix(name, "md") {
 			continue
 		}
 
-		name := filepath.Base(filepath.Dir(removablePath))
-		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") {
-			continue
-		}
+		flag, _ := os.ReadFile(removablePath)
+		removable := strings.TrimSpace(string(flag)) == "1"
 
 		devicePath := filepath.Join("/dev", name)
-		sizeBytes := readBlockSizeBytes(name)
-		model := strings.TrimSpace(readSysfsValue(filepath.Join("/sys/block", name, "device/model")))
-
 		isTezsign, status := probeTezsignDevice(devicePath)
 		if !isTezsign {
 			logger.Debug("Device did not validate as TezSign", "device", devicePath, "status", status)
 		}
+		// Built-in SD slots and many USB readers report removable=0; list those only if they validate.
+		if !removable && !isTezsign {
+			continue
+		}
+
+		sizeBytes := readBlockSizeBytes(name)
+		model := strings.TrimSpace(readSysfsValue(filepath.Join("/sys/block", name, "device/model")))
 
 		devices = append(devices, deviceCandidate{
 			Name:      name,
@@ -209,7 +213,7 @@ func discoverTezsignDevices(logger *slog.Logger) ([]deviceCandidate, error) {
 	}
 
 	if len(devices) == 0 {
-		return nil, errors.New("no removable block devices detected")
+		return nil, errors.New("no removable or TezSign block devices detected")
 	}
 
 	return devices, nil
